@@ -1,64 +1,80 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './BrandsListPage.css';
-import prizentLogo from '../assets/prizent_logo.png';
-import brandLogo from '../assets/brand_logo.png';
+import './CategoriesListPage.css';
 
-const BrandsListPage: React.FC = () => {
+interface Category {
+  id: number;
+  parentCategory: string;
+  category: string;
+  subCategory: string;
+  attributes: string;
+  status: 'Active' | 'Inactive';
+}
+
+const CategoriesListPage: React.FC = () => {
   const navigate = useNavigate();
-
-  const brands = [
+  
+  const [categories] = useState<Category[]>([
     {
       id: 1,
-      name: 'ShaktiBrandz',
-      description: 'Premium everyday wear brand',
-      status: 'active',
-      logo: brandLogo
+      parentCategory: 'Topwear',
+      category: 'T-Shirt',
+      subCategory: 'Men, Women',
+      attributes: 'Size, Fit, Fabric',
+      status: 'Active'
     },
     {
       id: 2,
-      name: 'UrbanThread',
-      description: 'Modern streetwear collection',
-      status: 'inactive',
-      logo: brandLogo
+      parentCategory: 'Bottomwear',
+      category: 'Jeans',
+      subCategory: 'Men, Women',
+      attributes: 'Size, Fit, Waist',
+      status: 'Inactive'
     },
     {
       id: 3,
-      name: 'EthniqWear',
-      description: 'Traditional and ethnic clothing',
-      status: 'active',
-      logo: brandLogo
+      parentCategory: 'Outerwear',
+      category: 'Hoodie',
+      subCategory: 'Men, Women, Unisex',
+      attributes: 'Size, Fit, Fabric +1',
+      status: 'Active'
     },
     {
       id: 4,
-      name: 'FitFlex',
-      description: 'Sports and activewear brand',
-      status: 'active',
-      logo: brandLogo
+      parentCategory: 'Accessories',
+      category: 'Cap',
+      subCategory: 'Unisex',
+      attributes: 'Size, Material',
+      status: 'Active'
     },
     {
       id: 5,
-      name: 'CozyLayer',
-      description: 'Winter and outerwear essentials',
-      status: 'active',
-      logo: brandLogo
+      parentCategory: 'Footwear',
+      category: 'Sneakers',
+      subCategory: 'Men, Women',
+      attributes: 'Size, Material, Sole',
+      status: 'Active'
     },
     {
       id: 6,
-      name: 'LuxeLine',
-      description: 'Premium designer fashion line',
-      status: 'active',
-      logo: brandLogo
+      parentCategory: 'Ethnic Wear',
+      category: 'Kurta',
+      subCategory: 'Men',
+      attributes: 'Size, Fit, Fabric',
+      status: 'Active'
     }
-  ];
+  ]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(6);
 
   return (
-    <div className="brands-page">
+    <div className="categories-page">
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-content">
           <div className="logo-container">
-            <img src={prizentLogo} alt="Prizent Logo" className="logo-image" />
+            <img src={require('../assets/prizent_logo.png')} alt="Prizent Logo" className="logo-image" />
           </div>
 
           <nav className="nav-menu">
@@ -88,13 +104,13 @@ const BrandsListPage: React.FC = () => {
               </a>
 
               <div className="sub-menu">
-                <a href="/brands" className="nav-item sub-item active">
+                <a href="/brands" className="nav-item sub-item">
                   <svg width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fillRule="evenodd" clipRule="evenodd" d="M12.7711 0.175032C12.3058 0.167376 11.8847 0.354783 11.5184 0.53939C11.0301 0.785534 10.6007 1.02434 10.162 1.02498C9.72331 1.02561 9.29333 0.788834 8.80425 0.544105C8.31517 0.299375 7.72934 0.0483752 7.07136 0.263259C6.41338 0.478141 6.08729 1.02634 5.83685 1.51259C5.58641 1.99883 5.37916 2.44422 5.02462 2.70264C4.67007 2.96107 4.18211 3.02192 3.64261 3.11145C3.10312 3.20099 2.48211 3.34349 2.07607 3.90415C1.67004 4.46482 1.72892 5.09913 1.81206 5.63974C1.89521 6.18035 1.98878 6.66284 1.85382 7.08034C1.71886 7.49784 1.36078 7.83433 0.976934 8.22392C0.593093 8.61352 0.173806 9.09346 0.174806 9.78575C0.175841 10.478 0.596682 10.9571 0.981648 11.3456C1.36662 11.734 1.72573 12.0687 1.8619 12.4858C1.99807 12.9029 1.90509 13.3862 1.82351 13.927C1.74194 14.4679 1.68525 15.1025 2.09291 15.662C2.50056 16.2214 3.1224 16.3613 3.66214 16.4493C4.20189 16.5372 4.68953 16.5973 5.04482 16.8547C5.40011 17.1121 5.60924 17.5572 5.86109 18.0428C6.11294 18.5283 6.4397 19.0757 7.0983 19.2887C7.75689 19.5017 8.34215 19.2493 8.83051 19.0032C9.31888 18.757 9.74823 18.5182 10.1869 18.5176C10.6256 18.5169 11.057 18.7551 11.546 18.9998C12.0351 19.2445 12.6209 19.4942 13.2789 19.2793C13.9369 19.0644 14.2616 18.5169 14.5121 18.0306C14.7625 17.5444 14.9711 17.0983 15.3257 16.8399C15.6802 16.5815 16.1675 16.5206 16.707 16.4311C17.2465 16.3416 17.8675 16.1991 18.2735 15.6384C18.6796 15.0777 18.6207 14.4434 18.5375 13.9028C18.4544 13.3622 18.3608 12.8797 18.4958 12.4622C18.6307 12.0447 18.9888 11.7082 19.3727 11.3186C19.7565 10.929 20.1758 10.4491 20.1748 9.75679C20.1738 9.0645 19.7536 8.58547 19.3686 8.19699C18.9837 7.8085 18.6239 7.47387 18.4877 7.05676C18.3515 6.63966 18.4445 6.15634 18.5261 5.61549C18.6077 5.07464 18.6644 4.44074 18.2567 3.88125C17.849 3.32177 17.2272 3.18124 16.6875 3.09327C16.1477 3.00529 15.6601 2.9459 15.3048 2.6885C14.9495 2.43111 14.741 1.9853 14.4892 1.49979C14.2373 1.01427 13.9092 0.468155 13.2506 0.255177C13.086 0.201933 12.9262 0.177583 12.7711 0.175032ZM12.7469 0.862666C12.8429 0.863921 12.9397 0.878983 13.0392 0.911157C13.4372 1.03986 13.6392 1.35925 13.877 1.81768C14.1148 2.2761 14.356 2.85203 14.9 3.24615C15.444 3.64027 16.0667 3.69043 16.5763 3.7735C17.086 3.85655 17.4527 3.94928 17.6991 4.28737C17.9454 4.62546 17.9209 5.00245 17.8439 5.51312C17.7668 6.02379 17.6232 6.63159 17.8317 7.27026C18.0402 7.90893 18.5155 8.31576 18.879 8.68257C19.2425 9.04938 19.4845 9.33979 19.4851 9.75814C19.4858 10.1765 19.2441 10.4672 18.8817 10.835C18.5193 11.2029 18.0458 11.6108 17.8391 12.2501C17.6325 12.8893 17.7781 13.4974 17.8567 14.0079C17.9352 14.5183 17.9599 14.8955 17.7145 15.2343C17.4692 15.5731 17.1032 15.6663 16.5939 15.7509C16.0845 15.8354 15.4618 15.8866 14.9189 16.2822C14.376 16.6779 14.1364 17.255 13.8999 17.7141C13.6634 18.1732 13.4624 18.4941 13.0648 18.624C12.6672 18.7538 12.3163 18.6133 11.8545 18.3822C11.3927 18.1511 10.8587 17.8269 10.187 17.8279C9.51522 17.8289 8.98118 18.1552 8.52006 18.3876C8.05895 18.62 7.70846 18.7608 7.31047 18.6321C6.91249 18.5034 6.71112 18.1833 6.47333 17.7249C6.23553 17.2664 5.99363 16.6905 5.44962 16.2964C4.9056 15.9023 4.28293 15.8521 3.7733 15.769C3.26366 15.686 2.89693 15.5939 2.65059 15.2558C2.40425 14.9178 2.42876 14.5408 2.50579 14.0301C2.58281 13.5194 2.72641 12.911 2.5179 12.2723C2.30939 11.6336 1.83477 11.2268 1.47129 10.86C1.1078 10.4932 0.865079 10.2034 0.864472 9.78508C0.863782 9.36673 1.1055 9.07535 1.46792 8.70749C1.83035 8.33963 2.30316 7.93176 2.50981 7.29249C2.71646 6.65321 2.57215 6.04579 2.49364 5.53535C2.41514 5.0249 2.38904 4.64772 2.6344 4.30892C2.87976 3.97012 3.2457 3.87689 3.75509 3.79235C4.26448 3.70782 4.88719 3.65599 5.43006 3.26029C5.97294 2.8646 6.21326 2.28756 6.44973 1.82845C6.6862 1.36934 6.88725 1.04976 7.28486 0.919913C7.68247 0.790062 8.03401 0.929275 8.49579 1.16035C8.95758 1.39142 9.49162 1.7156 10.1634 1.71463C10.8351 1.71366 11.3685 1.38804 11.8296 1.15563C12.1754 0.981328 12.4587 0.858899 12.7469 0.862666ZM10.1741 5.90644C10.1084 5.90659 10.0442 5.92564 9.98892 5.96132C9.93367 5.99701 9.88973 6.04784 9.86231 6.10782L8.96387 8.06431L6.83429 8.31821C6.76899 8.32602 6.70728 8.35246 6.65648 8.39442C6.60567 8.43637 6.5679 8.49208 6.54763 8.55494C6.52736 8.6178 6.52545 8.68518 6.54212 8.7491C6.55878 8.81302 6.59333 8.8708 6.64167 8.9156L8.21697 10.3777L7.79873 12.4918C7.78581 12.5566 7.79163 12.6238 7.81551 12.6853C7.83939 12.7469 7.88033 12.8003 7.93348 12.8392C7.98663 12.8781 8.04977 12.9009 8.11541 12.9049C8.18105 12.9088 8.24644 12.8938 8.30385 12.8616L10.1755 11.8082L12.0471 12.8602C12.1045 12.8926 12.1699 12.9077 12.2356 12.9039C12.3012 12.9 12.3644 12.8774 12.4177 12.8385C12.4709 12.7997 12.5119 12.7463 12.5359 12.6847C12.5599 12.6232 12.5658 12.556 12.5529 12.4912L12.1347 10.3771L13.7079 8.91358C13.7559 8.86867 13.7901 8.81093 13.8064 8.74716C13.8228 8.68339 13.8208 8.61625 13.8004 8.55363C13.7801 8.49101 13.7425 8.43552 13.6918 8.3937C13.6412 8.35187 13.5797 8.32545 13.5147 8.31754L11.3857 8.06363L10.4866 6.10782C10.4592 6.04774 10.4151 5.99683 10.3597 5.96114C10.3043 5.92545 10.2399 5.90646 10.1741 5.90644ZM10.1741 7.07764L10.8409 8.52902C10.8656 8.58285 10.9036 8.62941 10.9514 8.6642C10.9992 8.69899 11.055 8.72086 11.1137 8.7277L12.693 8.91627L11.5252 10.0013C11.4821 10.0414 11.4499 10.0919 11.4318 10.148C11.4136 10.2041 11.4101 10.264 11.4214 10.3218L11.7319 11.8897L10.3438 11.1098C10.2924 11.0809 10.2344 11.0658 10.1754 11.066C10.1164 11.0661 10.0585 11.0814 10.0071 11.1105L8.61837 11.8924L8.92817 10.3232C8.93955 10.2653 8.93599 10.2055 8.91784 10.1494C8.89968 10.0932 8.86754 10.0427 8.82446 10.0026L7.65729 8.91629L9.23596 8.72839C9.29451 8.72137 9.35029 8.69936 9.39794 8.66445C9.44558 8.62954 9.4835 8.58291 9.50805 8.52903L10.1741 7.07764Z" fill="#E1E1E1" stroke="#E1E1E1" strokeWidth="0.35"/>
                   </svg>
                   <span>Brands</span>
                 </a>
-                <div onClick={() => navigate('/categories')} className="nav-item sub-item" style={{ cursor: 'pointer' }}>
+                <div onClick={() => navigate('/categories')} className="nav-item sub-item active" style={{ cursor: 'pointer' }}>
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6.09888 19.9784C7.51028 19.9796 8.87809 19.4904 9.96754 18.5947C10.662 19.1688 11.4748 19.5828 12.348 19.8071C13.2212 20.0314 14.1333 20.0605 15.0191 19.8923C15.9049 19.7242 16.7426 19.3629 17.4723 18.8342C18.2021 18.3056 18.8059 17.6227 19.2407 16.8342C19.6755 16.0457 19.9306 15.1712 19.9877 14.2729C20.0448 13.3747 19.9025 12.475 19.5711 11.638C19.2396 10.8009 18.7271 10.0473 18.0701 9.43084C17.4131 8.81438 16.6279 8.35029 15.7705 8.07172C16.0819 7.15187 16.1694 6.17121 16.0257 5.21092C15.882 4.25062 15.5112 3.3383 14.9441 2.54945C14.377 1.7606 13.6298 1.11791 12.7644 0.674574C11.899 0.231237 10.9403 0 9.96754 0C8.99482 0 8.03609 0.231237 7.17069 0.674574C6.30529 1.11791 5.55811 1.7606 4.99098 2.54945C4.42386 3.3383 4.05309 4.25062 3.90938 5.21092C3.76567 6.17121 3.85314 7.15187 4.16455 8.07172C2.79082 8.53506 1.62631 9.46983 0.878194 10.7097C0.130082 11.9496 -0.153111 13.4142 0.078997 14.843C0.311105 16.2717 1.04346 17.5719 2.14577 18.5123C3.24808 19.4526 4.64886 19.9722 6.09888 19.9784ZM18.0272 13.8642C18.0272 14.9737 17.5857 16.0378 16.7997 16.8223C16.0137 17.6069 14.9477 18.0476 13.8362 18.0476C12.7247 18.0476 11.6587 17.6069 10.8727 16.8223C10.0867 16.0378 9.64515 14.9737 9.64515 13.8642C9.64394 13.3117 9.75356 12.7646 9.96754 12.2552C10.9163 12.2532 11.8516 12.0312 12.6998 11.6068C13.5479 11.1824 14.2857 10.5671 14.8549 9.80946C15.7606 10.036 16.5646 10.558 17.1393 11.2925C17.714 12.0271 18.0265 12.9322 18.0272 13.8642ZM9.96754 1.95745C10.7964 1.95745 11.6067 2.20281 12.296 2.66249C12.9852 3.12217 13.5223 3.77554 13.8396 4.53996C14.1568 5.30439 14.2398 6.14554 14.0781 6.95705C13.9163 7.76856 13.5172 8.51397 12.9311 9.09904C12.3449 9.6841 11.5982 10.0825 10.7852 10.244C9.97219 10.4054 9.12951 10.3225 8.36369 10.0059C7.59788 9.68926 6.94333 9.15306 6.48281 8.46509C6.02229 7.77713 5.77649 6.9683 5.77649 6.1409C5.77649 5.03138 6.21804 3.9673 7.00402 3.18276C7.78999 2.39821 8.856 1.95745 9.96754 1.95745ZM5.08013 9.80946C5.82688 10.799 6.85646 11.5395 8.03321 11.9334C7.74096 12.7953 7.64716 13.7119 7.75879 14.6151C7.87042 15.5182 8.18461 16.3846 8.67798 17.1498C8.18724 17.539 7.61529 17.8134 7.00424 17.9527C6.3932 18.0921 5.75863 18.0928 5.14725 17.9549C4.53587 17.8171 3.96326 17.5441 3.47158 17.156C2.9799 16.768 2.58167 16.2749 2.30621 15.7129C2.03075 15.1509 1.88508 14.5344 1.87992 13.9087C1.87477 13.2831 2.01026 12.6643 2.27642 12.0979C2.54258 11.5314 2.93263 11.0318 3.41785 10.6358C3.90307 10.2397 4.47111 9.95735 5.08013 9.80946Z" fill="#E1E1E1"/>
                   </svg>
@@ -138,9 +154,10 @@ const BrandsListPage: React.FC = () => {
 
       {/* Main Content */}
       <main className="main-content">
-        {/* Header */}
-        <header className="page-header">
-          <h2 className="breadcrumb">Configuration &gt; Brands</h2>
+        {/* Top Header */}
+        <header className="page-top-header">
+          <h1 className="page-breadcrumb">Configuration &gt; Categories</h1>
+          
           <div className="header-actions">
             <button className="icon-btn">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -164,55 +181,56 @@ const BrandsListPage: React.FC = () => {
           </div>
         </header>
 
-        {/* Page Title */}
-        <div className="page-title-section">
-          <div>
-            <h1 className="page-title">Brands List</h1>
-            <p className="page-subtitle">{brands.length} Total number of Items</p>
+        <div className="content-separator"></div>
+
+        {/* Categories Header */}
+        <div className="categories-header">
+          <div className="header-text">
+            <h2 className="categories-title">Categories List</h2>
+            <p className="categories-count">8 Total number to items</p>
           </div>
-          <a href="/add-brand" className="add-brand-btn">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          
+          <button className="add-category-btn" onClick={() => navigate('/add-category')}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M5 0V10M0 5H10" stroke="#FFFFFF" strokeWidth="2"/>
             </svg>
-            Add New Brand
-          </a>
+            ADD PRODUCT
+          </button>
         </div>
 
-        {/* Brands Table */}
-        <div className="brands-table-container">
-          <table className="brands-table">
+        {/* Categories Table */}
+        <div className="categories-table-container">
+          <table className="categories-table">
             <thead>
               <tr>
-                <th>Logo</th>
-                <th>Brand Name</th>
-                <th>Description</th>
+                <th>Parent Category</th>
+                <th>Category</th>
+                <th>Sub-Category</th>
+                <th>Attributes</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {brands.map((brand) => (
-                <tr key={brand.id}>
+              {categories.map((category) => (
+                <tr key={category.id}>
+                  <td>{category.parentCategory}</td>
+                  <td>{category.category}</td>
+                  <td>{category.subCategory}</td>
+                  <td>{category.attributes}</td>
                   <td>
-                    <div className="brand-logo">
-                      <img src={brand.logo} alt={brand.name} />
-                    </div>
-                  </td>
-                  <td className="brand-name">{brand.name}</td>
-                  <td className="brand-description">{brand.description}</td>
-                  <td>
-                    <span className={`status-badge ${brand.status}`}>
-                      {brand.status === 'active' ? 'Active' : 'Inactive'}
+                    <span className={`status-badge ${category.status.toLowerCase()}`}>
+                      {category.status}
                     </span>
                   </td>
                   <td>
-                    <div className="action-buttons">
-                      <button className="action-btn edit-btn">
+                    <div className="action-icons">
+                      <button className="action-btn">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565"/>
                         </svg>
                       </button>
-                      <button className="action-btn delete-btn">
+                      <button className="action-btn">
                         <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
                         </svg>
@@ -226,21 +244,24 @@ const BrandsListPage: React.FC = () => {
 
           {/* Pagination */}
           <div className="pagination">
-            <div className="pagination-center">
-              <button className="page-btn">&lt;</button>
-              <button className="page-btn active">1</button>
-              <button className="page-btn">2</button>
-              <button className="page-btn">3</button>
-              <button className="page-btn">4</button>
-              <button className="page-btn">5</button>
-              <span className="page-dots">......</span>
-              <button className="page-btn">&gt;</button>
-            </div>
-            <div className="pagination-right">
+            <div className="pagination-info">
               <span>Show 6</span>
-              <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                <path d="M0 0L5 5L10 0" fill="#454545"/>
+              <svg width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0L5 5L10 0H0Z" fill="#454545"/>
               </svg>
+            </div>
+
+            <div className="pagination-controls">
+              <button className="page-arrow" disabled={currentPage === 1}>
+                &lt;
+              </button>
+              <button className="page-number active">1</button>
+              <button className="page-number">2</button>
+              <button className="page-number">3</button>
+              <button className="page-number">4</button>
+              <button className="page-number">5</button>
+              <span className="page-ellipsis">......</span>
+              <button className="page-arrow">&gt;</button>
             </div>
           </div>
         </div>
@@ -249,4 +270,4 @@ const BrandsListPage: React.FC = () => {
   );
 };
 
-export default BrandsListPage;
+export default CategoriesListPage;
