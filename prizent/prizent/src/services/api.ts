@@ -14,11 +14,20 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     console.log('📤 Axios Request Interceptor:', config.method?.toUpperCase(), config.url);
-    const token = localStorage.getItem('token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log('🔑 Token added to request');
+    
+    // Don't add token to login/register endpoints
+    const isAuthEndpoint = config.url?.includes('/auth/login') || config.url?.includes('/auth/register');
+    
+    if (!isAuthEndpoint) {
+      const token = localStorage.getItem('token');
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('🔑 Token added to request');
+      }
+    } else {
+      console.log('⚠️ Skipping token for auth endpoint');
     }
+    
     return config;
   },
   (error: AxiosError) => {

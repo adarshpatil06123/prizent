@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MarketplacesListPage.css";
 
@@ -9,10 +9,108 @@ const marketplaces = [
   { name: "Ajio", mapping: "Mapped", costSlab: "0–799, 800–1499", commission: "20%", status: "Active" },
   { name: "Meesho", mapping: "Mapped", costSlab: "0–499", commission: "10%", status: "Active" },
   { name: "Nykaa Fashion", mapping: "Mapped", costSlab: "1500–2999", commission: "25%", status: "Active" },
+  { name: "Snapdeal", mapping: "Partial", costSlab: "0–599, 600–1200", commission: "12%", status: "Active" },
+  { name: "Shopclues", mapping: "Mapped", costSlab: "0–399, 400–999", commission: "8%", status: "Inactive" },
+  { name: "Tata Cliq", mapping: "Mapped", costSlab: "1000–2999, 3000+", commission: "19%", status: "Active" },
+  { name: "Pepperfry", mapping: "Partial", costSlab: "2000–5000, 5000+", commission: "17%", status: "Active" },
+  { name: "FirstCry", mapping: "Mapped", costSlab: "0–499, 500–1499", commission: "14%", status: "Active" },
+  { name: "Limeroad", mapping: "Partial", costSlab: "0–999, 1000–1999", commission: "16%", status: "Inactive" },
+  { name: "Shopsy", mapping: "Mapped", costSlab: "0–299, 300–799", commission: "11%", status: "Active" },
+  { name: "Jiomart", mapping: "Mapped", costSlab: "0–699, 700–1999", commission: "13%", status: "Active" },
+  { name: "PaytmMall", mapping: "Partial", costSlab: "0–999, 1000–2499", commission: "15%", status: "Inactive" },
+  { name: "Urban Ladder", mapping: "Mapped", costSlab: "3000–10000, 10000+", commission: "21%", status: "Active" },
+  { name: "Zivame", mapping: "Mapped", costSlab: "500–1499, 1500+", commission: "23%", status: "Active" },
+  { name: "Bewakoof", mapping: "Partial", costSlab: "0–699, 700–1299", commission: "17%", status: "Active" },
 ];
 
 const MarketplacesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  // Calculate pagination
+  const totalPages = Math.ceil(marketplaces.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentMarketplaces = marketplaces.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      // Show all pages if total pages are less than or equal to max visible
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(
+          <span
+            key={i}
+            className={currentPage === i ? "page-current" : "page"}
+            onClick={() => handlePageChange(i)}
+            style={{ cursor: 'pointer' }}
+          >
+            {i}
+          </span>
+        );
+      }
+    } else {
+      // Show first page
+      pageNumbers.push(
+        <span
+          key={1}
+          className={currentPage === 1 ? "page-current" : "page"}
+          onClick={() => handlePageChange(1)}
+          style={{ cursor: 'pointer' }}
+        >
+          1
+        </span>
+      );
+
+      if (currentPage > 3) {
+        pageNumbers.push(<span key="dots1" className="page-dots">......</span>);
+      }
+
+      // Show pages around current page
+      const startPage = Math.max(2, currentPage - 1);
+      const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(
+          <span
+            key={i}
+            className={currentPage === i ? "page-current" : "page"}
+            onClick={() => handlePageChange(i)}
+            style={{ cursor: 'pointer' }}
+          >
+            {i}
+          </span>
+        );
+      }
+
+      if (currentPage < totalPages - 2) {
+        pageNumbers.push(<span key="dots2" className="page-dots">......</span>);
+      }
+
+      // Show last page
+      pageNumbers.push(
+        <span
+          key={totalPages}
+          className={currentPage === totalPages ? "page-current" : "page"}
+          onClick={() => handlePageChange(totalPages)}
+          style={{ cursor: 'pointer' }}
+        >
+          {totalPages}
+        </span>
+      );
+    }
+
+    return pageNumbers;
+  };
 
   return (
     <div className="marketplaces-bg">
@@ -46,7 +144,7 @@ const MarketplacesListPage: React.FC = () => {
         <div className="marketplaces-toolbar">
           <div className="marketplaces-title-block">
             <h2 className="marketplace-list-title">Marketplace List</h2>
-            <span className="marketplaces-list-count">8 Total number to items</span>
+            <span className="marketplaces-list-count">{marketplaces.length} Total number to items</span>
           </div>
 
           <button className="add-marketplace-btn" onClick={() => navigate('/marketplaces/add')}>
@@ -68,7 +166,7 @@ const MarketplacesListPage: React.FC = () => {
               <div>Status</div>
               <div>Actions</div>
             </div>
-            {marketplaces.map((m, idx) => (
+            {currentMarketplaces.map((m, idx) => (
               <div className="marketplaces-table-row" key={idx}>
                 <div>{m.name}</div>
                 <div>{m.mapping}</div>
@@ -95,20 +193,27 @@ const MarketplacesListPage: React.FC = () => {
 
           <div className="pagination">
             <div className="show-6">
-              Show 6
+              Show {itemsPerPage}
               <svg width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <div className="page-numbers">
-              <span className="page-prev">&lt;</span>
-              <span className="page-current">1</span>
-              <span className="page">2</span>
-              <span className="page">3</span>
-              <span className="page">4</span>
-              <span className="page">5</span>
-              <span className="page-dots">......</span>
-              <span className="page-next">&gt;</span>
+              <span 
+                className="page-prev" 
+                onClick={() => handlePageChange(currentPage - 1)}
+                style={{ cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                &lt;
+              </span>
+              {renderPageNumbers()}
+              <span 
+                className="page-next" 
+                onClick={() => handlePageChange(currentPage + 1)}
+                style={{ cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                &gt;
+              </span>
             </div>
           </div>
         </div>
