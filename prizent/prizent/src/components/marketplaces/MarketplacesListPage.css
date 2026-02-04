@@ -4,7 +4,10 @@
   max-width: 100vw;
   min-height: 100vh;
   max-height: 100vh;
-  background: transparent;
+  background: url('../../assets/artistic-blurry-colorful-wallpaper-background.jpeg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: flex;
   font-family: 'Murecho', sans-serif;
   overflow: hidden;
