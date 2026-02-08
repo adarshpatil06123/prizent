@@ -1,42 +1,234 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './CustomFieldsPage.css';
+import {
+  createCustomField,
+  getCustomFields,
+  updateCustomField,
+  deleteCustomField,
+  toggleCustomField,
+  CustomFieldResponse
+} from '../services/customFieldService';
 
 const CustomFieldsPage: React.FC = () => {
+  // Form state
   const [fieldName, setFieldName] = useState('');
-  const [fieldType, setFieldType] = useState('Text');
+  const [fieldType, setFieldType] = useState('text');
   const [fieldRequired, setFieldRequired] = useState(false);
-  const [enableField, setEnableField] = useState(false);
+  const [enableField, setEnableField] = useState(true);
   const [applyToProducts, setApplyToProducts] = useState(false);
   const [applyToCategories, setApplyToCategories] = useState(false);
   const [applyToMarketplaces, setApplyToMarketplaces] = useState(false);
 
-  // Sample data for existing fields
-  const existingFields = [
-    {
-      id: 1,
-      name: 'Material',
-      type: 'Text',
-      required: 'No',
-      applyTo: 'Products',
-      status: 'Active'
-    },
-    {
-      id: 2,
-      name: 'Material',
-      type: 'Text',
-      required: 'No',
-      applyTo: 'Products',
-      status: 'Inactive'
-    },
-    {
-      id: 3,
-      name: 'Material',
-      type: 'Text',
-      required: 'No',
-      applyTo: 'Products',
-      status: 'Active'
+  // Data state
+  const [existingFields, setExistingFields] = useState<CustomFieldResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Edit mode state
+  const [editingField, setEditingField] = useState<CustomFieldResponse | null>(null);
+
+  // Fetch existing custom fields on component mount
+  useEffect(() => {
+    fetchCustomFields();
+  }, []);
+
+  // Clear messages after 5 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(null), 5000);
+      return () => clearTimeout(timer);
     }
-  ];
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  const fetchCustomFields = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Fetching custom fields...');
+      const fields = await getCustomFields();
+      console.log('Custom fields fetched:', fields);
+      setExistingFields(fields);
+      if (fields.length === 0) {
+        console.log('No custom fields found');
+      }
+    } catch (err: any) {
+      console.error('Error fetching custom fields:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load custom fields';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFieldName('');
+    setFieldType('text');
+    setFieldRequired(false);
+    setEnableField(true);
+    setApplyToProducts(false);
+    setApplyToCategories(false);
+    setApplyToMarketplaces(false);
+    setEditingField(null);
+  };
+
+  const getSelectedModules = (): string[] => {
+    const modules: string[] = [];
+    if (applyToProducts) modules.push('p');
+    if (applyToCategories) modules.push('c');
+    if (applyToMarketplaces) modules.push('m');
+    return modules;
+  };
+
+  const handleAddField = async () => {
+    try {
+      // Validation
+      if (!fieldName.trim()) {
+        setError('Field name is required');
+        return;
+      }
+
+      const selectedModules = getSelectedModules();
+      if (selectedModules.length === 0) {
+        setError('Please select at least one module (Products, Categories, or Marketplaces)');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // Create custom field for each selected module
+      const promises = selectedModules.map(module =>
+        createCustomField({
+          name: fieldName,
+          fieldType: fieldType as any,
+          module: module as any,
+          required: fieldRequired,
+          enabled: enableField
+        })
+      );
+
+      await Promise.all(promises);
+      
+      setSuccessMessage(`Custom field "${fieldName}" created successfully for ${selectedModules.length} module(s)`);
+      resetForm();
+      await fetchCustomFields();
+    } catch (err: any) {
+      console.error('Error creating custom field:', err);
+      setError(err.response?.data?.message || 'Failed to create custom field');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditField = (field: CustomFieldResponse) => {
+    setEditingField(field);
+    setFieldName(field.name);
+    setFieldType(field.fieldType);
+    setFieldRequired(field.required);
+    setEnableField(field.enabled);
+    
+    // Set the module checkboxes based on the field's module
+    setApplyToProducts(field.module === 'p');
+    setApplyToCategories(field.module === 'c');
+    setApplyToMarketplaces(field.module === 'm');
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleUpdateField = async () => {
+    if (!editingField) return;
+
+    try {
+      if (!fieldName.trim()) {
+        setError('Field name is required');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      await updateCustomField(editingField.id, {
+        name: fieldName,
+        fieldType: fieldType as any,
+        required: fieldRequired
+      });
+
+      setSuccessMessage(`Custom field "${fieldName}" updated successfully`);
+      resetForm();
+      await fetchCustomFields();
+    } catch (err: any) {
+      console.error('Error updating custom field:', err);
+      setError(err.response?.data?.message || 'Failed to update custom field');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteField = async (fieldId: number, fieldName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the custom field "${fieldName}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await deleteCustomField(fieldId);
+      setSuccessMessage(`Custom field "${fieldName}" deleted successfully`);
+      await fetchCustomFields();
+    } catch (err: any) {
+      console.error('Error deleting custom field:', err);
+      setError(err.response?.data?.message || 'Failed to delete custom field');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (fieldId: number, currentStatus: boolean, fieldName: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await toggleCustomField(fieldId, !currentStatus);
+      setSuccessMessage(`Custom field "${fieldName}" ${!currentStatus ? 'enabled' : 'disabled'} successfully`);
+      await fetchCustomFields();
+    } catch (err: any) {
+      console.error('Error toggling custom field:', err);
+      setError(err.response?.data?.message || 'Failed to toggle custom field status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getModuleName = (moduleCode: string): string => {
+    const moduleMap: { [key: string]: string } = {
+      'p': 'Products',
+      'c': 'Categories',
+      'm': 'Marketplaces',
+      'b': 'Brands'
+    };
+    return moduleMap[moduleCode] || moduleCode;
+  };
+
+  const getFieldTypeName = (type: string): string => {
+    const typeMap: { [key: string]: string } = {
+      'text': 'Text',
+      'numeric': 'Number',
+      'dropdown': 'Dropdown',
+      'date': 'Date',
+      'file': 'File'
+    };
+    return typeMap[type] || type;
+  };
 
   return (
     <div className="custom-fields-page">
@@ -66,13 +258,27 @@ const CustomFieldsPage: React.FC = () => {
         </div>
       </header>
 
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="alert alert-success">
+          ✓ {successMessage}
+        </div>
+      )}
+      {error && (
+        <div className="alert alert-error">
+          ✗ {error}
+        </div>
+      )}
+
       {/* Main Content Layout */}
       <div className="content-wrapper">
         {/* Top Section */}
         <div className="top-section">
           {/* Create Custom Field Card */}
           <div className="create-field-card">
-            <h3 className="section-title">Create Custom Field</h3>
+            <h3 className="section-title">
+              {editingField ? 'Edit Custom Field' : 'Create Custom Field'}
+            </h3>
             
             <div className="field-inputs-row">
               <input
@@ -89,9 +295,12 @@ const CustomFieldsPage: React.FC = () => {
                   onChange={(e) => setFieldType(e.target.value)}
                   className="field-select"
                 >
-                  <option value="Text">field type</option>
-                  <option value="Number">Number</option>
-                  <option value="Date">Date</option>
+                  <option value="">Select field type</option>
+                  <option value="text">Text</option>
+                  <option value="numeric">Number</option>
+                  <option value="dropdown">Dropdown</option>
+                  <option value="date">Date</option>
+                  <option value="file">File</option>
                 </select>
               </div>
             </div>
@@ -127,6 +336,7 @@ const CustomFieldsPage: React.FC = () => {
                   type="checkbox"
                   checked={applyToProducts}
                   onChange={(e) => setApplyToProducts(e.target.checked)}
+                  disabled={editingField !== null}
                 />
                 <span>Products</span>
               </label>
@@ -136,6 +346,7 @@ const CustomFieldsPage: React.FC = () => {
                   type="checkbox"
                   checked={applyToCategories}
                   onChange={(e) => setApplyToCategories(e.target.checked)}
+                  disabled={editingField !== null}
                 />
                 <span>Categories</span>
               </label>
@@ -145,63 +356,119 @@ const CustomFieldsPage: React.FC = () => {
                   type="checkbox"
                   checked={applyToMarketplaces}
                   onChange={(e) => setApplyToMarketplaces(e.target.checked)}
+                  disabled={editingField !== null}
                 />
                 <span>Marketplaces</span>
               </label>
             </div>
+            {editingField && (
+              <p className="info-text">
+                <small>Note: Module cannot be changed when editing</small>
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Add Field Button */}
-        <button className="add-field-btn">Add Field</button>
+        {/* Add/Update Field Button */}
+        <div className="button-row">
+          {editingField ? (
+            <>
+              <button 
+                className="add-field-btn" 
+                onClick={handleUpdateField}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Update Field'}
+              </button>
+              <button 
+                className="cancel-btn" 
+                onClick={resetForm}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button 
+              className="add-field-btn" 
+              onClick={handleAddField}
+              disabled={loading}
+            >
+              {loading ? 'Adding...' : 'Add Field'}
+            </button>
+          )}
+        </div>
 
         {/* Previously Added Fields Section */}
         <div className="previous-fields-section">
           <h3 className="section-title">Previously added custom fields</h3>
           
-          <div className="fields-table-container">
-            <table className="fields-table">
-              <thead>
-                <tr>
-                  <th>Field Name</th>
-                  <th>Field Type</th>
-                  <th>Required</th>
-                  <th>Apply to</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {existingFields.map((field) => (
-                  <tr key={field.id}>
-                    <td>{field.name}</td>
-                    <td>{field.type}</td>
-                    <td>{field.required}</td>
-                    <td>{field.applyTo}</td>
-                    <td>
-                      <span className={`status-badge ${field.status.toLowerCase()}`}>
-                        {field.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="action-buttons">
-                        <button className="action-btn edit-btn">
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565"/>
-                          </svg>
-                        </button>
-                        <button className="action-btn delete-btn">
-                          <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
+          {loading && existingFields.length === 0 ? (
+            <div className="loading-state">Loading custom fields...</div>
+          ) : existingFields.length === 0 ? (
+            <div className="empty-state">
+              No custom fields created yet. Create your first custom field above.
+            </div>
+          ) : (
+            <div className="fields-table-container">
+              <table className="fields-table">
+                <thead>
+                  <tr>
+                    <th>Field Name</th>
+                    <th>Field Type</th>
+                    <th>Required</th>
+                    <th>Apply to</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {existingFields.map((field) => (
+                    <tr key={field.id}>
+                      <td>{field.name}</td>
+                      <td>{getFieldTypeName(field.fieldType)}</td>
+                      <td>{field.required ? 'Yes' : 'No'}</td>
+                      <td>{getModuleName(field.module)}</td>
+                      <td>
+                        <button
+                          className={`status-badge ${field.enabled ? 'active' : 'inactive'}`}
+                          onClick={() => handleToggleStatus(field.id, field.enabled, field.name)}
+                          disabled={loading}
+                          title={`Click to ${field.enabled ? 'disable' : 'enable'}`}
+                        >
+                          {field.enabled ? 'Active' : 'Inactive'}
+                        </button>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-btn edit-btn"
+                            onClick={() => handleEditField(field)}
+                            disabled={loading}
+                            title="Edit custom field"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565"/>
+                            </svg>
+                          </button>
+                          <button 
+                            className="action-btn delete-btn"
+                            onClick={() => handleDeleteField(field.id, field.name)}
+                            disabled={loading}
+                            title="Delete custom field"
+                          >
+                            <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

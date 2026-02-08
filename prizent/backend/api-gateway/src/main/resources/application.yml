@@ -45,6 +45,12 @@ spring:
             - Path=/api/admin/categories/**
           filters:
             - PreserveHostHeader
+        - id: admin-service-custom-fields
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/admin/custom-fields/**
+          filters:
+            - PreserveHostHeader
         - id: admin-service-attributes
           uri: http://localhost:8082
           predicates:
