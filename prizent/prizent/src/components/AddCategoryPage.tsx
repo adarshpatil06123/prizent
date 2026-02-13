@@ -1,18 +1,57 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AddCategoryPage.css';
-import prizentLogo from '../assets/prizent_logo.png';
+import { useCategories } from '../contexts/CategoryContext';
+import { Category } from '../services/categoryService';
 
 const AddCategoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { categories, createCategory, loading } = useCategories();
   const [categoryName, setCategoryName] = useState('');
+  const [categoryType, setCategoryType] = useState('');
   const [parentCategory, setParentCategory] = useState('');
-  const [enableCategory, setEnableCategory] = useState(false);
+  const [enableCategory, setEnableCategory] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
-  const handleSave = () => {
-    console.log({ categoryName, parentCategory, enableCategory });
-    // Add save logic here
-    navigate('/categories');
+  const handleSave = async () => {
+    if (!categoryName.trim()) {
+      setValidationError('Category name is required');
+      return;
+    }
+    
+    if (!categoryType) {
+      setValidationError('Category type is required');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setValidationError('');
+      
+      // Determine parent ID based on category type
+      let parentId = null;
+      if (categoryType === 'Category' || categoryType === 'Sub-category') {
+        if (!parentCategory) {
+          setValidationError(`Parent category is required for ${categoryType}`);
+          setSaving(false);
+          return;
+        }
+        parentId = parseInt(parentCategory);
+      }
+      
+      // CategoryContext will automatically refresh all components
+      await createCategory(categoryName.trim(), parentId);
+      console.log('Category created successfully via context');
+      
+      // Navigate immediately - context handles the refresh
+      navigate('/categories');
+    } catch (err: any) {
+      setValidationError(err.response?.data?.message || 'Failed to create category');
+      console.error('Error creating category:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -59,6 +98,11 @@ const AddCategoryPage: React.FC = () => {
         {/* Category Details Section */}
         <section className="form-section">
           <h3 className="section-title">Category Details</h3>
+          {validationError && (
+            <div style={{ color: 'red', padding: '0.5rem', marginBottom: '1rem', backgroundColor: '#fee', borderRadius: '4px' }}>
+              {validationError}
+            </div>
+          )}
           <div className="form-container">
             <input
               type="text"
@@ -67,19 +111,63 @@ const AddCategoryPage: React.FC = () => {
               className="form-input"
               value={categoryName}
               onChange={(e) => setCategoryName(e.target.value)}
+              disabled={saving}
             />
             <select
-              name="parentCategory"
+              name="categoryType"
               className="form-select"
-              value={parentCategory}
-              onChange={(e) => setParentCategory(e.target.value)}
+              value={categoryType}
+              onChange={(e) => setCategoryType(e.target.value)}
+              disabled={saving}
             >
-              <option value="">Parent Category</option>
-              <option value="category-type">category type</option>
-              <option value="parent-category">Parent category</option>
-              <option value="category">Category</option>
-              <option value="sub-category">Sub-category</option>
+              <option value="">Select Category Type</option>
+              <option value="Parent category">Parent category</option>
+              <option value="Category">Category</option>
+              <option value="Sub-category">Sub-category</option>
             </select>
+            {(categoryType === 'Category' || categoryType === 'Sub-category') && (
+              <select
+                name="parentCategory"
+                className="form-select"
+                value={parentCategory}
+                onChange={(e) => setParentCategory(e.target.value)}
+                disabled={saving || loading}
+              >
+                <option value="">Select Parent Category</option>
+                {(() => {
+                  // Filter categories based on the selected category type
+                  let availableParents: Category[] = [];
+                  
+                  if (categoryType === 'Category') {
+                    // For "Category": Only show root categories (no parent)
+                    availableParents = categories.filter(cat => 
+                      cat.parentCategoryId === null && 
+                      cat.enabled && 
+                      // Filter out test/invalid categories
+                      !['adda', 'test', 'TO', 'top'].includes(cat.name.toLowerCase())
+                    );
+                  } else if (categoryType === 'Sub-category') {
+                    // For "Sub-category": Show Level 1 categories (has parent but can have children)
+                    const rootCategoryIds = new Set(
+                      categories.filter(cat => cat.parentCategoryId === null).map(cat => cat.id)
+                    );
+                    availableParents = categories.filter(cat => 
+                      cat.parentCategoryId !== null && 
+                      rootCategoryIds.has(cat.parentCategoryId) &&
+                      cat.enabled &&
+                      // Filter out test/invalid categories  
+                      !['adda', 'test', 'TO', 'top'].includes(cat.name.toLowerCase())
+                    );
+                  }
+                  
+                  return availableParents.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ));
+                })()}
+              </select>
+            )}
             <div className="checkbox-container">
               <input
                 type="checkbox"
@@ -87,6 +175,7 @@ const AddCategoryPage: React.FC = () => {
                 name="enableCategory"
                 checked={enableCategory}
                 onChange={(e) => setEnableCategory(e.target.checked)}
+                disabled={saving}
               />
               <label htmlFor="enableCategory">Enable category</label>
             </div>
@@ -95,11 +184,11 @@ const AddCategoryPage: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="form-actions">
-          <button className="cancel-btn" onClick={handleCancel}>
-            Cancle
+          <button className="cancel-btn" onClick={handleCancel} disabled={saving}>
+            Cancel
           </button>
-          <button className="save-btn" onClick={handleSave}>
-            SAVE
+          <button className="save-btn" onClick={handleSave} disabled={saving || !categoryName.trim()}>
+            {saving ? 'SAVING...' : 'SAVE'}
           </button>
         </div>
       </main>

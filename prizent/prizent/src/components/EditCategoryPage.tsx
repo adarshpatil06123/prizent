@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useCategories } from '../hooks/useCategories';
+import { useCategories } from '../contexts/CategoryContext';
 import './AddCategoryPage.css'; // Reusing the same styles
 
 const EditCategoryPage: React.FC = () => {

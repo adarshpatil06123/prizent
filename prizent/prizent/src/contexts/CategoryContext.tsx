@@ -1,7 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import categoryService, { Category, CategoryTreeNode, UpdateCategoryRequest } from '../services/categoryService';
 
-export const useCategories = () => {
+interface CategoryContextType {
+  categories: Category[];
+  categoryTree: CategoryTreeNode[];
+  loading: boolean;
+  error: string | null;
+  fetchCategories: () => Promise<void>;
+  fetchCategoryTree: () => Promise<void>;
+  createCategory: (name: string, parentCategoryId: number | null) => Promise<any>;
+  updateCategory: (id: number, data: UpdateCategoryRequest) => Promise<any>;
+  deleteCategory: (id: number) => Promise<any>;
+  getCategoryById: (id: number) => Category | undefined;
+  toggleCategoryStatus: (id: number) => Promise<void>;
+  categoriesCount: number;
+  refreshCategories: () => Promise<void>;
+}
+
+const CategoryContext = createContext<CategoryContextType | undefined>(undefined);
+
+interface CategoryProviderProps {
+  children: ReactNode;
+}
+
+export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -11,9 +33,11 @@ export const useCategories = () => {
     setLoading(true);
     setError(null);
     try {
+      console.log('CategoryContext: Fetching categories...');
       const response = await categoryService.getAllCategories();
       if (response.success && response.categories) {
         setCategories(response.categories);
+        console.log('CategoryContext: Categories updated:', response.categories.length, 'categories');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch categories');
@@ -43,9 +67,12 @@ export const useCategories = () => {
     setLoading(true);
     setError(null);
     try {
+      console.log('CategoryContext: Creating category:', name, 'parent:', parentCategoryId);
       const response = await categoryService.createCategory({ name, parentCategoryId });
       if (response.success) {
-        await fetchCategories(); // Refresh the list
+        console.log('CategoryContext: Category created successfully, refreshing...');
+        await fetchCategories(); // Refresh the shared state
+        await fetchCategoryTree(); // Also refresh tree
         return response;
       }
       throw new Error(response.message);
@@ -56,7 +83,7 @@ export const useCategories = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchCategories]);
+  }, [fetchCategories, fetchCategoryTree]);
 
   const updateCategory = useCallback(async (id: number, data: UpdateCategoryRequest) => {
     setLoading(true);
@@ -64,7 +91,8 @@ export const useCategories = () => {
     try {
       const response = await categoryService.updateCategory(id, data);
       if (response.success) {
-        await fetchCategories(); // Refresh the list
+        await fetchCategories(); // Refresh the shared state
+        await fetchCategoryTree();
         return response;
       }
       throw new Error(response.message);
@@ -75,7 +103,7 @@ export const useCategories = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchCategories]);
+  }, [fetchCategories, fetchCategoryTree]);
 
   const deleteCategory = useCallback(async (id: number) => {
     setLoading(true);
@@ -83,7 +111,8 @@ export const useCategories = () => {
     try {
       const response = await categoryService.deleteCategory(id);
       if (response.success) {
-        await fetchCategories(); // Refresh the list
+        await fetchCategories(); // Refresh the shared state
+        await fetchCategoryTree();
         return response;
       }
       throw new Error(response.message);
@@ -94,7 +123,7 @@ export const useCategories = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchCategories]);
+  }, [fetchCategories, fetchCategoryTree]);
 
   const getCategoryById = useCallback((id: number): Category | undefined => {
     return categories.find(category => category.id === id);
@@ -111,7 +140,7 @@ export const useCategories = () => {
       } else {
         await categoryService.enableCategory(id);
       }
-      await fetchCategories(); // Refresh the list
+      await fetchCategories(); // Refresh the shared state
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to toggle category status');
       console.error('Error toggling category status:', err);
@@ -121,12 +150,18 @@ export const useCategories = () => {
     }
   }, [getCategoryById, fetchCategories]);
 
-  // Auto-fetch categories when hook is first used
+  const refreshCategories = useCallback(async () => {
+    await fetchCategories();
+    await fetchCategoryTree();
+  }, [fetchCategories, fetchCategoryTree]);
+
+  // Auto-fetch categories when context is initialized
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchCategoryTree();
+  }, [fetchCategories, fetchCategoryTree]);
 
-  return {
+  const contextValue: CategoryContextType = {
     categories,
     categoryTree,
     loading,
@@ -138,8 +173,23 @@ export const useCategories = () => {
     deleteCategory,
     getCategoryById,
     toggleCategoryStatus,
+    refreshCategories,
     categoriesCount: categories.length
   };
+
+  return (
+    <CategoryContext.Provider value={contextValue}>
+      {children}
+    </CategoryContext.Provider>
+  );
 };
 
-export default useCategories;
+export const useCategories = (): CategoryContextType => {
+  const context = useContext(CategoryContext);
+  if (!context) {
+    throw new Error('useCategories must be used within a CategoryProvider');
+  }
+  return context;
+};
+
+export default CategoryProvider;

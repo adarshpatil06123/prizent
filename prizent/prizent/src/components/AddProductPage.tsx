@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AddProductPage.css';
 import productService, { CreateProductRequest } from '../services/productService';
-import categoryService, { Category } from '../services/categoryService';
+import { useCategories } from '../contexts/CategoryContext';
+import brandService, { Brand } from '../services/brandService';
 
 const AddProductPage: React.FC = () => {
   const navigate = useNavigate();
+  const { categories } = useCategories(); // Use CategoryContext
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [formData, setFormData] = useState<CreateProductRequest>({
     name: '',
-    brandId: 1,
+    brandId: 0,
     skuCode: '',
-    categoryId: 1, 
+    categoryId: 0, 
     mrp: 0,
     productCost: 0,
     proposedSellingPriceSales: 0,
@@ -20,20 +22,20 @@ const AddProductPage: React.FC = () => {
     currentType: 'A'
   });
 
-  // Fetch categories on component mount
+  // Fetch brands on component mount (categories come from context)
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchBrands = async () => {
       try {
-        const response = await categoryService.getAllCategories();
-        if (response.success && response.categories) {
-          setCategories(response.categories);
+        const response = await brandService.getAllBrands();
+        if (response.success && response.brands) {
+          setBrands(response.brands);
         }
       } catch (error) {
-        console.error('Failed to fetch categories:', error);
+        console.error('Failed to fetch brands:', error);
       }
     };
 
-    fetchCategories();
+    fetchBrands();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -165,11 +167,19 @@ const AddProductPage: React.FC = () => {
                 required
               >
                 <option value={0}>Select Category</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+                {categories
+                  .filter(category => 
+                    // Only show enabled categories that are not test categories
+                    category.enabled && 
+                    !['adda', 'test', 'TO', 'top'].includes(category.name.toLowerCase()) &&
+                    // Only show non-root categories (categories that can have products)
+                    category.parentCategoryId !== null
+                  )
+                  .map(category => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
               </select>
               <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
                 <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
@@ -237,9 +247,12 @@ const AddProductPage: React.FC = () => {
                 value={formData.brandId}
                 onChange={handleInputChange}
               >
-                <option value={1}>Default Brand (ID: 1)</option>
-                <option value={2}>Brand 2</option>
-                <option value={3}>Brand 3</option>
+                <option value={0}>Select Brand</option>
+                {brands.map(brand => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
               </select>
               <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
                 <path d="M0 0L5 5L10 0" fill="#454545" />

@@ -71,7 +71,16 @@ export const getCustomFields = async (module?: string): Promise<CustomFieldRespo
   try {
     const url = module ? `/admin/custom-fields?module=${module}` : '/admin/custom-fields';
     const response = await apiClient.get(url);
-    return response.data;
+    // API returns { success, customFields: [...], count, message }
+    const data = response.data;
+    if (data && data.customFields) {
+      return data.customFields;
+    }
+    // Fallback: if data is already an array
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   } catch (error) {
     console.error('Error fetching custom fields:', error);
     throw error;
@@ -158,7 +167,16 @@ export const getCustomFieldValues = async (
 ): Promise<CustomFieldValueResponse[]> => {
   try {
     const response = await apiClient.get(`admin/custom-fields/values?module=${module}&moduleId=${moduleId}`);
-    return response.data;
+    // API returns { success, values: [...], count, message }
+    const data = response.data;
+    if (data && data.values) {
+      return data.values;
+    }
+    // Fallback: if data is already an array
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   } catch (error) {
     console.error(`Error fetching custom field values for ${module}:${moduleId}:`, error);
     throw error;
@@ -175,7 +193,14 @@ export const getCustomFieldValues = async (
 export const getBrandCustomFields = async (): Promise<CustomFieldResponse[]> => {
   try {
     const response = await apiClient.get('admin/custom-fields/brands');
-    return response.data;
+    const data = response.data;
+    if (data && data.customFields) {
+      return data.customFields;
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   } catch (error) {
     console.error('Error fetching brand custom fields:', error);
     throw error;
@@ -188,7 +213,14 @@ export const getBrandCustomFields = async (): Promise<CustomFieldResponse[]> => 
 export const getBrandCustomFieldValues = async (brandId: number): Promise<CustomFieldValueResponse[]> => {
   try {
     const response = await apiClient.get(`admin/custom-fields/brands/${brandId}/values`);
-    return response.data;
+    const data = response.data;
+    if (data && data.values) {
+      return data.values;
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   } catch (error) {
     console.error(`Error fetching custom field values for brand ${brandId}:`, error);
     throw error;
