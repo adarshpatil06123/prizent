@@ -1,9 +1,142 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AddMarketplacePage.css";
+import marketplaceService, { CreateMarketplaceRequest, CreateMarketplaceCostRequest } from '../../services/marketplaceService';
 
 const AddMarketplacePage: React.FC = () => {
   const navigate = useNavigate();
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    enabled: false
+  });
+  
+  // Cost slabs state
+  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '', to: '', valueType: 'A' as 'P' | 'A' }]);
+  const [commissionBreakdowns, setCommissionBreakdowns] = useState<{
+    category: 'COMMISSION' | 'SHIPPING' | 'MARKETING';
+    value: string;
+    valueType: 'P' | 'A';
+  }[]>([
+    { category: 'COMMISSION', value: '', valueType: 'P' },
+    { category: 'SHIPPING', value: '', valueType: 'P' }
+  ]);
+  const [shippingCosts, setShippingCosts] = useState([{ range: '1-500rs', cost: '' }]);
+  
+  // UI state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [productCostValueType, setProductCostValueType] = useState<'P' | 'A'>('A');
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const addProductCostSlab = () => {
+    setProductCostSlabs(prev => [...prev, { from: '', to: '', valueType: productCostValueType }]);
+  };
+
+  const updateProductCostSlab = (index: number, field: string, value: string) => {
+    setProductCostSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: value } : slab
+    ));
+  };
+
+  const addCommissionBreakdown = () => {
+    setCommissionBreakdowns(prev => [...prev, { category: 'COMMISSION', value: '', valueType: 'P' }]);
+  };
+
+  const updateCommissionBreakdown = (index: number, field: 'category' | 'value' | 'valueType', value: string) => {
+    setCommissionBreakdowns(prev => prev.map((breakdown, i) => 
+      i === index ? { ...breakdown, [field]: value } : breakdown
+    ));
+  };
+
+  const addShippingCost = () => {
+    setShippingCosts(prev => [...prev, { range: '', cost: '' }]);
+  };
+
+  const updateShippingCost = (index: number, field: string, value: string) => {
+    setShippingCosts(prev => prev.map((shipping, i) => 
+      i === index ? { ...shipping, [field]: value } : shipping
+    ));
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Validate required fields
+      if (!formData.name.trim()) {
+        setError('Marketplace name is required');
+        return;
+      }
+      
+      // Prepare cost data
+      const costs: CreateMarketplaceCostRequest[] = [];
+      
+      // Add product cost slabs
+      productCostSlabs.forEach((slab) => {
+        if (slab.from && slab.to) {
+          costs.push({
+            costCategory: 'COMMISSION',
+            costValueType: slab.valueType,
+            costValue: parseFloat(slab.to) || 0,
+            costProductRange: `${slab.from}-${slab.to}`
+          });
+        }
+      });
+      
+      // Add commission breakdowns
+      commissionBreakdowns.forEach((breakdown) => {
+        if (breakdown.value) {
+          costs.push({
+            costCategory: breakdown.category,
+            costValueType: breakdown.valueType,
+            costValue: parseFloat(breakdown.value) || 0,
+            costProductRange: 'All'
+          });
+        }
+      });
+      
+      // Add shipping costs
+      shippingCosts.forEach((shipping) => {
+        if (shipping.cost && shipping.range) {
+          costs.push({
+            costCategory: 'SHIPPING',
+            costValueType: 'A',
+            costValue: parseFloat(shipping.cost) || 0,
+            costProductRange: shipping.range
+          });
+        }
+      });
+      
+      const request: CreateMarketplaceRequest = {
+        name: formData.name.trim(),
+        description: formData.description.trim() || '',
+        enabled: formData.enabled,
+        costs
+      };
+      
+      console.log('Creating marketplace with data:', request);
+      const response = await marketplaceService.createMarketplace(request);
+      
+      if (response.success) {
+        console.log('✓ Marketplace created successfully!');
+        navigate('/marketplaces');
+      } else {
+        setError(response.message || 'Failed to create marketplace');
+      }
+    } catch (err: any) {
+      console.error('Error creating marketplace:', err);
+      setError(err.response?.data?.message || 'Failed to create marketplace. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="add-marketplace-bg">
@@ -40,9 +173,25 @@ const AddMarketplacePage: React.FC = () => {
 
         <h3 className="section-title">Marketplace Details</h3>
 
+        {error && (
+          <div className="error-message" style={{padding: '15px', marginBottom: '20px', backgroundColor: '#fee', color: '#c23939', borderRadius: '8px'}}>
+            {error}
+          </div>
+        )}
+
         <div className="details-card">
-          <input className="text-input" placeholder="enter marketplace name" />
-          <input className="text-input" placeholder="discription" />
+          <input 
+            className="text-input" 
+            placeholder="enter marketplace name" 
+            value={formData.name}
+            onChange={(e) => handleInputChange('name', e.target.value)}
+          />
+          <input 
+            className="text-input" 
+            placeholder="description" 
+            value={formData.description}
+            onChange={(e) => handleInputChange('description', e.target.value)}
+          />
           <div className="select-input">
             <span>Category mapping</span>
             <svg width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -50,7 +199,11 @@ const AddMarketplacePage: React.FC = () => {
             </svg>
           </div>
           <label className="activate-row">
-            <input type="checkbox" />
+            <input 
+              type="checkbox" 
+              checked={formData.enabled}
+              onChange={(e) => handleInputChange('enabled', e.target.checked)}
+            />
             <span>Activate marketplace</span>
           </label>
         </div>
@@ -62,7 +215,11 @@ const AddMarketplacePage: React.FC = () => {
               <div className="panel-units">
                 <span>%</span>
                 <label className="switch">
-                  <input type="checkbox" />
+                  <input 
+                    type="checkbox" 
+                    checked={productCostValueType === 'A'}
+                    onChange={(e) => setProductCostValueType(e.target.checked ? 'A' : 'P')}
+                  />
                   <span className="slider" />
                 </label>
                 <span>Rs</span>
@@ -73,13 +230,23 @@ const AddMarketplacePage: React.FC = () => {
               <span>From cost</span>
               <span>To cost</span>
             </div>
-            <div className="panel-form-grid">
-              <input className="small-input" placeholder="0" />
-              <input className="small-input" placeholder="500" />
-              <input className="small-input" placeholder="500" />
-              <input className="small-input" placeholder="1000" />
-            </div>
-            <button className="link-btn">+ Add slab</button>
+            {productCostSlabs.map((slab, index) => (
+              <div className="panel-form-grid" key={index}>
+                <input 
+                  className="small-input" 
+                  placeholder="0" 
+                  value={slab.from}
+                  onChange={(e) => updateProductCostSlab(index, 'from', e.target.value)}
+                />
+                <input 
+                  className="small-input" 
+                  placeholder="500" 
+                  value={slab.to}
+                  onChange={(e) => updateProductCostSlab(index, 'to', e.target.value)}
+                />
+              </div>
+            ))}
+            <button className="link-btn" onClick={addProductCostSlab} type="button">+ Add slab</button>
           </div>
 
           <div className="panel">
@@ -87,37 +254,28 @@ const AddMarketplacePage: React.FC = () => {
               <span>Commission Breakdown</span>
             </div>
             <div className="panel-divider" />
-            <div className="commission-row">
-              <div className="select-sm">Platform fee</div>
-              <input className="num-input" placeholder="500" />
-              <span className="unit">%</span>
-              <label className="switch">
-                <input type="checkbox" />
-                <span className="slider" />
-              </label>
-              <span className="unit">Rs</span>
-            </div>
-            <div className="commission-row">
-              <div className="select-sm">Logistics</div>
-              <input className="num-input" placeholder="500" />
-              <span className="unit">%</span>
-              <label className="switch">
-                <input type="checkbox" />
-                <span className="slider" />
-              </label>
-              <span className="unit">Rs</span>
-            </div>
-            <div className="commission-row">
-              <div className="select-sm">Platform fee</div>
-              <input className="num-input" placeholder="500" />
-              <span className="unit">%</span>
-              <label className="switch">
-                <input type="checkbox" />
-                <span className="slider" />
-              </label>
-              <span className="unit">Rs</span>
-            </div>
-            <button className="link-btn">+ Add Commision</button>
+            {commissionBreakdowns.map((breakdown, index) => (
+              <div className="commission-row" key={index}>
+                <div className="select-sm">{breakdown.category === 'COMMISSION' ? 'Platform fee' : breakdown.category === 'SHIPPING' ? 'Logistics' : breakdown.category}</div>
+                <input 
+                  className="num-input" 
+                  placeholder="500" 
+                  value={breakdown.value}
+                  onChange={(e) => updateCommissionBreakdown(index, 'value', e.target.value)}
+                />
+                <span className="unit">%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={breakdown.valueType === 'A'}
+                    onChange={(e) => updateCommissionBreakdown(index, 'valueType', e.target.checked ? 'A' : 'P')}
+                  />
+                  <span className="slider" />
+                </label>
+                <span className="unit">Rs</span>
+              </div>
+            ))}
+            <button className="link-btn" onClick={addCommissionBreakdown} type="button">+ Add Commission</button>
           </div>
 
           <div className="panel">
@@ -129,19 +287,42 @@ const AddMarketplacePage: React.FC = () => {
               <span>Cost Slabs</span>
               <span>Shipping cost</span>
             </div>
-            <div className="panel-form-grid">
-              <div className="select-sm">1-500rs</div>
-              <input className="small-input" placeholder="500" />
-              <div className="select-sm">500-800rs</div>
-              <input className="small-input" placeholder="500" />
-            </div>
-            <button className="link-btn">+ cost slab</button>
+            {shippingCosts.map((shipping, index) => (
+              <div className="panel-form-grid" key={index}>
+                <input 
+                  className="small-input" 
+                  placeholder="1-500rs" 
+                  value={shipping.range}
+                  onChange={(e) => updateShippingCost(index, 'range', e.target.value)}
+                />
+                <input 
+                  className="small-input" 
+                  placeholder="500" 
+                  value={shipping.cost}
+                  onChange={(e) => updateShippingCost(index, 'cost', e.target.value)}
+                />
+              </div>
+            ))}
+            <button className="link-btn" onClick={addShippingCost} type="button">+ cost slab</button>
           </div>
         </div>
 
         <div className="footer-actions">
-          <button className="cancel-btn" onClick={() => navigate("/marketplaces")}>Cancel</button>
-          <button className="save-btn">SAVE</button>
+          <button 
+            className="cancel-btn" 
+            onClick={() => navigate('/marketplaces')}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button 
+            className="save-btn" 
+            onClick={handleSubmit}
+            disabled={loading}
+            type="button"
+          >
+            {loading ? 'Saving...' : 'SAVE'}
+          </button>
         </div>
       </main>
     </div>

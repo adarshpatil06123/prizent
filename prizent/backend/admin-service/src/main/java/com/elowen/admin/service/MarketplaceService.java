@@ -1,14 +1,10 @@
 package com.elowen.admin.service;
 
-import com.elowen.admin.context.ClientContext;
-import com.elowen.admin.dto.*;
-import com.elowen.admin.entity.Marketplace;
-import com.elowen.admin.entity.MarketplaceCost;
-import com.elowen.admin.exception.DuplicateMarketplaceException;
-import com.elowen.admin.exception.MarketplaceNotFoundException;
-import com.elowen.admin.repository.MarketplaceCostRepository;
-import com.elowen.admin.repository.MarketplaceRepository;
-import com.elowen.admin.security.UserPrincipal;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,10 +17,18 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.elowen.admin.context.ClientContext;
+import com.elowen.admin.dto.CreateMarketplaceRequest;
+import com.elowen.admin.dto.MarketplaceResponse;
+import com.elowen.admin.dto.PagedResponse;
+import com.elowen.admin.dto.UpdateMarketplaceRequest;
+import com.elowen.admin.entity.Marketplace;
+import com.elowen.admin.entity.MarketplaceCost;
+import com.elowen.admin.exception.DuplicateMarketplaceException;
+import com.elowen.admin.exception.MarketplaceNotFoundException;
+import com.elowen.admin.repository.MarketplaceCostRepository;
+import com.elowen.admin.repository.MarketplaceRepository;
+import com.elowen.admin.security.UserPrincipal;
 
 @Service
 public class MarketplaceService {
@@ -119,7 +123,8 @@ public class MarketplaceService {
         Sort sort = Sort.by(Sort.Direction.DESC, "createDateTime");
         Pageable pageable = PageRequest.of(page, size, sort);
         
-        Page<Marketplace> marketplacePage = marketplaceRepository.findByClientIdAndEnabledTrue(clientId, pageable);
+        // Get all marketplaces (both active and inactive)
+        Page<Marketplace> marketplacePage = marketplaceRepository.findByClientId(clientId, pageable);
         
         List<MarketplaceResponse> responses = marketplacePage.getContent().stream()
                 .map(this::toResponseWithCosts)
@@ -165,6 +170,22 @@ public class MarketplaceService {
         return costs.stream()
                 .map(MarketplaceResponse.CostResponse::new)
                 .collect(Collectors.toList());
+    }
+    
+    @Transactional
+    public void deleteMarketplace(Long id) {
+        Integer clientId = getClientId();
+        
+        Marketplace marketplace = marketplaceRepository.findByIdAndClientId(id, clientId)
+            .orElseThrow(() -> new MarketplaceNotFoundException("Marketplace not found"));
+        
+        // Delete associated costs first (cascade should handle this, but let's be explicit)
+        marketplaceCostRepository.deleteByMarketplaceId(id);
+        
+        // Delete the marketplace
+        marketplaceRepository.delete(marketplace);
+        
+        log.info("Marketplace ID {} deleted for client {}", id, clientId);
     }
     
     private void saveCostSlabs(Long marketplaceId, Integer clientId, Long userId, 

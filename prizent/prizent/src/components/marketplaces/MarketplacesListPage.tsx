@@ -1,44 +1,85 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MarketplacesListPage.css";
-
-const marketplaces = [
-  { name: "Amazon", mapping: "Mapped", costSlab: "0–500, 500–1000", commission: "18%", status: "Active" },
-  { name: "Flipkart", mapping: "Partial", costSlab: "0–499, 500–999", commission: "15%", status: "Inactive" },
-  { name: "Myntra", mapping: "Mapped", costSlab: "999–1999, 2000+", commission: "22%", status: "Active" },
-  { name: "Ajio", mapping: "Mapped", costSlab: "0–799, 800–1499", commission: "20%", status: "Active" },
-  { name: "Meesho", mapping: "Mapped", costSlab: "0–499", commission: "10%", status: "Active" },
-  { name: "Nykaa Fashion", mapping: "Mapped", costSlab: "1500–2999", commission: "25%", status: "Active" },
-  { name: "Snapdeal", mapping: "Partial", costSlab: "0–599, 600–1199", commission: "12%", status: "Active" },
-  { name: "Tata CLiQ", mapping: "Mapped", costSlab: "500–1499, 1500+", commission: "19%", status: "Active" },
-  { name: "FirstCry", mapping: "Mapped", costSlab: "0–399, 400–799", commission: "16%", status: "Active" },
-  { name: "Shoppers Stop", mapping: "Partial", costSlab: "1000–2499, 2500+", commission: "23%", status: "Inactive" },
-  { name: "Lifestyle", mapping: "Mapped", costSlab: "800–1999, 2000+", commission: "21%", status: "Active" },
-  { name: "Limeroad", mapping: "Partial", costSlab: "0–499, 500–999", commission: "14%", status: "Active" },
-  { name: "Paytm Mall", mapping: "Mapped", costSlab: "0–599, 600–1199", commission: "17%", status: "Inactive" },
-  { name: "ShopClues", mapping: "Partial", costSlab: "0–399, 400–799", commission: "11%", status: "Active" },
-  { name: "Jabong", mapping: "Mapped", costSlab: "999–1999, 2000+", commission: "20%", status: "Active" },
-  { name: "Koovs", mapping: "Partial", costSlab: "500–1499, 1500+", commission: "22%", status: "Inactive" },
-  { name: "Craftsvilla", mapping: "Mapped", costSlab: "0–699, 700–1399", commission: "13%", status: "Active" },
-  { name: "Zivame", mapping: "Mapped", costSlab: "400–999, 1000+", commission: "24%", status: "Active" },
-  { name: "Bewakoof", mapping: "Partial", costSlab: "0–499, 500–999", commission: "15%", status: "Active" },
-  { name: "Clovia", mapping: "Mapped", costSlab: "300–799, 800+", commission: "26%", status: "Active" },
-  { name: "FabIndia", mapping: "Mapped", costSlab: "700–1999, 2000+", commission: "18%", status: "Active" },
-  { name: "Fynd", mapping: "Partial", costSlab: "500–1499, 1500+", commission: "19%", status: "Inactive" },
-  { name: "Pernia's Pop-Up Shop", mapping: "Mapped", costSlab: "2000–4999, 5000+", commission: "28%", status: "Active" },
-  { name: "Caratlane", mapping: "Mapped", costSlab: "5000–14999, 15000+", commission: "12%", status: "Active" },
-];
+import marketplaceService, { Marketplace, calculateTotalCommission, formatCostSlabs } from '../../services/marketplaceService';
 
 const MarketplacesListPage: React.FC = () => {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
+  const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(marketplaces.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentMarketplaces = marketplaces.slice(startIndex, endIndex);
+  // Fetch marketplaces on component mount and page change
+  useEffect(() => {
+    fetchMarketplaces();
+  }, [currentPage]);
+
+  const fetchMarketplaces = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Convert 1-based page to 0-based for API
+      const apiPage = currentPage - 1;
+      const response = await marketplaceService.getAllMarketplaces(apiPage, itemsPerPage);
+      
+      if (response.success && response.marketplaces) {
+        setMarketplaces(response.marketplaces.content);
+        setTotalPages(response.marketplaces.totalPages);
+        setTotalElements(response.marketplaces.totalElements);
+      } else {
+        setError(response.message || 'Failed to load marketplaces');
+      }
+    } catch (err: any) {
+      console.error('Error fetching marketplaces:', err);
+      setError('Failed to load marketplaces. Please try again.');
+      
+      // Fallback: Set empty data if API fails
+      setMarketplaces([]);
+      setTotalPages(0);
+      setTotalElements(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (marketplace: Marketplace) => {
+    try {
+      await marketplaceService.toggleMarketplace(marketplace.id, !marketplace.enabled);
+      // Refresh the data after toggle
+      await fetchMarketplaces();
+    } catch (err: any) {
+      console.error('Error toggling marketplace:', err);
+      setError('Failed to update marketplace status');
+    }
+  };
+
+  const handleDeleteMarketplace = async (marketplace: Marketplace) => {
+    if (!window.confirm(`Are you sure you want to delete marketplace "${marketplace.name}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await marketplaceService.deleteMarketplace(marketplace.id);
+      // Refresh the data after delete
+      await fetchMarketplaces();
+    } catch (err: any) {
+      console.error('Error deleting marketplace:', err);
+      setError('Failed to delete marketplace');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditMarketplace = (marketplace: Marketplace) => {
+    // Navigate to edit page (implement when edit page is ready)
+    navigate(`/marketplaces/edit/${marketplace.id}`);
+  };
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -110,7 +151,9 @@ const MarketplacesListPage: React.FC = () => {
         <div className="marketplaces-toolbar">
           <div className="marketplaces-title-block">
             <h2 className="marketplace-list-title">Marketplace List</h2>
-            <span className="marketplaces-list-count">{marketplaces.length} Total number to items</span>
+            <span className="marketplaces-list-count">
+              {loading ? 'Loading...' : `${totalElements} Total number of items`}
+            </span>
           </div>
 
           <button className="add-marketplace-btn" onClick={() => navigate('/marketplaces/add')}>
@@ -118,11 +161,17 @@ const MarketplacesListPage: React.FC = () => {
               <rect x="4" width="2" height="10" fill="white" />
               <rect y="4" width="10" height="2" fill="white" />
             </svg>
-            ADD PRODUCT
+            ADD MARKETPLACE
           </button>
         </div>
 
         <div className="marketplaces-card">
+          {error && (
+            <div className="error-message" style={{padding: '20px', textAlign: 'center', color: '#C23939'}}>
+              {error}
+            </div>
+          )}
+          
           <div className="marketplaces-table">
             <div className="marketplaces-table-row marketplaces-table-header">
               <div>Marketplace</div>
@@ -132,29 +181,42 @@ const MarketplacesListPage: React.FC = () => {
               <div>Status</div>
               <div>Actions</div>
             </div>
-            {currentMarketplaces.map((m, idx) => (
-              <div className="marketplaces-table-row" key={idx}>
-                <div>{m.name}</div>
-                <div>{m.mapping}</div>
-                <div>{m.costSlab}</div>
-                <div>{m.commission}</div>
-                <div>
-                  <span className={`status-badge ${m.status.toLowerCase()}`}>{m.status}</span>
-                </div>
+            
+            {loading ? (
+              <div style={{padding: '40px', textAlign: 'center'}}>
+                Loading marketplaces...
+              </div>
+            ) : marketplaces.length === 0 ? (
+              <div style={{padding: '40px', textAlign: 'center'}}>
+                No marketplaces found. Click "ADD MARKETPLACE" to create your first marketplace.
+              </div>
+            ) : (
+              marketplaces.map((marketplace) => (
+                <div className="marketplaces-table-row" key={marketplace.id}>
+                  <div>{marketplace.name}</div>
+                  <div>Mapped</div> {/* TODO: Add real category mapping logic */}
+                  <div>{formatCostSlabs(marketplace.costs || [])}</div>
+                  <div>{calculateTotalCommission(marketplace.costs || [])}</div>
+                  <div>
+                    <span className={`status-badge ${marketplace.enabled ? 'active' : 'inactive'}`}>
+                      {marketplace.enabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 <div className="action-buttons">
-                  <button className="action-btn edit-btn" title="Edit">
+                  <button className="action-btn edit-btn" title="Edit" onClick={() => handleEditMarketplace(marketplace)}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565" />
                     </svg>
                   </button>
-                  <button className="action-btn delete-btn" title="Delete">
+                  <button className="action-btn delete-btn" title="Delete" onClick={() => handleDeleteMarketplace(marketplace)}>
                     <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565" />
                     </svg>
                   </button>
                 </div>
-              </div>
-            ))}
+                </div>
+              ))
+            )}
           </div>
 
           <div className="pagination">
