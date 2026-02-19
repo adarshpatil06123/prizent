@@ -70,18 +70,26 @@ public class CustomFieldController {
     
     /**
      * GET /api/admin/custom-fields?module=p&enabledOnly=true
-     * Get all custom fields by module
+     * Get all custom fields by module (module is optional - returns all if not specified)
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getCustomFieldsByModule(
-            @RequestParam String module,
+            @RequestParam(required = false) String module,
             @RequestParam(required = false) Boolean enabledOnly,
             @AuthenticationPrincipal UserPrincipal principal) {
         
         Integer clientId = (principal != null && principal.getClientId() != null) ? principal.getClientId() : 1;
         
-        List<CustomFieldResponse> customFields = customFieldConfigService.getCustomFieldsByModule(
-                clientId, module, enabledOnly);
+        List<CustomFieldResponse> customFields;
+        
+        if (module != null && !module.isEmpty()) {
+            // Get custom fields for specific module
+            customFields = customFieldConfigService.getCustomFieldsByModule(
+                    clientId, module, enabledOnly);
+        } else {
+            // Get all custom fields for all modules
+            customFields = customFieldConfigService.getAllCustomFields(clientId, enabledOnly);
+        }
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -168,7 +176,7 @@ public class CustomFieldController {
     
     /**
      * DELETE /api/admin/custom-fields/{id}
-     * Soft delete a custom field (disable it)
+     * Permanently delete a custom field from database
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteCustomField(
@@ -185,7 +193,7 @@ public class CustomFieldController {
         response.put("success", true);
         response.put("message", "Custom field deleted successfully");
         
-        log.info("Custom field deleted (soft): ID {} for client {}", id, clientId);
+        log.info("Custom field permanently deleted: ID {} for client {}", id, clientId);
         return ResponseEntity.ok(response);
     }
     

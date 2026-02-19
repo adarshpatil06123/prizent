@@ -1,5 +1,22 @@
 import apiClient from './api';
 
+// Custom field interfaces
+export interface CustomFieldValue {
+  fieldId: number;
+  value: string;
+}
+
+export interface CustomFieldValueResponse {
+  id: number;
+  customFieldId: number;
+  clientId: number;
+  module: string;
+  moduleId: number;
+  value: string;
+  fieldName?: string;
+  fieldType?: string;
+}
+
 // Product interface matching the backend response
 export interface Product {
   id: number;
@@ -16,6 +33,7 @@ export interface Product {
   enabled: boolean;
   createDateTime: string;
   updatedBy: number;
+  customFields?: CustomFieldValueResponse[];
 }
 
 // Create product request interface
@@ -29,6 +47,7 @@ export interface CreateProductRequest {
   proposedSellingPriceSales: number;
   proposedSellingPriceNonSales: number;
   currentType: 'T' | 'A' | 'N';
+  customFields?: CustomFieldValue[];
 }
 
 // Update product request interface
@@ -116,6 +135,21 @@ const productService = {
       return response.data;
     } catch (error: any) {
       console.error('Error fetching product:', error);
+      throw error;
+    }
+  },
+
+  // Get product by ID with custom fields
+  getProductByIdFull: async (id: number): Promise<Product> => {
+    console.log('=== PRODUCT SERVICE GET PRODUCT BY ID (FULL) ===');
+    console.log(`Product ID: ${id}`);
+    
+    try {
+      const response = await apiClient.get(`products/${id}/full`);
+      console.log('✓ Product with custom fields retrieved:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching product with custom fields:', error);
       throw error;
     }
   },

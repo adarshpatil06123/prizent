@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCategories } from '../contexts/CategoryContext';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
@@ -10,6 +10,7 @@ interface CategoryDisplay {
   category: string;
   subCategory: string;
   attributes: string;
+  fields: string;
   status: 'Active' | 'Inactive';
 }
 
@@ -109,6 +110,7 @@ const CategoriesListPage: React.FC = () => {
         category: category.name,
         subCategory: children.length > 0 ? children.map(c => c.name).join(', ') : 'None',
         attributes: 'None',
+        fields: fieldsStr,
         
         status: category.enabled ? 'Active' as const : 'Inactive' as const
       };
@@ -216,7 +218,7 @@ const CategoriesListPage: React.FC = () => {
                 <th>Category</th>
                 <th>Sub-Category</th>
                 <th>Attributes</th>
-                {categoryCustomFields.filter(f => f.enabled).map(field => (<th key={field.id}>{field.name}</th>))}
+                <th>Custom Fields</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -229,11 +231,8 @@ const CategoriesListPage: React.FC = () => {
                   <td>{category.category}</td>
                   <td>{category.subCategory}</td>
                   <td>{category.attributes}</td>
-                  {categoryCustomFields.filter(f => f.enabled).map(field => {
-                    const fieldValues = categoryFieldValues.get(category.id) || [];
-                    const fieldValue = fieldValues.find(v => v.customFieldId === field.id);
-                    return <td key={field.id}>{fieldValue ? fieldValue.value : '-'}</td>;
-                  })}
+                  <td>{category.fields}</td>
+                  <td>{category.fields}</td>
                   <td>
                     <button 
                       className={'status-badge ' + category.status.toLowerCase()}
@@ -317,3 +316,4 @@ const CategoriesListPage: React.FC = () => {
 };
 
 export default CategoriesListPage;
+

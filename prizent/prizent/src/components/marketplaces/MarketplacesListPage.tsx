@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MarketplacesListPage.css";
 import marketplaceService, { Marketplace, calculateTotalCommission, formatCostSlabs } from '../../services/marketplaceService';
+import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../../services/customFieldService';
 
 const MarketplacesListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -12,6 +13,23 @@ const MarketplacesListPage: React.FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
+  const [marketplaceFieldValues, setMarketplaceFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
+
+  // Fetch custom fields on component mount
+  useEffect(() => {
+    const fetchCustomFieldsData = async () => {
+      try {
+        const fields = await getCustomFields('m'); // 'm' for marketplaces
+        const enabledFields = fields.filter(f => f.enabled);
+        setCustomFields(enabledFields);
+        console.log('Loaded marketplace custom fields:', enabledFields);
+      } catch (err) {
+        console.error('Failed to fetch custom fields:', err);
+      }
+    };
+    fetchCustomFieldsData();
+  }, []);
 
   // Fetch marketplaces on component mount and page change
   useEffect(() => {
@@ -31,6 +49,22 @@ const MarketplacesListPage: React.FC = () => {
         setMarketplaces(response.marketplaces.content);
         setTotalPages(response.marketplaces.totalPages);
         setTotalElements(response.marketplaces.totalElements);
+
+        // Fetch custom field values for all marketplaces
+        const valuesMap = new Map<number, CustomFieldValueResponse[]>();
+        await Promise.all(
+          response.marketplaces.content.map(async (marketplace: Marketplace) => {
+            try {
+              const values = await getCustomFieldValues('m', marketplace.id);
+              if (values && values.length > 0) {
+                valuesMap.set(marketplace.id, values);
+              }
+            } catch {
+              // Skip marketplaces with no custom field values
+            }
+          })
+        );
+        setMarketplaceFieldValues(valuesMap);
       } else {
         setError(response.message || 'Failed to load marketplaces');
       }
@@ -179,6 +213,9 @@ const MarketplacesListPage: React.FC = () => {
               <div>Product cost slab</div>
               <div>Total Commission</div>
               <div>Status</div>
+              {customFields.map(field => (
+                <div key={field.id}>{field.name}</div>
+              ))}
               <div>Actions</div>
             </div>
             
@@ -191,7 +228,14 @@ const MarketplacesListPage: React.FC = () => {
                 No marketplaces found. Click "ADD MARKETPLACE" to create your first marketplace.
               </div>
             ) : (
-              marketplaces.map((marketplace) => (
+              marketplaces.map((marketplace) => {
+                const fieldValues = marketplaceFieldValues.get(marketplace.id) || [];
+                const getFieldValue = (fieldId: number) => {
+                  const value = fieldValues.find(v => v.customFieldId === fieldId);
+                  return value ? value.value : '-';
+                };
+                
+                return (
                 <div className="marketplaces-table-row" key={marketplace.id}>
                   <div>{marketplace.name}</div>
                   <div>Mapped</div> {/* TODO: Add real category mapping logic */}
@@ -202,6 +246,9 @@ const MarketplacesListPage: React.FC = () => {
                       {marketplace.enabled ? 'Active' : 'Inactive'}
                     </span>
                   </div>
+                  {customFields.map(field => (
+                    <div key={field.id}>{getFieldValue(field.id)}</div>
+                  ))}
                 <div className="action-buttons">
                   <button className="action-btn edit-btn" title="Edit" onClick={() => handleEditMarketplace(marketplace)}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -215,7 +262,8 @@ const MarketplacesListPage: React.FC = () => {
                   </button>
                 </div>
                 </div>
-              ))
+              );
+              })
             )}
           </div>
 

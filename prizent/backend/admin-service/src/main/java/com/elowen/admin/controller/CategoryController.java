@@ -4,6 +4,7 @@ import com.elowen.admin.dto.CategoryResponse;
 import com.elowen.admin.dto.CategoryTreeNode;
 import com.elowen.admin.dto.CreateCategoryRequest;
 import com.elowen.admin.dto.UpdateCategoryRequest;
+import com.elowen.admin.exception.CategoryNotFoundException;
 import com.elowen.admin.security.JwtUtil;
 import com.elowen.admin.security.UserPrincipal;
 import com.elowen.admin.service.CategoryService;
@@ -161,13 +162,31 @@ public class CategoryController {
             @AuthenticationPrincipal UserPrincipal principal) {
         
         Integer clientId = principal != null ? principal.getClientId() : 1; // Default clientId for testing
-        categoryService.deleteCategory(categoryId, clientId);
         
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Category deleted successfully");
-        
-        return ResponseEntity.ok(response);
+        try {
+            categoryService.deleteCategory(categoryId, clientId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Category deleted successfully");
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (CategoryNotFoundException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(404).body(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to delete category: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
     }
 
     /**

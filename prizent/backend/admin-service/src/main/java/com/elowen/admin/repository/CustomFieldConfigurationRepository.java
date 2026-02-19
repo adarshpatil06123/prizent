@@ -16,6 +16,10 @@ public interface CustomFieldConfigurationRepository extends JpaRepository<Custom
     
     List<CustomFieldConfiguration> findAllByClientIdAndModuleAndEnabledTrueOrderByCreateDateTimeDesc(Integer clientId, String module);
     
+    List<CustomFieldConfiguration> findAllByClientIdOrderByCreateDateTimeDesc(Integer clientId);
+    
+    List<CustomFieldConfiguration> findAllByClientIdAndEnabledTrueOrderByCreateDateTimeDesc(Integer clientId);
+    
     boolean existsByClientIdAndModuleAndNameAndEnabledTrue(Integer clientId, String module, String name);
     
     // For duplicate check during create/update

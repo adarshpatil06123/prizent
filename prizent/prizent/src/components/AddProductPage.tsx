@@ -22,7 +22,7 @@ const AddProductPage: React.FC = () => {
     currentType: 'A'
   });
 
-  // Fetch brands on component mount (categories come from context)
+  // Fetch brands on component mount
   useEffect(() => {
     const fetchBrands = async () => {
       try {
@@ -65,21 +65,21 @@ const AddProductPage: React.FC = () => {
 
     try {
       setLoading(true);
-      
-      await productService.createProduct(formData);
-      
+      const response = await productService.createProduct(formData);
+      console.log('Product created:', response);
       alert('Product created successfully!');
       navigate('/products');
-      
     } catch (error: any) {
       console.error('Error creating product:', error);
       
       if (error.response?.status === 409) {
         alert('SKU code already exists. Please use a different SKU code.');
       } else if (error.response?.status === 400) {
-        alert('Invalid product data. Please check your inputs.');
+        const message = error.response?.data?.message || 'Invalid product data. Please check your inputs.';
+        alert(message);
       } else {
-        alert('Failed to create product. Please try again.');
+        const message = error.response?.data?.message || 'Failed to create product. Please try again.';
+        alert(message);
       }
     } finally {
       setLoading(false);

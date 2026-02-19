@@ -77,6 +77,24 @@ public class CustomFieldConfigurationService {
     }
     
     /**
+     * Get all custom fields for all modules (optionally filtered by enabled status)
+     */
+    @Transactional(readOnly = true)
+    public List<CustomFieldResponse> getAllCustomFields(Integer clientId, Boolean enabledOnly) {
+        List<CustomFieldConfiguration> customFields;
+        
+        if (enabledOnly != null && enabledOnly) {
+            customFields = customFieldRepository.findAllByClientIdAndEnabledTrueOrderByCreateDateTimeDesc(clientId);
+        } else {
+            customFields = customFieldRepository.findAllByClientIdOrderByCreateDateTimeDesc(clientId);
+        }
+        
+        return customFields.stream()
+                .map(CustomFieldResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    /**
      * Get a custom field by ID
      */
     @Transactional(readOnly = true)
@@ -157,20 +175,17 @@ public class CustomFieldConfigurationService {
     }
     
     /**
-     * Soft delete a custom field (disable it)
+     * Hard delete a custom field (permanently remove from database)
+     * Note: This will also cascade delete all associated custom field values
      */
     @Transactional
     public void deleteCustomField(Long customFieldId, Integer clientId, Long deletedBy) {
         CustomFieldConfiguration customField = findCustomFieldByIdAndClientId(customFieldId, clientId);
         
-        customField.setEnabled(false);
-        if (deletedBy != null) {
-            customField.setUpdatedBy(deletedBy);
-        }
+        // Hard delete - permanently remove from database
+        customFieldRepository.delete(customField);
         
-        customFieldRepository.save(customField);
-        
-        log.info("Soft deleted (disabled) custom field ID {} for client {}", customFieldId, clientId);
+        log.info("Hard deleted (permanently removed) custom field ID {} for client {}", customFieldId, clientId);
     }
     
     /**

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './ProductsListPage.css';
 import productThumb from '../assets/brand_logo.png';
 import productService, { Product, PagedResponse, getProductStatusDisplay } from '../services/productService';
+import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 
 const ProductsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -13,8 +14,25 @@ const ProductsListPage: React.FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
+  const [productFieldValues, setProductFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
 
-  // Fetch products from API
+  // Fetch custom fields on component mount
+  useEffect(() => {
+    const fetchCustomFieldsData = async () => {
+      try {
+        const fields = await getCustomFields('p'); // 'p' for products
+        const enabledFields = fields.filter(f => f.enabled);
+        setCustomFields(enabledFields);
+        console.log('Loaded product custom fields:', enabledFields);
+      } catch (err) {
+        console.error('Failed to fetch custom fields:', err);
+      }
+    };
+    fetchCustomFieldsData();
+  }, []);
+
+  // Fetch products and their custom field values
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -28,6 +46,22 @@ const ProductsListPage: React.FC = () => {
         setProducts(response.content);
         setTotalPages(response.totalPages);
         setTotalElements(response.totalElements);
+
+        // Fetch custom field values for all products
+        const valuesMap = new Map<number, CustomFieldValueResponse[]>();
+        await Promise.all(
+          response.content.map(async (product) => {
+            try {
+              const values = await getCustomFieldValues('p', product.id);
+              if (values && values.length > 0) {
+                valuesMap.set(product.id, values);
+              }
+            } catch {
+              // Skip products with no custom field values
+            }
+          })
+        );
+        setProductFieldValues(valuesMap);
       } catch (err: any) {
         console.error('Error fetching products:', err);
         setError('Failed to load products. Please try again.');
@@ -110,6 +144,9 @@ const ProductsListPage: React.FC = () => {
               <div>Category</div>
               <div>Units</div>
               <div>Status</div>
+              {customFields.map(field => (
+                <div key={field.id}>{field.name}</div>
+              ))}
               <div>Actions</div>
             </div>
 
@@ -136,7 +173,14 @@ const ProductsListPage: React.FC = () => {
               </div>
             ) : (
               // Products list
-              products.map((product) => (
+              products.map((product) => {
+                const fieldValues = productFieldValues.get(product.id) || [];
+                const getFieldValue = (fieldId: number) => {
+                  const value = fieldValues.find(v => v.customFieldId === fieldId);
+                  return value ? value.value : '-';
+                };
+                
+                return (
                 <div className="products-table-row" key={product.id}>
                   <div className="product-cell">
                     <img className="product-thumb" src={productThumb} alt="" />
@@ -150,6 +194,9 @@ const ProductsListPage: React.FC = () => {
                       {getProductStatusDisplay(product.currentType)}
                     </span>
                   </div>
+                  {customFields.map(field => (
+                    <div key={field.id}>{getFieldValue(field.id)}</div>
+                  ))}
                   <div className="action-buttons">
                     <button 
                       className="action-btn edit-btn" 
@@ -180,7 +227,8 @@ const ProductsListPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ))
+              );
+              })
             )}
           </div>
 

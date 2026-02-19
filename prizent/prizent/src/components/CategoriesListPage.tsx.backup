@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCategories } from '../contexts/CategoryContext';
+import { useCategories } from '../hooks/useCategories';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 import './CategoriesListPage.css';
 
@@ -75,7 +75,7 @@ const CategoriesListPage: React.FC = () => {
       const children = categories.filter(cat => cat.parentCategoryId === category.id);
       
       const fieldValues = categoryFieldValues.get(category.id) || [];
-      let fieldsStr = 'None';
+      let attributesStr = 'None';
       if (fieldValues.length > 0) {
         const fieldNames = fieldValues
           .map(fv => {
@@ -85,9 +85,9 @@ const CategoriesListPage: React.FC = () => {
           .filter(Boolean);
         if (fieldNames.length > 0) {
           if (fieldNames.length <= 3) {
-            fieldsStr = fieldNames.join(', ');
+            attributesStr = fieldNames.join(', ');
           } else {
-            fieldsStr = fieldNames.slice(0, 3).join(', ') + ' +' + (fieldNames.length - 3);
+            attributesStr = fieldNames.slice(0, 3).join(', ') + ' +' + (fieldNames.length - 3);
           }
         }
       } else if (categoryCustomFields.length > 0) {
@@ -96,9 +96,9 @@ const CategoriesListPage: React.FC = () => {
           .map(cf => cf.name);
         if (fieldNames.length > 0) {
           if (fieldNames.length <= 3) {
-            fieldsStr = fieldNames.join(', ');
+            attributesStr = fieldNames.join(', ');
           } else {
-            fieldsStr = fieldNames.slice(0, 3).join(', ') + ' +' + (fieldNames.length - 3);
+            attributesStr = fieldNames.slice(0, 3).join(', ') + ' +' + (fieldNames.length - 3);
           }
         }
       }
@@ -108,8 +108,7 @@ const CategoriesListPage: React.FC = () => {
         parentCategory: parent ? parent.name : 'Root',
         category: category.name,
         subCategory: children.length > 0 ? children.map(c => c.name).join(', ') : 'None',
-        attributes: 'None',
-        
+        attributes: attributesStr,
         status: category.enabled ? 'Active' as const : 'Inactive' as const
       };
     });
@@ -216,7 +215,6 @@ const CategoriesListPage: React.FC = () => {
                 <th>Category</th>
                 <th>Sub-Category</th>
                 <th>Attributes</th>
-                {categoryCustomFields.filter(f => f.enabled).map(field => (<th key={field.id}>{field.name}</th>))}
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -229,11 +227,6 @@ const CategoriesListPage: React.FC = () => {
                   <td>{category.category}</td>
                   <td>{category.subCategory}</td>
                   <td>{category.attributes}</td>
-                  {categoryCustomFields.filter(f => f.enabled).map(field => {
-                    const fieldValues = categoryFieldValues.get(category.id) || [];
-                    const fieldValue = fieldValues.find(v => v.customFieldId === field.id);
-                    return <td key={field.id}>{fieldValue ? fieldValue.value : '-'}</td>;
-                  })}
                   <td>
                     <button 
                       className={'status-badge ' + category.status.toLowerCase()}
@@ -269,7 +262,7 @@ const CategoriesListPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
                     No categories found. Click "ADD CATEGORY" to create one.
                   </td>
                 </tr>
