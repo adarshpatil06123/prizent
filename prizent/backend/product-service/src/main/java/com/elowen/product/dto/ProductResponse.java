@@ -5,6 +5,7 @@ import com.elowen.product.entity.ProductType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO for product responses
@@ -25,6 +26,7 @@ public class ProductResponse {
     private Boolean enabled;
     private LocalDateTime createDateTime;
     private Long updatedBy;
+    private List<CustomFieldValueResponse> customFields;
 
     // Constructors
     public ProductResponse() {}
@@ -167,6 +169,14 @@ public class ProductResponse {
 
     public void setUpdatedBy(Long updatedBy) {
         this.updatedBy = updatedBy;
+    }
+    
+    public List<CustomFieldValueResponse> getCustomFields() {
+        return customFields;
+    }
+    
+    public void setCustomFields(List<CustomFieldValueResponse> customFields) {
+        this.customFields = customFields;
     }
 
     @Override

@@ -33,8 +33,10 @@ public class ProductController {
      * POST /api/products
      */
     @PostMapping
-    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody CreateProductRequest request) {
-        ProductResponse response = productService.createProduct(request);
+    public ResponseEntity<ProductResponse> createProduct(
+            @Valid @RequestBody CreateProductRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authToken) {
+        ProductResponse response = productService.createProduct(request, authToken);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -71,6 +73,18 @@ public class ProductController {
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         ProductResponse response = productService.getProductById(id);
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Get product by ID with custom field values
+     * GET /api/products/{id}/full
+     */
+    @GetMapping("/{id}/full")
+    public ResponseEntity<ProductResponse> getProductByIdWithCustomFields(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String authToken) {
+        ProductResponse response = productService.getProductByIdWithCustomFields(id, authToken);
         return ResponseEntity.ok(response);
     }
 

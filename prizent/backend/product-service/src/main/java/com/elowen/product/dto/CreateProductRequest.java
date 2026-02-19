@@ -1,12 +1,14 @@
 package com.elowen.product.dto;
 
 import com.elowen.product.entity.ProductType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * DTO for creating new products
@@ -42,6 +44,9 @@ public class CreateProductRequest {
 
     @NotNull(message = "Current type is required")
     private ProductType currentType;
+    
+    @Valid
+    private List<CustomFieldValueRequest> customFields;
 
     // Constructors
     public CreateProductRequest() {}
@@ -131,6 +136,14 @@ public class CreateProductRequest {
 
     public void setCurrentType(ProductType currentType) {
         this.currentType = currentType;
+    }
+    
+    public List<CustomFieldValueRequest> getCustomFields() {
+        return customFields;
+    }
+    
+    public void setCustomFields(List<CustomFieldValueRequest> customFields) {
+        this.customFields = customFields;
     }
 
     @Override

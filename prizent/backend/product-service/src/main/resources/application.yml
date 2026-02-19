@@ -27,6 +27,11 @@ jwt:
   secret: ${JWT_SECRET:mySecretKeyForDevelopmentOnlyChangeInProduction}
   expiration: 14400000 # 4 hours in milliseconds
 
+# Admin Service Configuration (for inter-service communication)
+admin:
+  service:
+    url: http://localhost:8082/api/admin
+
 logging:
   level:
     com.elowen.product: DEBUG

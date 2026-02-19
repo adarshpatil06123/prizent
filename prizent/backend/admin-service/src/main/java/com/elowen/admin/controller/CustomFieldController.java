@@ -1,5 +1,6 @@
 package com.elowen.admin.controller;
 
+import com.elowen.admin.dto.BulkSaveCustomFieldValuesRequest;
 import com.elowen.admin.dto.CreateCustomFieldRequest;
 import com.elowen.admin.dto.CustomFieldResponse;
 import com.elowen.admin.dto.CustomFieldValueResponse;
@@ -256,6 +257,33 @@ public class CustomFieldController {
         response.put("value", valueResponse);
         
         log.info("Custom field value saved: ID {} for client {}", valueResponse.getId(), clientId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+    
+    /**
+     * POST /api/admin/custom-fields/values/bulk
+     * Bulk save custom field values (for product/brand/category/marketplace creation)
+     */
+    @PostMapping("/values/bulk")
+    public ResponseEntity<Map<String, Object>> bulkSaveCustomFieldValues(
+            @Valid @RequestBody BulkSaveCustomFieldValuesRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        
+        Integer clientId = (principal != null && principal.getClientId() != null) ? principal.getClientId() : 1;
+        Long userId = extractUserIdFromToken(authHeader);
+        
+        List<CustomFieldValueResponse> valueResponses = customFieldValueService.saveBulkCustomFieldValues(
+                request, clientId, userId);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Custom field values saved successfully");
+        response.put("values", valueResponses);
+        response.put("count", valueResponses.size());
+        
+        log.info("Bulk saved {} custom field values for client {} module {} moduleId {}", 
+                valueResponses.size(), clientId, request.getModule(), request.getModuleId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     

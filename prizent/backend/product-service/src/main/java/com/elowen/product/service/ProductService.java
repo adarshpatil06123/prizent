@@ -1,6 +1,8 @@
 package com.elowen.product.service;
 
+import com.elowen.product.client.AdminServiceClient;
 import com.elowen.product.dto.CreateProductRequest;
+import com.elowen.product.dto.CustomFieldValueResponse;
 import com.elowen.product.dto.PagedResponse;
 import com.elowen.product.dto.ProductResponse;
 import com.elowen.product.dto.UpdateProductRequest;
@@ -10,6 +12,8 @@ import com.elowen.product.exception.DuplicateSkuException;
 import com.elowen.product.exception.ProductNotFoundException;
 import com.elowen.product.repository.ProductRepository;
 import com.elowen.product.security.UserPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -22,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -31,8 +36,11 @@ import java.util.Set;
 @Service
 @Transactional
 public class ProductService {
+    
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
 
     private final ProductRepository productRepository;
+    private final AdminServiceClient adminServiceClient;
     
     // Whitelist of allowed sort fields for security
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
@@ -40,24 +48,36 @@ public class ProductService {
     );
 
     @Autowired
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, AdminServiceClient adminServiceClient) {
         this.productRepository = productRepository;
+        this.adminServiceClient = adminServiceClient;
     }
 
     /**
-     * Create a new product
+     * Create a new product with transactional integrity
      * 
      * IMPORTANT: Brand and Category validation is DEFERRED to external admin-service.
      * This service does NOT validate brandId/categoryId existence as cross-service calls 
      * are prohibited by architectural rules. Client applications must ensure valid 
      * brand/category IDs before calling this service.
+     * 
+     * TRANSACTIONAL GUARANTEE:
+     * If custom field saving fails in admin-service, the entire transaction is rolled back.
+     * There will NEVER be a product saved without its required custom fields.
+     * 
+     * @param request Product creation request with optional custom fields
+     * @param authToken JWT token for admin-service authentication
+     * @return ProductResponse with saved custom fields
+     * @throws DuplicateSkuException if SKU already exists for this client
+     * @throws RuntimeException if custom field validation/saving fails (triggers rollback)
      */
-    public ProductResponse createProduct(CreateProductRequest request) {
+    @Transactional
+    public ProductResponse createProduct(CreateProductRequest request, String authToken) {
         UserPrincipal userPrincipal = getCurrentUserPrincipal();
         Integer clientId = userPrincipal.getClientId();
         Long userId = userPrincipal.getId();
 
-        // PART 1: Input normalization
+        // Input normalization
         String normalizedName = normalizeProductName(request.getName());
         String normalizedSku = normalizeSkuCode(request.getSkuCode());
         
@@ -71,7 +91,7 @@ public class ProductService {
             throw new DuplicateSkuException(normalizedSku);
         }
 
-        // Create and save product with normalized inputs
+        // Create product entity
         Product product = new Product(
             clientId,
             normalizedName,
@@ -86,9 +106,11 @@ public class ProductService {
             userId
         );
 
+        // Save product to database
+        Product savedProduct;
         try {
-            Product savedProduct = productRepository.save(product);
-            return new ProductResponse(savedProduct);
+            savedProduct = productRepository.save(product);
+            log.info("Product created with ID {} for client {}", savedProduct.getId(), clientId);
         } catch (DataIntegrityViolationException e) {
             // Handle unique constraint violations gracefully
             String message = e.getMessage();
@@ -100,6 +122,37 @@ public class ProductService {
             // Re-throw as generic error for other constraint violations
             throw new IllegalArgumentException("Data integrity violation: Unable to create product");
         }
+        
+        // Save custom field values via admin-service
+        // If this fails, the entire transaction (including product save) will be rolled back
+        List<CustomFieldValueResponse> customFieldValues = null;
+        if (request.getCustomFields() != null && !request.getCustomFields().isEmpty()) {
+            log.info("Saving {} custom field values for product ID {}", 
+                    request.getCustomFields().size(), savedProduct.getId());
+            
+            try {
+                customFieldValues = adminServiceClient.bulkSaveCustomFieldValues(
+                    "p", // module = product
+                    savedProduct.getId(),
+                    request.getCustomFields(),
+                    authToken
+                );
+                log.info("Successfully saved {} custom field values for product ID {}", 
+                        customFieldValues.size(), savedProduct.getId());
+            } catch (Exception e) {
+                log.error("Failed to save custom field values for product ID {}: {}", 
+                        savedProduct.getId(), e.getMessage());
+                // Throw exception to trigger transaction rollback
+                // Product will NOT remain in database
+                throw new RuntimeException("Failed to save custom field values: " + e.getMessage(), e);
+            }
+        }
+        
+        // Build response
+        ProductResponse response = new ProductResponse(savedProduct);
+        response.setCustomFields(customFieldValues);
+        
+        return response;
     }
 
     /**
@@ -144,6 +197,38 @@ public class ProductService {
             .orElseThrow(() -> new ProductNotFoundException(id));
         
         return new ProductResponse(product);
+    }
+    
+    /**
+     * Get product by ID with custom field values
+     * Fetches product from product-service and custom fields from admin-service
+     */
+    @Transactional(readOnly = true)
+    public ProductResponse getProductByIdWithCustomFields(Long id, String authToken) {
+        UserPrincipal userPrincipal = getCurrentUserPrincipal();
+        Integer clientId = userPrincipal.getClientId();
+
+        // Get product
+        Product product = productRepository.findByIdAndClientId(id, clientId)
+            .orElseThrow(() -> new ProductNotFoundException(id));
+        
+        ProductResponse response = new ProductResponse(product);
+        
+        // Fetch custom field values from admin-service
+        try {
+            List<CustomFieldValueResponse> customFieldValues = adminServiceClient.getCustomFieldValues(
+                "p", // module = product
+                id,
+                authToken
+            );
+            response.setCustomFields(customFieldValues);
+            log.debug("Retrieved {} custom field values for product ID {}", customFieldValues.size(), id);
+        } catch (Exception e) {
+            log.error("Failed to fetch custom field values for product ID {}: {}", id, e.getMessage());
+            // Don't fail the request, just return product without custom fields
+        }
+        
+        return response;
     }
 
     /**
