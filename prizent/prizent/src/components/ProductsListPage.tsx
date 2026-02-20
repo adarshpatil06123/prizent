@@ -144,9 +144,6 @@ const ProductsListPage: React.FC = () => {
               <div>Category</div>
               <div>Units</div>
               <div>Status</div>
-              {customFields.map(field => (
-                <div key={field.id}>{field.name}</div>
-              ))}
               <div>Actions</div>
             </div>
 
@@ -194,9 +191,6 @@ const ProductsListPage: React.FC = () => {
                       {getProductStatusDisplay(product.currentType)}
                     </span>
                   </div>
-                  {customFields.map(field => (
-                    <div key={field.id}>{getFieldValue(field.id)}</div>
-                  ))}
                   <div className="action-buttons">
                     <button 
                       className="action-btn edit-btn" 

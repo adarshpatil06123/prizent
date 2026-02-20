@@ -85,7 +85,7 @@
   position: relative;
   width: 1550px;
   height: 194px;
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #DCDADA;
   border-radius: 10px;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.03);
@@ -319,7 +319,7 @@
 .marketplace-table-card {
   width: 1550px;
   height: 380px;
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #DCDADA;
   border-radius: 13px;
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
@@ -336,7 +336,7 @@
 .table-header {
   display: flex;
   padding: 18px 32px;
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
 }
 
 .header-cell {

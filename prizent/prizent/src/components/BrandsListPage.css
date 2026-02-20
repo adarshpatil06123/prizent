@@ -174,7 +174,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1px 30px;
+  padding: 1px 30px 1px 0px;
   overflow-y: hidden;
  
 }
@@ -274,12 +274,13 @@
 
 /* Brands Table */
 .brands-table-container {
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #DCDADA;
   border-radius: 13px;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.03);
   padding: 25px 30px 30px 30px;
   min-height: 600px;
+  margin-left: 0px;
 }
 
 .brands-table {
@@ -302,15 +303,15 @@
 }
 
 .brands-table thead th:nth-child(2) {
-  width: 180px;
+  width: 150px;
 }
 
 .brands-table thead th:nth-child(3) {
-  width: 280px;
+  width: 230px;
 }
 
 .brands-table thead th:nth-child(4) {
-  width: 120px;
+  width: 100px;
 }
 
 .brands-table thead th:last-child {
@@ -705,7 +706,7 @@
   
   .brands-page .brands-table tbody tr {
     display: block;
-    background: #FAFBFF;
+    background: rgba(250, 251, 255, 0.9);
     border-radius: 12px;
     margin-bottom: 15px;
     padding: 15px;
@@ -832,7 +833,7 @@
   
   .brands-page .brands-table tbody tr {
     display: block;
-    background: #FAFBFF;
+    background: rgba(250, 251, 255, 0.9);
     border-radius: 10px;
     margin-bottom: 12px;
     padding: 12px;
@@ -968,7 +969,7 @@
   
   .brands-page .brands-table tbody tr {
     display: block;
-    background: #FAFBFF;
+    background: rgba(250, 251, 255, 0.9);
     border-radius: 8px;
     margin-bottom: 10px;
     padding: 10px;

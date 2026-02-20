@@ -76,7 +76,17 @@ public class JwtUtil {
     @SuppressWarnings("unchecked")
     public List<String> extractRoles(String token) {
         Claims claims = extractAllClaims(token);
-        return (List<String>) claims.get("roles");
+        Object rolesObj = claims.get("roles");
+        
+        if (rolesObj instanceof List) {
+            return (List<String>) rolesObj;
+        } else if (rolesObj instanceof String[]) {
+            return java.util.Arrays.asList((String[]) rolesObj);
+        } else if (rolesObj instanceof String) {
+            return java.util.Collections.singletonList((String) rolesObj);
+        } else {
+            return java.util.Collections.emptyList();
+        }
     }
 
     public boolean isTokenValid(String token) {

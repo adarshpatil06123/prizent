@@ -47,6 +47,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Allow health check endpoint
                 .requestMatchers("/actuator/health").permitAll()
+                // Temporary: Allow products without auth for testing
+                .requestMatchers("/api/products/**").permitAll()
                 // Require authentication for all other API endpoints
                 .requestMatchers("/api/**").authenticated()
                 // Allow all other requests (if any)

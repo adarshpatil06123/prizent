@@ -21,6 +21,10 @@ const AddProductPage: React.FC = () => {
     proposedSellingPriceNonSales: 0,
     currentType: 'A'
   });
+  const [quantity, setQuantity] = useState('');
+  const [status, setStatus] = useState('Active');
+  const [subCategory, setSubCategory] = useState('');
+  const [attributes, setAttributes] = useState('');
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -124,143 +128,177 @@ const AddProductPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Product Details Section */}
-      <section className="product-details-section">
-        <h2 className="section-title">Product Details</h2>
-        <div className="product-details-card">
-          {/* Upload Area */}
-          <div className="upload-area">
-            <div className="upload-icon">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 3V17M3 10H17" stroke="#B3B3B3" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+      {/* Main Content Grid */}
+      <div className="main-content-grid">
+        {/* Product Details Section */}
+        <section className="product-details-section">
+          <h2 className="section-title">Product Details</h2>
+          <div className="product-details-card">
+            {/* Upload Area */}
+            <div className="upload-area">
+              <div className="upload-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 3V17M3 10H17" stroke="#B3B3B3" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <p className="upload-text">Upload file here</p>
             </div>
-            <p className="upload-text">Upload file here</p>
-          </div>
 
-          {/* Form Fields */}
-          <div className="product-form-grid">
-            <input 
-              type="text" 
-              placeholder="Enter product name" 
-              className="form-input"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-            />
-            <input 
-              type="text" 
-              placeholder="SKU code (unique identifier)" 
-              className="form-input"
-              name="skuCode"
-              value={formData.skuCode}
-              onChange={handleInputChange}
-              required
-            />
-            <div className="form-input-with-dropdown">
-              <select 
-                className="form-select" 
-                name="categoryId"
-                value={formData.categoryId}
+            {/* Form Fields */}
+            <div className="product-form-grid">
+              <input 
+                type="text" 
+                placeholder="enter product name" 
+                className="form-input"
+                name="name"
+                value={formData.name}
                 onChange={handleInputChange}
                 required
-              >
-                <option value={0}>Select Category</option>
-                {categories
-                  .filter(category => 
-                    // Only show enabled categories that are not test categories
-                    category.enabled && 
-                    !['adda', 'test', 'TO', 'top'].includes(category.name.toLowerCase()) &&
-                    // Only show non-root categories (categories that can have products)
-                    category.parentCategoryId !== null
-                  )
-                  .map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-              </select>
-              <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
-              </svg>
-            </div>
-            <input 
-              type="number" 
-              placeholder="MRP (₹)" 
-              className="form-input"
-              name="mrp"
-              value={formData.mrp}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-            />
-            <input 
-              type="number" 
-              placeholder="Product Cost (₹)" 
-              className="form-input"
-              name="productCost"
-              value={formData.productCost}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-            />
-            <input 
-              type="number" 
-              placeholder="Selling Price - Sales (₹)" 
-              className="form-input"
-              name="proposedSellingPriceSales"
-              value={formData.proposedSellingPriceSales}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-            />
-            <input 
-              type="number" 
-              placeholder="Selling Price - Non Sales (₹)" 
-              className="form-input"
-              name="proposedSellingPriceNonSales"
-              value={formData.proposedSellingPriceNonSales}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-            />
-            <div className="form-input-with-dropdown">
-              <select 
-                className="form-select" 
-                name="currentType"
-                value={formData.currentType}
+              />
+              <input 
+                type="text" 
+                placeholder="SKU code (dangerous/not suitable...)" 
+                className="form-input"
+                name="skuCode"
+                value={formData.skuCode}
                 onChange={handleInputChange}
-              >
-                <option value="T">Trade</option>
-                <option value="A">Active</option>
-                <option value="N">Non-Active</option>
-              </select>
-              <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                <path d="M0 0L5 5L10 0" fill="#454545" />
-              </svg>
-            </div>
-            <div className="form-input-with-dropdown">
-              <select 
-                className="form-select"
-                name="brandId"
-                value={formData.brandId}
-                onChange={handleInputChange}
-              >
-                <option value={0}>Select Brand</option>
-                {brands.map(brand => (
-                  <option key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
-              <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                <path d="M0 0L5 5L10 0" fill="#454545" />
-              </svg>
+                required
+              />
+              <div className="form-input-with-dropdown">
+                <select 
+                  className="form-select" 
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                >
+                  <option value="">quantity</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                </select>
+                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
+                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
+                </svg>
+              </div>
+              <div className="form-input-with-dropdown">
+                <select 
+                  className="form-select" 
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="Active">status</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
+                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
+                </svg>
+              </div>
             </div>
           </div>
+        </section>
+
+        {/* Bottom Sections: Categories and Pricing */}
+        <div className="bottom-sections">
+          {/* Categories Details Section */}
+          <section className="categories-details-section">
+            <h2 className="section-title">Categories Details</h2>
+            <div className="categories-card">
+              <div className="form-input-with-dropdown">
+                <select 
+                  className="form-select" 
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value={0}>Categories</option>
+                  {categories
+                    .filter(category => 
+                      category.enabled && 
+                      !['adda', 'test', 'TO', 'top'].includes(category.name.toLowerCase()) &&
+                      category.parentCategoryId !== null
+                    )
+                    .map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                </select>
+                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
+                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
+                </svg>
+              </div>
+              <div className="form-input-with-dropdown">
+                <select 
+                  className="form-select" 
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                >
+                  <option value="">Sub-Categories</option>
+                  <option value="Sub 1">Sub Category 1</option>
+                  <option value="Sub 2">Sub Category 2</option>
+                </select>
+                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
+                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
+                </svg>
+              </div>
+              <div className="form-input-with-dropdown">
+                <select 
+                  className="form-select" 
+                  value={attributes}
+                  onChange={(e) => setAttributes(e.target.value)}
+                >
+                  <option value="">Attributes</option>
+                  <option value="Attr 1">Attribute 1</option>
+                  <option value="Attr 2">Attribute 2</option>
+                </select>
+                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
+                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
+                </svg>
+              </div>
+            </div>
+          </section>
+
+          {/* Pricing Attributes Section */}
+          <section className="pricing-attributes-section">
+            <h2 className="section-title">Pricing Attributes</h2>
+            <div className="pricing-card">
+              <input 
+                type="number" 
+                placeholder="MRP" 
+                className="form-input"
+                name="mrp"
+                value={formData.mrp}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+              />
+              <input 
+                type="number" 
+                placeholder="Product Cost" 
+                className="form-input"
+                name="productCost"
+                value={formData.productCost}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+              />
+              <input 
+                type="number" 
+                placeholder="Proposed selling price" 
+                className="form-input"
+                name="proposedSellingPriceSales"
+                value={formData.proposedSellingPriceSales}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
       {/* Action Buttons */}
       <div className="action-buttons">

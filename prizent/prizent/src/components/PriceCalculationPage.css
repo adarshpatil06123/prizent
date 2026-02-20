@@ -84,7 +84,7 @@
   width: 100%;
   max-width: 1500px;
   height: 99px;
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #DCDADA;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.03);
   border-radius: 10px;
@@ -174,7 +174,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: none;
   border-right: 1px solid #000000;
   font-family: 'Murecho', sans-serif;
@@ -197,7 +197,7 @@
 }
 
 .tab-btn.active {
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 1px solid #1E1E1E;
   box-shadow: inset 0px 0px 4px rgba(30, 30, 30, 0.2);
   z-index: 1;
@@ -231,7 +231,7 @@
 
 /* Set Pricing Card */
 .set-pricing-card {
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.375px solid #DCDADA;
   box-shadow: 0px 0px 3px rgba(0, 0, 0, 0.03);
   border-radius: 7.5px;
@@ -338,7 +338,7 @@
 
 /* Net Outcome Card */
 .net-outcome-card {
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.375px solid #DCDADA;
   box-shadow: 0px 0px 3px rgba(0, 0, 0, 0.03);
   border-radius: 7.5px;
@@ -496,7 +496,7 @@
 .pricing-history-card {
   width: 100%;
   max-width: 1400px;
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #DCDADA;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.03);
   border-radius: 13px;

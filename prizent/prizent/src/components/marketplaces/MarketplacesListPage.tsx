@@ -213,9 +213,6 @@ const MarketplacesListPage: React.FC = () => {
               <div>Product cost slab</div>
               <div>Total Commission</div>
               <div>Status</div>
-              {customFields.map(field => (
-                <div key={field.id}>{field.name}</div>
-              ))}
               <div>Actions</div>
             </div>
             
@@ -246,9 +243,6 @@ const MarketplacesListPage: React.FC = () => {
                       {marketplace.enabled ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  {customFields.map(field => (
-                    <div key={field.id}>{getFieldValue(field.id)}</div>
-                  ))}
                 <div className="action-buttons">
                   <button className="action-btn edit-btn" title="Edit" onClick={() => handleEditMarketplace(marketplace)}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -281,7 +281,7 @@
 
 /* Form Section */
 .add-category-page .form-section {
-  background: #FAFBFF;
+  background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #C6C6C6;
   border-radius: 10px;
   padding: 24px;
