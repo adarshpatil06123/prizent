@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCategories } from '../contexts/CategoryContext';
+import { getCustomFields, saveCustomFieldValue, getCustomFieldValues, CustomFieldResponse } from '../services/customFieldService';
 import './EditCategoryPage.css';
 
 const EditCategoryPage: React.FC = () => {
@@ -14,6 +15,23 @@ const EditCategoryPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [loadingCategory, setLoadingCategory] = useState(true);
   const [validationError, setValidationError] = useState('');
+  const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
+
+  // Fetch custom fields for categories
+  useEffect(() => {
+    const fetchCustomFields = async () => {
+      try {
+        const fields = await getCustomFields('c');
+        const enabledFields = fields.filter(f => f.enabled);
+        setCustomFields(enabledFields);
+        console.log('Loaded category custom fields:', enabledFields);
+      } catch (error) {
+        console.error('Failed to fetch custom fields:', error);
+      }
+    };
+    fetchCustomFields();
+  }, []);
 
   useEffect(() => {
     const loadCategory = async () => {
@@ -27,6 +45,19 @@ const EditCategoryPage: React.FC = () => {
           setCategoryName(category.name);
           setParentCategory(category.parentCategoryId ? category.parentCategoryId.toString() : '');
           setEnableCategory(category.enabled);
+
+          // Load custom field values
+          try {
+            const fieldValues = await getCustomFieldValues('c', parseInt(id));
+            const valuesMap: { [key: number]: string } = {};
+            fieldValues.forEach(fv => {
+              valuesMap[fv.customFieldId] = fv.value;
+            });
+            setCustomFieldValues(valuesMap);
+            console.log('Loaded custom field values:', valuesMap);
+          } catch (error) {
+            console.error('Failed to load custom field values:', error);
+          }
         } else {
           setValidationError('Category not found');
         }
@@ -59,6 +90,27 @@ const EditCategoryPage: React.FC = () => {
         parentCategoryId: parentCategory ? parseInt(parentCategory) : null,
         enabled: enableCategory,
       });
+      
+      // Save custom field values
+      try {
+        await Promise.all(
+          Object.entries(customFieldValues).map(async ([fieldId, value]) => {
+            const trimmedValue = value.trim();
+            if (trimmedValue) {
+              await saveCustomFieldValue({
+                customFieldId: Number(fieldId),
+                module: 'c',
+                moduleId: parseInt(id),
+                value: trimmedValue
+              });
+            }
+          })
+        );
+        console.log('Custom field values saved');
+      } catch (fieldError) {
+        console.error('Error saving custom field values:', fieldError);
+        // Continue with success message even if custom fields fail
+      }
       
       // Navigate back on success
       navigate('/categories');
@@ -175,6 +227,45 @@ const EditCategoryPage: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Custom Fields Section */}
+        {customFields.length > 0 && (
+          <section className="form-section" style={{ marginTop: '32px' }}>
+            <h3 className="section-title">Custom Fields</h3>
+            <div className="form-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+              {customFields.map((field) => (
+                <div key={field.id}>
+                  {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
+                    <input
+                      type={field.fieldType === 'numeric' ? 'number' : 'text'}
+                      placeholder={field.name + (field.required ? ' *' : '')}
+                      className="form-input"
+                      value={customFieldValues[field.id] || ''}
+                      onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                      required={field.required}
+                      disabled={saving}
+                    />
+                  ) : field.fieldType === 'dropdown' && field.dropdownOptions ? (
+                    <select
+                      className="form-select"
+                      value={customFieldValues[field.id] || ''}
+                      onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                      required={field.required}
+                      disabled={saving}
+                    >
+                      <option value="">{field.name + (field.required ? ' *' : '')}</option>
+                      {field.dropdownOptions.split(',').map((option: string, idx: number) => (
+                        <option key={idx} value={option.trim()}>
+                          {option.trim()}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Action Buttons */}
         <div className="form-actions">

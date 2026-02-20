@@ -212,6 +212,9 @@ const MarketplacesListPage: React.FC = () => {
               <div>Category Mapping</div>
               <div>Product cost slab</div>
               <div>Total Commission</div>
+              {customFields.filter(f => f.enabled).map((field) => (
+                <div key={field.id}>{field.name}</div>
+              ))}
               <div>Status</div>
               <div>Actions</div>
             </div>
@@ -238,6 +241,9 @@ const MarketplacesListPage: React.FC = () => {
                   <div>Mapped</div> {/* TODO: Add real category mapping logic */}
                   <div>{formatCostSlabs(marketplace.costs || [])}</div>
                   <div>{calculateTotalCommission(marketplace.costs || [])}</div>
+                  {customFields.filter(f => f.enabled).map((field) => (
+                    <div key={field.id}>{getFieldValue(field.id)}</div>
+                  ))}
                   <div>
                     <span className={`status-badge ${marketplace.enabled ? 'active' : 'inactive'}`}>
                       {marketplace.enabled ? 'Active' : 'Inactive'}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./EditMarketplacePage.css";
 import marketplaceService, { UpdateMarketplaceRequest, UpdateMarketplaceCostRequest } from '../../services/marketplaceService';
+import { getCustomFields, saveCustomFieldValue, getCustomFieldValues, CustomFieldResponse } from '../../services/customFieldService';
 
 const EditMarketplacePage: React.FC = () => {
   const navigate = useNavigate();
@@ -31,6 +32,23 @@ const EditMarketplacePage: React.FC = () => {
   const [loadingMarketplace, setLoadingMarketplace] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [productCostValueType, setProductCostValueType] = useState<'P' | 'A'>('A');
+  const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
+
+  // Fetch custom fields for marketplaces
+  useEffect(() => {
+    const fetchCustomFields = async () => {
+      try {
+        const fields = await getCustomFields('m');
+        const enabledFields = fields.filter(f => f.enabled);
+        setCustomFields(enabledFields);
+        console.log('Loaded marketplace custom fields:', enabledFields);
+      } catch (error) {
+        console.error('Failed to fetch custom fields:', error);
+      }
+    };
+    fetchCustomFields();
+  }, []);
 
   // Fetch marketplace data
   useEffect(() => {
@@ -78,6 +96,19 @@ const EditMarketplacePage: React.FC = () => {
                 cost: String(c.costValue || '')
               })));
             }
+          }
+
+          // Load custom field values
+          try {
+            const fieldValues = await getCustomFieldValues('m', Number(id));
+            const valuesMap: { [key: number]: string } = {};
+            fieldValues.forEach(fv => {
+              valuesMap[fv.customFieldId] = fv.value;
+            });
+            setCustomFieldValues(valuesMap);
+            console.log('Loaded custom field values:', valuesMap);
+          } catch (error) {
+            console.error('Failed to load custom field values:', error);
           }
         } else {
           setError('Failed to load marketplace data');
@@ -194,6 +225,28 @@ const EditMarketplacePage: React.FC = () => {
       
       if (response.success) {
         console.log('✓ Marketplace updated successfully!');
+
+        // Save custom field values
+        try {
+          await Promise.all(
+            Object.entries(customFieldValues).map(async ([fieldId, value]) => {
+              const trimmedValue = value.trim();
+              if (trimmedValue) {
+                await saveCustomFieldValue({
+                  customFieldId: Number(fieldId),
+                  module: 'm',
+                  moduleId: Number(id),
+                  value: trimmedValue
+                });
+              }
+            })
+          );
+          console.log('Custom field values saved');
+        } catch (fieldError) {
+          console.error('Error saving custom field values:', fieldError);
+          // Continue with navigation even if custom fields fail
+        }
+
         navigate('/marketplaces');
       } else {
         setError(response.message || 'Failed to update marketplace');
@@ -384,6 +437,45 @@ const EditMarketplacePage: React.FC = () => {
             <button className="link-btn" onClick={addShippingCost} type="button">+ cost slab</button>
           </div>
         </div>
+
+        {/* Custom Fields Section */}
+        {customFields.length > 0 && (
+          <div className="panel" style={{ marginTop: '32px' }}>
+            <h3 className="panel-title">Custom Fields</h3>
+            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', padding: '24px' }}>
+              {customFields.map((field) => (
+                <div key={field.id}>
+                  {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
+                    <input
+                      type={field.fieldType === 'numeric' ? 'number' : 'text'}
+                      placeholder={field.name + (field.required ? ' *' : '')}
+                      className="form-input"
+                      value={customFieldValues[field.id] || ''}
+                      onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                      required={field.required}
+                      disabled={loading}
+                    />
+                  ) : field.fieldType === 'dropdown' && field.dropdownOptions ? (
+                    <select
+                      className="form-select"
+                      value={customFieldValues[field.id] || ''}
+                      onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                      required={field.required}
+                      disabled={loading}
+                    >
+                      <option value="">{field.name + (field.required ? ' *' : '')}</option>
+                      {field.dropdownOptions.split(',').map((option: string, idx: number) => (
+                        <option key={idx} value={option.trim()}>
+                          {option.trim()}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="footer-actions">
           <button 

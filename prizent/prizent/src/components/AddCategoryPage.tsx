@@ -59,30 +59,26 @@ const AddCategoryPage: React.FC = () => {
       }
       
       // CategoryContext will automatically refresh all components
-      await createCategory(categoryName.trim(), parentId);
+      const response = await createCategory(categoryName.trim(), parentId);
       console.log('Category created successfully via context');
       
       // Save custom field values
-      if (Object.keys(customFieldValues).length > 0) {
+      if (Object.keys(customFieldValues).length > 0 && response.category) {
         try {
-          // Get the newly created category ID from context
-          const newCategory = categories.find(c => c.name === categoryName.trim());
-          if (newCategory) {
-            await Promise.all(
-              Object.entries(customFieldValues).map(async ([fieldId, value]) => {
-                const trimmedValue = value.trim();
-                if (trimmedValue) {
-                  await saveCustomFieldValue({
-                    customFieldId: Number(fieldId),
-                    module: 'c',
-                    moduleId: newCategory.id,
-                    value: trimmedValue
-                  });
-                }
-              })
-            );
-            console.log('Custom field values saved');
-          }
+          await Promise.all(
+            Object.entries(customFieldValues).map(async ([fieldId, value]) => {
+              const trimmedValue = value.trim();
+              if (trimmedValue) {
+                await saveCustomFieldValue({
+                  customFieldId: Number(fieldId),
+                  module: 'c',
+                  moduleId: response.category!.id,
+                  value: trimmedValue
+                });
+              }
+            })
+          );
+          console.log('Custom field values saved');
         } catch (fieldError) {
           console.error('Error saving custom field values:', fieldError);
           // Continue with navigation even if custom fields fail

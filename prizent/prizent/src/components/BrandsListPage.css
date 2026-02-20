@@ -281,11 +281,14 @@
   padding: 15px 30px 30px 30px;
   min-height: 600px;
   margin-left: 0px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .brands-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: fit-content;
 }
 
 .brands-table thead th {
