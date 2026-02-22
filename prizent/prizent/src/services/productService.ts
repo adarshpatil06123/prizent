@@ -84,11 +84,11 @@ export interface ProductStats {
 export const getProductStatusDisplay = (currentType: 'T' | 'A' | 'N'): string => {
   switch (currentType) {
     case 'T':
-      return 'Trade';
+      return 'Top Seller';
     case 'A':
-      return 'Active';
+      return 'Avg Seller';
     case 'N':
-      return 'Non-active';
+      return 'Non-Seller';
     default:
       return 'Unknown';
   }
@@ -185,6 +185,21 @@ const productService = {
     }
   },
 
+  // Update product flag/currentType
+  updateProductFlag: async (id: number, currentType: 'T' | 'A' | 'N'): Promise<Product> => {
+    console.log('=== PRODUCT SERVICE UPDATE PRODUCT FLAG ===');
+    console.log(`Product ID: ${id}, Flag: ${currentType}`);
+    
+    try {
+      const response = await apiClient.patch(`products/${id}/flag?currentType=${currentType}`);
+      console.log('✓ Product flag updated:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error updating product flag:', error);
+      throw error;
+    }
+  },
+
   // Enable or disable product
   toggleProductStatus: async (id: number, enabled: boolean): Promise<Product> => {
     console.log('=== PRODUCT SERVICE TOGGLE PRODUCT STATUS ===');
@@ -196,6 +211,20 @@ const productService = {
       return response.data;
     } catch (error: any) {
       console.error('Error toggling product status:', error);
+      throw error;
+    }
+  },
+
+  // Delete product permanently
+  deleteProduct: async (id: number): Promise<void> => {
+    console.log('=== PRODUCT SERVICE DELETE PRODUCT ===');
+    console.log(`Product ID: ${id}`);
+    
+    try {
+      await apiClient.delete(`products/${id}`);
+      console.log('✓ Product deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting product:', error);
       throw error;
     }
   },

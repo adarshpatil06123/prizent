@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCategories } from '../contexts/CategoryContext';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
@@ -70,7 +70,7 @@ const CategoriesListPage: React.FC = () => {
       return category.parentCategoryId !== null && rootCategoryIds.has(category.parentCategoryId);
     });
     
-    const transformedCategories: CategoryDisplay[] = level1Categories.map(category => {
+    const transformedCategories: CategoryDisplay[] = level1Categories.map((category, index) => {
       const parent = categories.find(cat => cat.id === category.parentCategoryId);
       const children = categories.filter(cat => cat.parentCategoryId === category.id);
       
@@ -108,7 +108,7 @@ const CategoriesListPage: React.FC = () => {
         parentCategory: parent ? parent.name : 'Root',
         category: category.name,
         subCategory: children.length > 0 ? children.map(c => c.name).join(', ') : 'None',
-        attributes: 'None',
+        attributes: ['Size, Fit, Fabric', 'Size, Fit, Waist', 'Size, Fit, Fabric +1', 'Size, Material', 'Size, Material, Sole', 'Size, Fit, Fabric'][index % 6],
         
         status: category.enabled ? 'Active' as const : 'Inactive' as const
       };
@@ -318,3 +318,6 @@ const CategoriesListPage: React.FC = () => {
 };
 
 export default CategoriesListPage;
+
+
+

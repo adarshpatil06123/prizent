@@ -195,7 +195,7 @@ const MarketplacesListPage: React.FC = () => {
               <rect x="4" width="2" height="10" fill="white" />
               <rect y="4" width="10" height="2" fill="white" />
             </svg>
-            ADD MARKETPLACE
+            Add New Marketplace
           </button>
         </div>
 

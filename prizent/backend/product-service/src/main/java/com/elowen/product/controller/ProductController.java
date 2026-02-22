@@ -115,6 +115,29 @@ public class ProductController {
     }
 
     /**
+     * Update product flag/currentType (Top Seller, Avg Seller, Non-Seller)
+     * PATCH /api/products/{id}/flag?currentType=T
+     */
+    @PatchMapping("/{id}/flag")
+    public ResponseEntity<ProductResponse> updateProductFlag(
+            @PathVariable Long id,
+            @RequestParam String currentType) {
+        
+        ProductResponse response = productService.updateProductFlag(id, currentType);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Delete a product permanently
+     * DELETE /api/products/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Get product statistics for dashboard
      * GET /api/products/stats
      */

@@ -281,48 +281,50 @@ const CustomFieldsPage: React.FC = () => {
             </h3>
             
             <div className="field-inputs-row">
-              <input
-                type="text"
-                placeholder="enter field name"
-                value={fieldName}
-                onChange={(e) => setFieldName(e.target.value)}
-                className="field-input"
-              />
-              
-              <div className="select-wrapper">
-                <select
-                  value={fieldType}
-                  onChange={(e) => setFieldType(e.target.value)}
-                  className="field-select"
-                >
-                  <option value="">Select field type</option>
-                  <option value="text">Text</option>
-                  <option value="numeric">Number</option>
-                  <option value="dropdown">Dropdown</option>
-                  <option value="date">Date</option>
-                  <option value="file">File</option>
-                </select>
+              <div className="inputs-container">
+                <input
+                  type="text"
+                  placeholder="enter field name"
+                  value={fieldName}
+                  onChange={(e) => setFieldName(e.target.value)}
+                  className="field-input"
+                />
+                
+                <div className="select-wrapper">
+                  <select
+                    value={fieldType}
+                    onChange={(e) => setFieldType(e.target.value)}
+                    className="field-select"
+                  >
+                    <option value="">field type</option>
+                    <option value="text">Text</option>
+                    <option value="numeric">Number</option>
+                    <option value="dropdown">Dropdown</option>
+                    <option value="date">Date</option>
+                    <option value="file">File</option>
+                  </select>
+                </div>
               </div>
-            </div>
 
-            <div className="checkbox-row">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={fieldRequired}
-                  onChange={(e) => setFieldRequired(e.target.checked)}
-                />
-                <span>Field required</span>
-              </label>
-              
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={enableField}
-                  onChange={(e) => setEnableField(e.target.checked)}
-                />
-                <span>Enable field</span>
-              </label>
+              <div className="checkbox-row">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={fieldRequired}
+                    onChange={(e) => setFieldRequired(e.target.checked)}
+                  />
+                  <span>Field required</span>
+                </label>
+                
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={enableField}
+                    onChange={(e) => setEnableField(e.target.checked)}
+                  />
+                  <span>Enable field</span>
+                </label>
+              </div>
             </div>
           </div>
 

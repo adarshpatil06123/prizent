@@ -1,7 +1,7 @@
 /* Custom Fields Page */
 .custom-fields-page {
   flex: 1;
-  padding: 30px 60px 30px 20px;
+  padding: 20px 30px 20px 15px;
   overflow-y: auto;
   font-family: 'Murecho', sans-serif;
 }
@@ -11,7 +11,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 45px;
+  margin-bottom: 20px;
 }
 
 .breadcrumb {
@@ -49,24 +49,24 @@
 /* Content Wrapper */
 .content-wrapper {
   width: 100%;
-  margin-left:40px;
+  margin-left: 20px;
   height: 100%;
 }
 
 /* Section Titles */
 .section-title {
   font-weight: 500;
-  font-size: 20px;
-  line-height: 29px;
+  font-size: 18px;
+  line-height: 26px;
   color: #000000;
-  margin: 0 0 16px 0;
+  margin: 0 0 12px 0;
 }
 
 /* Top Section */
 .top-section {
   display: flex;
-  gap: 39px;
-  margin-bottom: 40px;
+  gap: 24px;
+  margin-bottom: 24px;
   align-items: stretch;
   height: 100%;
 }
@@ -80,33 +80,38 @@
 }
 
 .create-field-card > .section-title {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .field-inputs-row {
   display: flex;
+  flex-direction: column;
   gap: 28px;
-  margin-bottom: 29px;
   background: rgba(250, 251, 255, 0.9);
   border: 0.5px solid #DCDADA;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.03);
   border-radius: 10px;
-  padding: 33px 29px 61px 29px;
+  padding: 40px 50px;
+}
+
+.inputs-container {
+  display: flex;
+  gap: 40px;
 }
 
 .field-input,
 .field-select {
   flex: 1;
-  padding: 10px 14px;
-  height: 48px;
+  padding: 14px 18px;
+  height: 56px;
   border: 1px solid #C1C1C1;
   filter: drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.01));
   backdrop-filter: blur(1.5px);
   border-radius: 6px;
   font-family: 'Murecho';
   font-weight: 400;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 16px;
+  line-height: 24px;
   color: #7C7C7C;
   background: white;
   box-sizing: border-box;
@@ -132,14 +137,15 @@
 
 .checkbox-row {
   display: flex;
-  gap: 71px;
-  padding-left: 176px;
+  gap: 50px;
+  justify-content: center;
+  padding: 10px 0;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   cursor: pointer;
   font-weight: 400;
   font-size: 18px;
@@ -148,8 +154,8 @@
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   accent-color: #C1C1C1;
   cursor: pointer;
 }
@@ -215,7 +221,7 @@
   color: #FFFFFF;
   cursor: pointer;
   margin-left: auto;
-  margin-bottom: 52px;
+  margin-bottom: 24px;
 }
 
 .add-field-btn:hover {
@@ -224,11 +230,11 @@
 
 /* Previously Added Fields Section */
 .previous-fields-section {
-  margin-top: -20;
+  margin-top: 10px;
 }
 
 .previous-fields-section > .section-title {
-  margin-bottom: 17px;
+  margin-bottom: 12px;
 }
 
 .fields-table-container {
@@ -236,7 +242,7 @@
   border: 0.5px solid #DCDADA;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.03);
   border-radius: 13px;
-  padding: 25px 29px;
+  padding: 16px 20px;
   width: 100%;
   height: 100%;
   max-width: 1480px;
@@ -249,44 +255,48 @@
 
 .fields-table thead th {
   font-weight: 500;
-  font-size: 20px;
-  line-height: 29px;
+  font-size: 16px;
+  line-height: 23px;
   color: #1A1A1A;
   text-align: left;
-  padding-bottom: 22px;
+  padding-bottom: 12px;
   border-bottom: 0.75px solid #E4E4E4;
 }
 
 .fields-table thead th:first-child {
-  padding-left: 26px;
+  width: 18%;
+  padding-left: 16px;
 }
 
 .fields-table thead th:nth-child(2) {
-  padding-left: 69px;
+  width: 14%;
 }
 
 .fields-table thead th:nth-child(3) {
-  padding-left: 48px;
+  width: 12%;
+  text-align: center;
 }
 
 .fields-table thead th:nth-child(4) {
-  padding-left: 41px;
+  width: 14%;
 }
 
 .fields-table thead th:nth-child(5) {
-  padding-left: 65px;
+  width: 12%;
+  text-align: center;
 }
 
 .fields-table thead th:nth-child(6) {
-  padding-left: 62px;
+  width: 10%;
+  text-align: center;
 }
 
 .fields-table tbody td {
   font-weight: 400;
-  font-size: 16px;
-  line-height: 23px;
+  font-size: 14px;
+  line-height: 20px;
   color: #454545;
-  padding: 27px 0;
+  padding: 16px 0;
   border-bottom: 0.5px solid #E4E4E4;
 }
 
@@ -295,27 +305,25 @@
 }
 
 .fields-table tbody td:first-child {
-  padding-left: 26px;
+  padding-left: 16px;
 }
 
 .fields-table tbody td:nth-child(2) {
-  padding-left: 69px;
 }
 
 .fields-table tbody td:nth-child(3) {
-  padding-left: 48px;
+  text-align: center;
 }
 
 .fields-table tbody td:nth-child(4) {
-  padding-left: 41px;
 }
 
 .fields-table tbody td:nth-child(5) {
-  padding-left: 65px;
+  text-align: center;
 }
 
 .fields-table tbody td:nth-child(6) {
-  padding-left: 62px;
+  text-align: center;
 }
 
 /* Status Badge */
@@ -323,19 +331,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 4px 16px;
+  border-radius: 6px;
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
-  min-width: 67px;
+  min-width: 70px;
+  cursor: pointer;
 }
 
 .status-badge.active {
   background: #CFFACF;
   border: 1px solid #008000;
   color: #008000;
-  padding: 5px 23px;
 }
 
 .status-badge.inactive {
@@ -347,8 +355,8 @@
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 17px;
-  margin-left: 20px;
+  gap: 12px;
+  justify-content: center;
 }
 
 .action-btn {

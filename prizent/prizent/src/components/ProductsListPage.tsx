@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ProductsListPage.css';
 import productThumb from '../assets/brand_logo.png';
 import productService, { Product, PagedResponse, getProductStatusDisplay } from '../services/productService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
+import categoryService, { Category } from '../services/categoryService';
 
 const ProductsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +17,54 @@ const ProductsListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [productFieldValues, setProductFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
+  const [openFlagDropdown, setOpenFlagDropdown] = useState<number | null>(null);
+  const flagDropdownRef = useRef<HTMLDivElement>(null);
+  const [categoryMap, setCategoryMap] = useState<Map<number, string>>(new Map());
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryService.getAllCategories();
+        if (response.categories) {
+          const map = new Map<number, string>();
+          response.categories.forEach((cat: Category) => {
+            map.set(cat.id, cat.name);
+          });
+          setCategoryMap(map);
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (flagDropdownRef.current && !flagDropdownRef.current.contains(event.target as Node)) {
+        setOpenFlagDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle flag change
+  const handleFlagChange = async (productId: number, newFlag: 'T' | 'A' | 'N') => {
+    try {
+      await productService.updateProductFlag(productId, newFlag);
+      // Update the local state
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, currentType: newFlag } : p
+      ));
+      setOpenFlagDropdown(null);
+    } catch (err) {
+      console.error('Failed to update product flag:', err);
+      alert('Failed to update product flag');
+    }
+  };
 
   // Fetch custom fields on component mount
   useEffect(() => {
@@ -41,7 +90,8 @@ const ProductsListPage: React.FC = () => {
         
         // Convert 1-based page to 0-based for API
         const apiPage = currentPage - 1;
-        const response: PagedResponse<Product> = await productService.getAllProducts(apiPage, itemsPerPage);
+        // Use getAllProductsIncludingDisabled to show both active and inactive products
+        const response: PagedResponse<Product> = await productService.getAllProductsIncludingDisabled(apiPage, itemsPerPage);
         
         setProducts(response.content);
         setTotalPages(response.totalPages);
@@ -187,15 +237,51 @@ const ProductsListPage: React.FC = () => {
                     <span className="product-name">{product.name}</span>
                   </div>
                   <div>{product.skuCode}</div>
-                  <div>Category {product.categoryId}</div> {/* Will be replaced with actual category name later */}
-                  <div>-</div> {/* Units not available in backend model yet */}
+                  <div>{categoryMap.get(product.categoryId) || `Category ${product.categoryId}`}</div>
+                  <div>{product.mrp ? Math.floor(product.mrp).toString().slice(0, 3) : '-'}</div>
                   {customFields.map((field) => (
                     <div key={field.id}>{getFieldValue(field.id)}</div>
                   ))}
-                  <div>
-                    <span className={`product-status ${getProductStatusDisplay(product.currentType).toLowerCase().replace(/\s/g, '-')}`}>
+                  <div className="status-cell" style={{ position: 'relative' }}>
+                    <span 
+                      className={`product-status ${getProductStatusDisplay(product.currentType).toLowerCase().replace(/\s/g, '-')}`}
+                      onClick={() => setOpenFlagDropdown(openFlagDropdown === product.id ? null : product.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       {getProductStatusDisplay(product.currentType)}
                     </span>
+                    {openFlagDropdown === product.id && (
+                      <div className="flag-dropdown" ref={flagDropdownRef}>
+                        <div className="flag-dropdown-header">Mark flag</div>
+                        <label className="flag-option">
+                          <input 
+                            type="radio" 
+                            name={`flag-${product.id}`} 
+                            checked={product.currentType === 'T'} 
+                            onChange={() => handleFlagChange(product.id, 'T')}
+                          />
+                          <span className="product-status top-seller">Top Seller</span>
+                        </label>
+                        <label className="flag-option">
+                          <input 
+                            type="radio" 
+                            name={`flag-${product.id}`} 
+                            checked={product.currentType === 'A'} 
+                            onChange={() => handleFlagChange(product.id, 'A')}
+                          />
+                          <span className="product-status avg-seller">Avg Seller</span>
+                        </label>
+                        <label className="flag-option">
+                          <input 
+                            type="radio" 
+                            name={`flag-${product.id}`} 
+                            checked={product.currentType === 'N'} 
+                            onChange={() => handleFlagChange(product.id, 'N')}
+                          />
+                          <span className="product-status non-seller">Non-Seller</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                   <div className="action-buttons">
                     <button 
@@ -209,15 +295,18 @@ const ProductsListPage: React.FC = () => {
                     </button>
                     <button 
                       className="action-btn delete-btn" 
-                      title={product.enabled ? "Disable" : "Enable"}
+                      title="Delete"
                       onClick={async () => {
-                        try {
-                          await productService.toggleProductStatus(product.id, !product.enabled);
-                          // Refresh the products list
-                          window.location.reload(); // Simple refresh for now
-                        } catch (err) {
-                          console.error('Error toggling product status:', err);
-                          alert('Failed to update product status');
+                        if (window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+                          try {
+                            await productService.deleteProduct(product.id);
+                            // Remove from local state
+                            setProducts(prev => prev.filter(p => p.id !== product.id));
+                            setTotalElements(prev => prev - 1);
+                          } catch (err) {
+                            console.error('Error deleting product:', err);
+                            alert('Failed to delete product');
+                          }
                         }
                       }}
                     >

@@ -101,6 +101,7 @@
 
 .superadmin-sidebar .nav-item span {
   flex: 1;
+  white-space: nowrap;
 }
 
 /* Sub-menu styling */

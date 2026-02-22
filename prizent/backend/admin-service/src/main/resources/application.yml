@@ -12,7 +12,7 @@ spring:
     url: jdbc:mysql://localhost:3306/admin_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
-    password: preetam@123P
+    password: Adarsh@.27
 
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect

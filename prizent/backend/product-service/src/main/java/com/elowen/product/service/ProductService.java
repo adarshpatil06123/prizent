@@ -309,6 +309,45 @@ public class ProductService {
     }
 
     /**
+     * Update product flag/currentType (Top Seller, Avg Seller, Non-Seller)
+     */
+    public ProductResponse updateProductFlag(Long id, String currentType) {
+        UserPrincipal userPrincipal = getCurrentUserPrincipal();
+        Integer clientId = userPrincipal.getClientId();
+        Long userId = userPrincipal.getId();
+
+        Product product = productRepository.findByIdAndClientId(id, clientId)
+            .orElseThrow(() -> new ProductNotFoundException(id));
+
+        // Validate currentType
+        ProductType type;
+        try {
+            type = ProductType.valueOf(currentType);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid currentType: " + currentType + ". Allowed values: T, A, N");
+        }
+
+        product.setCurrentType(type);
+        product.setUpdatedBy(userId);
+
+        Product savedProduct = productRepository.save(product);
+        return new ProductResponse(savedProduct);
+    }
+
+    /**
+     * Delete a product permanently from the database
+     */
+    public void deleteProduct(Long id) {
+        UserPrincipal userPrincipal = getCurrentUserPrincipal();
+        Integer clientId = userPrincipal.getClientId();
+
+        Product product = productRepository.findByIdAndClientId(id, clientId)
+            .orElseThrow(() -> new ProductNotFoundException(id));
+
+        productRepository.delete(product);
+    }
+
+    /**
      * Get product statistics for dashboard
      */
     @Transactional(readOnly = true)
