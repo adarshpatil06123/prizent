@@ -89,6 +89,30 @@ export const calculateTotalCommission = (costs: MarketplaceCost[]): string => {
   return commission.costValueType === 'P' ? `${commission.costValue}%` : `₹${commission.costValue}`;
 };
 
+// Helper function to calculate total shipping from costs
+export const calculateTotalShipping = (costs: MarketplaceCost[]): string => {
+  if (!costs || costs.length === 0) return '0%';
+  
+  const shippingCosts = costs.filter(cost => cost.costCategory === 'SHIPPING');
+  if (shippingCosts.length === 0) return '0%';
+  
+  // Take the first shipping cost for display
+  const shipping = shippingCosts[0];
+  return shipping.costValueType === 'P' ? `${shipping.costValue}%` : `₹${shipping.costValue}`;
+};
+
+// Helper function to calculate total marketing from costs
+export const calculateTotalMarketing = (costs: MarketplaceCost[]): string => {
+  if (!costs || costs.length === 0) return '0%';
+  
+  const marketingCosts = costs.filter(cost => cost.costCategory === 'MARKETING');
+  if (marketingCosts.length === 0) return '0%';
+  
+  // Take the first marketing cost for display
+  const marketing = marketingCosts[0];
+  return marketing.costValueType === 'P' ? `${marketing.costValue}%` : `₹${marketing.costValue}`;
+};
+
 // Helper function to format cost slabs for display
 export const formatCostSlabs = (costs: MarketplaceCost[]): string => {
   if (!costs || costs.length === 0) return 'No slabs';

@@ -22,9 +22,8 @@ const AddProductPage: React.FC = () => {
     proposedSellingPriceNonSales: 0,
     currentType: 'A'
   });
-  const [quantity, setQuantity] = useState('');
-  const [subCategory, setSubCategory] = useState('');
-  const [attributes, setAttributes] = useState('');
+  const [brandName, setBrandName] = useState('');
+  const [enabled, setEnabled] = useState(false);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
 
@@ -202,39 +201,21 @@ const AddProductPage: React.FC = () => {
                 onChange={handleInputChange}
                 required
               />
-              <div className="form-input-with-dropdown">
-                <select 
-                  className="form-select" 
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                >
-                  <option value="">quantity</option>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="5">5</option>
-                  <option value="10">10</option>
-                </select>
-                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
-                </svg>
-              </div>
-              <div className="form-input-with-dropdown">
-                <select 
-                  className="form-select" 
-                  name="currentType"
-                  value={formData.currentType}
-                  onChange={handleInputChange}
-                >
-                  <option value="" disabled>Status</option>
-                  <option value="T">Top Seller</option>
-                  <option value="A">Average Seller</option>
-                  <option value="N">Non Seller</option>
-                </select>
-                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
-                </svg>
-              </div>
+              <input 
+                type="text" 
+                placeholder="brand name" 
+                className="form-input"
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+              />
+              <label className="activate-checkbox">
+                <input 
+                  type="checkbox" 
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                />
+                <span>Active product</span>
+              </label>
             </div>
           </div>
         </section>
@@ -265,34 +246,6 @@ const AddProductPage: React.FC = () => {
                         {category.name}
                       </option>
                     ))}
-                </select>
-                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
-                </svg>
-              </div>
-              <div className="form-input-with-dropdown">
-                <select 
-                  className="form-select" 
-                  value={subCategory}
-                  onChange={(e) => setSubCategory(e.target.value)}
-                >
-                  <option value="">Sub-Categories</option>
-                  <option value="Sub 1">Sub Category 1</option>
-                  <option value="Sub 2">Sub Category 2</option>
-                </select>
-                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
-                </svg>
-              </div>
-              <div className="form-input-with-dropdown">
-                <select 
-                  className="form-select" 
-                  value={attributes}
-                  onChange={(e) => setAttributes(e.target.value)}
-                >
-                  <option value="">Attributes</option>
-                  <option value="Attr 1">Attribute 1</option>
-                  <option value="Attr 2">Attribute 2</option>
                 </select>
                 <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
                   <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>

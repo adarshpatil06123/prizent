@@ -161,7 +161,6 @@ const AddCategoryPage: React.FC = () => {
               onChange={(e) => setCategoryType(e.target.value)}
               disabled={saving}
             >
-              <option value="">Select Category Type</option>
               <option value="Parent category">Parent category</option>
               <option value="Category">Category</option>
               <option value="Sub-category">Sub-category</option>
@@ -174,7 +173,7 @@ const AddCategoryPage: React.FC = () => {
                 onChange={(e) => setParentCategory(e.target.value)}
                 disabled={saving || loading}
               >
-                <option value="">Select Parent Category</option>
+                <option value="">parent categories</option>
                 {(() => {
                   // Filter categories based on the selected category type
                   let availableParents: Category[] = [];
@@ -232,7 +231,7 @@ const AddCategoryPage: React.FC = () => {
                 <div key={field.id}>
                   {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
                     <input
-                      type={field.fieldType === 'numeric' ? 'number' : 'text'}
+                      type="text"
                       placeholder={field.name + (field.required ? ' *' : '')}
                       className="form-input"
                       value={customFieldValues[field.id] || ''}

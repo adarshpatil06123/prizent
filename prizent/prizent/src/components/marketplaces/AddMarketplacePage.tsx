@@ -15,21 +15,16 @@ const AddMarketplacePage: React.FC = () => {
   });
   
   // Cost slabs state
-  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '', to: '', valueType: 'A' as 'P' | 'A' }]);
-  const [commissionBreakdowns, setCommissionBreakdowns] = useState<{
-    category: 'COMMISSION' | 'SHIPPING' | 'MARKETING';
-    value: string;
-    valueType: 'P' | 'A';
-  }[]>([
-    { category: 'COMMISSION', value: '', valueType: 'P' },
-    { category: 'SHIPPING', value: '', valueType: 'P' }
-  ]);
-  const [shippingCosts, setShippingCosts] = useState([{ range: '1-500rs', cost: '' }]);
+  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
+  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
+  const [shippingSlabs, setShippingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
   
   // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productCostValueType, setProductCostValueType] = useState<'P' | 'A'>('A');
+  const [marketingValueType, setMarketingValueType] = useState<'P' | 'A'>('A');
+  const [shippingValueType, setShippingValueType] = useState<'P' | 'A'>('A');
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
 
@@ -53,7 +48,13 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addProductCostSlab = () => {
-    setProductCostSlabs(prev => [...prev, { from: '', to: '', valueType: productCostValueType }]);
+    setProductCostSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: productCostValueType }]);
+  };
+
+  const removeProductCostSlab = (index: number) => {
+    if (productCostSlabs.length > 1) {
+      setProductCostSlabs(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const updateProductCostSlab = (index: number, field: string, value: string) => {
@@ -62,23 +63,35 @@ const AddMarketplacePage: React.FC = () => {
     ));
   };
 
-  const addCommissionBreakdown = () => {
-    setCommissionBreakdowns(prev => [...prev, { category: 'COMMISSION', value: '', valueType: 'P' }]);
+  const addMarketingSlab = () => {
+    setMarketingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: marketingValueType }]);
   };
 
-  const updateCommissionBreakdown = (index: number, field: 'category' | 'value' | 'valueType', value: string) => {
-    setCommissionBreakdowns(prev => prev.map((breakdown, i) => 
-      i === index ? { ...breakdown, [field]: value } : breakdown
+  const removeMarketingSlab = (index: number) => {
+    if (marketingSlabs.length > 1) {
+      setMarketingSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateMarketingSlab = (index: number, field: string, value: string) => {
+    setMarketingSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: value } : slab
     ));
   };
 
-  const addShippingCost = () => {
-    setShippingCosts(prev => [...prev, { range: '', cost: '' }]);
+  const addShippingSlab = () => {
+    setShippingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: shippingValueType }]);
   };
 
-  const updateShippingCost = (index: number, field: string, value: string) => {
-    setShippingCosts(prev => prev.map((shipping, i) => 
-      i === index ? { ...shipping, [field]: value } : shipping
+  const removeShippingSlab = (index: number) => {
+    if (shippingSlabs.length > 1) {
+      setShippingSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateShippingSlab = (index: number, field: string, value: string) => {
+    setShippingSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: value } : slab
     ));
   };
 
@@ -98,36 +111,36 @@ const AddMarketplacePage: React.FC = () => {
       
       // Add product cost slabs
       productCostSlabs.forEach((slab) => {
-        if (slab.from && slab.to) {
+        if (slab.from && slab.to && slab.value) {
           costs.push({
             costCategory: 'COMMISSION',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.to) || 0,
+            costValue: parseFloat(slab.value) || 0,
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
       });
       
-      // Add commission breakdowns
-      commissionBreakdowns.forEach((breakdown) => {
-        if (breakdown.value) {
+      // Add marketing slabs
+      marketingSlabs.forEach((slab) => {
+        if (slab.from && slab.to && slab.value) {
           costs.push({
-            costCategory: breakdown.category,
-            costValueType: breakdown.valueType,
-            costValue: parseFloat(breakdown.value) || 0,
-            costProductRange: 'All'
+            costCategory: 'MARKETING',
+            costValueType: slab.valueType,
+            costValue: parseFloat(slab.value) || 0,
+            costProductRange: `${slab.from}-${slab.to}`
           });
         }
       });
       
-      // Add shipping costs
-      shippingCosts.forEach((shipping) => {
-        if (shipping.cost && shipping.range) {
+      // Add shipping slabs
+      shippingSlabs.forEach((slab) => {
+        if (slab.from && slab.to && slab.value) {
           costs.push({
             costCategory: 'SHIPPING',
-            costValueType: 'A',
-            costValue: parseFloat(shipping.cost) || 0,
-            costProductRange: shipping.range
+            costValueType: slab.valueType,
+            costValue: parseFloat(slab.value) || 0,
+            costProductRange: `${slab.from}-${slab.to}`
           });
         }
       });
@@ -234,12 +247,6 @@ const AddMarketplacePage: React.FC = () => {
             value={formData.description}
             onChange={(e) => handleInputChange('description', e.target.value)}
           />
-          <div className="select-input">
-            <span>Category mapping</span>
-            <svg width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
           <label className="activate-row">
             <input 
               type="checkbox" 
@@ -253,7 +260,7 @@ const AddMarketplacePage: React.FC = () => {
         <div className="grid-3">
           <div className="panel">
             <div className="panel-header">
-              <span>Product cost</span>
+              <span>Commission</span>
               <div className="panel-units">
                 <span>%</span>
                 <label className="switch">
@@ -268,12 +275,14 @@ const AddMarketplacePage: React.FC = () => {
               </div>
             </div>
             <div className="panel-divider" />
-            <div className="panel-columns">
+            <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
               <span>From cost</span>
               <span>To cost</span>
+              <span>Value</span>
+              <span></span>
             </div>
             {productCostSlabs.map((slab, index) => (
-              <div className="panel-form-grid" key={index}>
+              <div className="panel-form-grid" key={index} style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
                 <input 
                   className="small-input" 
                   placeholder="0" 
@@ -282,10 +291,26 @@ const AddMarketplacePage: React.FC = () => {
                 />
                 <input 
                   className="small-input" 
-                  placeholder="500" 
+                  placeholder="1750" 
                   value={slab.to}
                   onChange={(e) => updateProductCostSlab(index, 'to', e.target.value)}
                 />
+                <input 
+                  className="small-input" 
+                  placeholder="10" 
+                  value={slab.value}
+                  onChange={(e) => updateProductCostSlab(index, 'value', e.target.value)}
+                />
+                {productCostSlabs.length > 1 && (
+                  <button 
+                    className="delete-btn" 
+                    onClick={() => removeProductCostSlab(index)} 
+                    type="button"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
             <button className="link-btn" onClick={addProductCostSlab} type="button">+ Add slab</button>
@@ -293,59 +318,118 @@ const AddMarketplacePage: React.FC = () => {
 
           <div className="panel">
             <div className="panel-header">
-              <span>Commission Breakdown</span>
-            </div>
-            <div className="panel-divider" />
-            {commissionBreakdowns.map((breakdown, index) => (
-              <div className="commission-row" key={index}>
-                <div className="select-sm">{breakdown.category === 'COMMISSION' ? 'Platform fee' : breakdown.category === 'SHIPPING' ? 'Logistics' : breakdown.category}</div>
-                <input 
-                  className="num-input" 
-                  placeholder="500" 
-                  value={breakdown.value}
-                  onChange={(e) => updateCommissionBreakdown(index, 'value', e.target.value)}
-                />
-                <span className="unit">%</span>
+              <span>Marketing</span>
+              <div className="panel-units">
+                <span>%</span>
                 <label className="switch">
                   <input 
                     type="checkbox" 
-                    checked={breakdown.valueType === 'A'}
-                    onChange={(e) => updateCommissionBreakdown(index, 'valueType', e.target.checked ? 'A' : 'P')}
+                    checked={marketingValueType === 'A'}
+                    onChange={(e) => setMarketingValueType(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
-                <span className="unit">Rs</span>
+                <span>Rs</span>
+              </div>
+            </div>
+            <div className="panel-divider" />
+            <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+              <span>From cost</span>
+              <span>To cost</span>
+              <span>Value</span>
+              <span></span>
+            </div>
+            {marketingSlabs.map((slab, index) => (
+              <div className="panel-form-grid" key={index} style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                <input 
+                  className="small-input" 
+                  placeholder="0" 
+                  value={slab.from}
+                  onChange={(e) => updateMarketingSlab(index, 'from', e.target.value)}
+                />
+                <input 
+                  className="small-input" 
+                  placeholder="750" 
+                  value={slab.to}
+                  onChange={(e) => updateMarketingSlab(index, 'to', e.target.value)}
+                />
+                <input 
+                  className="small-input" 
+                  placeholder="100" 
+                  value={slab.value}
+                  onChange={(e) => updateMarketingSlab(index, 'value', e.target.value)}
+                />
+                {marketingSlabs.length > 1 && (
+                  <button 
+                    className="delete-btn" 
+                    onClick={() => removeMarketingSlab(index)} 
+                    type="button"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
-            <button className="link-btn" onClick={addCommissionBreakdown} type="button">+ Add Commission</button>
+            <button className="link-btn" onClick={addMarketingSlab} type="button">+ Add slab</button>
           </div>
 
           <div className="panel">
             <div className="panel-header">
-              <span>Shipping Cost</span>
+              <span>Shipping</span>
+              <div className="panel-units">
+                <span>%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={shippingValueType === 'A'}
+                    onChange={(e) => setShippingValueType(e.target.checked ? 'A' : 'P')}
+                  />
+                  <span className="slider" />
+                </label>
+                <span>Rs</span>
+              </div>
             </div>
             <div className="panel-divider" />
-            <div className="panel-columns">
-              <span>Cost Slabs</span>
-              <span>Shipping cost</span>
+            <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+              <span>From cost</span>
+              <span>To cost</span>
+              <span>Value</span>
+              <span></span>
             </div>
-            {shippingCosts.map((shipping, index) => (
-              <div className="panel-form-grid" key={index}>
+            {shippingSlabs.map((slab, index) => (
+              <div className="panel-form-grid" key={index} style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
                 <input 
                   className="small-input" 
-                  placeholder="1-500rs" 
-                  value={shipping.range}
-                  onChange={(e) => updateShippingCost(index, 'range', e.target.value)}
+                  placeholder="0" 
+                  value={slab.from}
+                  onChange={(e) => updateShippingSlab(index, 'from', e.target.value)}
                 />
                 <input 
                   className="small-input" 
-                  placeholder="500" 
-                  value={shipping.cost}
-                  onChange={(e) => updateShippingCost(index, 'cost', e.target.value)}
+                  placeholder="750" 
+                  value={slab.to}
+                  onChange={(e) => updateShippingSlab(index, 'to', e.target.value)}
                 />
+                <input 
+                  className="small-input" 
+                  placeholder="13" 
+                  value={slab.value}
+                  onChange={(e) => updateShippingSlab(index, 'value', e.target.value)}
+                />
+                {shippingSlabs.length > 1 && (
+                  <button 
+                    className="delete-btn" 
+                    onClick={() => removeShippingSlab(index)} 
+                    type="button"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
-            <button className="link-btn" onClick={addShippingCost} type="button">+ cost slab</button>
+            <button className="link-btn" onClick={addShippingSlab} type="button">+ Add slab</button>
           </div>
         </div>
 

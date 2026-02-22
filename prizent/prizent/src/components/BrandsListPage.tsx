@@ -11,6 +11,7 @@ const BrandsListPage: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetchBrands();
@@ -42,6 +43,27 @@ const BrandsListPage: React.FC = () => {
       console.error('Error deleting brand:', err);
       alert('Failed to delete brand');
     }
+  };
+
+  const toggleDescription = (brandId: number) => {
+    setExpandedDescriptions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(brandId)) {
+        newSet.delete(brandId);
+      } else {
+        newSet.add(brandId);
+      }
+      return newSet;
+    });
+  };
+
+  const truncateText = (text: string, maxLength: number = 35) => {
+    if (!text || text.length <= maxLength) return text;
+    return text.slice(0, maxLength).trim() + '...';
+  };
+
+  const isLongDescription = (text: string, maxLength: number = 35) => {
+    return text && text.length > maxLength;
   };
 
   // Pagination logic
@@ -170,7 +192,28 @@ const BrandsListPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="brand-name" data-label="Brand: ">{brand.name}</td>
-                      <td className="brand-description" data-label="Description: ">{brand.description || '-'}</td>
+                      <td className="brand-description" data-label="Description: ">
+                        {brand.description ? (
+                          <div className="description-container">
+                            <span className="description-text">
+                              {expandedDescriptions.has(brand.id) 
+                                ? brand.description 
+                                : truncateText(brand.description)}
+                            </span>
+                            {isLongDescription(brand.description) && (
+                              <>
+                                {' '}
+                                <button 
+                                  className="see-more-btn"
+                                  onClick={() => toggleDescription(brand.id)}
+                                >
+                                  {expandedDescriptions.has(brand.id) ? 'See less' : 'See more'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : '-'}
+                      </td>
                       <td data-label="Status: ">
                         <span className={`status-badge ${brand.enabled ? 'active' : 'inactive'}`}>
                           {brand.enabled ? 'Active' : 'Inactive'}

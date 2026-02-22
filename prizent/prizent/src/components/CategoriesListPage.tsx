@@ -8,8 +8,6 @@ interface CategoryDisplay {
   id: number;
   parentCategory: string;
   category: string;
-  subCategory: string;
-  attributes: string;
   status: 'Active' | 'Inactive';
 }
 
@@ -107,9 +105,6 @@ const CategoriesListPage: React.FC = () => {
         id: category.id,
         parentCategory: parent ? parent.name : 'Root',
         category: category.name,
-        subCategory: children.length > 0 ? children.map(c => c.name).join(', ') : 'None',
-        attributes: ['Size, Fit, Fabric', 'Size, Fit, Waist', 'Size, Fit, Fabric +1', 'Size, Material', 'Size, Material, Sole', 'Size, Fit, Fabric'][index % 6],
-        
         status: category.enabled ? 'Active' as const : 'Inactive' as const
       };
     });
@@ -212,11 +207,9 @@ const CategoriesListPage: React.FC = () => {
           <table className="categories-table">
             <thead>
               <tr>
-                <th>Parent Category</th>
                 <th>Category</th>
-                <th>Sub-Category</th>
-                <th>Attributes</th>
-                {categoryCustomFields.filter(f => f.enabled).map((field) => (
+                <th>Parent Category</th>
+                {categoryCustomFields.filter(f => f.enabled).slice(0, 3).map((field) => (
                   <th key={field.id}>{field.name}</th>
                 ))}
                 <th>Status</th>
@@ -227,11 +220,9 @@ const CategoriesListPage: React.FC = () => {
               {currentCategories.length > 0 ? (
                 currentCategories.map((category) => (
                 <tr key={category.id}>
-                  <td>{category.parentCategory}</td>
                   <td>{category.category}</td>
-                  <td>{category.subCategory}</td>
-                  <td>{category.attributes}</td>
-                  {categoryCustomFields.filter(f => f.enabled).map((field) => {
+                  <td>{category.parentCategory}</td>
+                  {categoryCustomFields.filter(f => f.enabled).slice(0, 3).map((field) => {
                     const fieldValue = categoryFieldValues.get(category.id)?.find(v => v.customFieldId === field.id);
                     return <td key={field.id}>{fieldValue?.value || '-'}</td>;
                   })}

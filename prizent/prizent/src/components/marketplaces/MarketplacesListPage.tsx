@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MarketplacesListPage.css";
-import marketplaceService, { Marketplace, calculateTotalCommission, formatCostSlabs } from '../../services/marketplaceService';
+import marketplaceService, { Marketplace, calculateTotalCommission, calculateTotalShipping, calculateTotalMarketing, formatCostSlabs } from '../../services/marketplaceService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../../services/customFieldService';
 
 const MarketplacesListPage: React.FC = () => {
@@ -208,10 +208,10 @@ const MarketplacesListPage: React.FC = () => {
           
           <div className="marketplaces-table">
             <div className="marketplaces-table-row marketplaces-table-header">
-              <div>Marketplace</div>
-              <div>Category Mapping</div>
-              <div>Product cost slab</div>
-              <div>Total Commission</div>
+              <div>Name</div>
+              <div>Commission</div>
+              <div>Shipping</div>
+              <div>Marketing</div>
               {customFields.filter(f => f.enabled).map((field) => (
                 <div key={field.id}>{field.name}</div>
               ))}
@@ -238,9 +238,9 @@ const MarketplacesListPage: React.FC = () => {
                 return (
                 <div className="marketplaces-table-row" key={marketplace.id}>
                   <div>{marketplace.name}</div>
-                  <div>Mapped</div> {/* TODO: Add real category mapping logic */}
-                  <div>{formatCostSlabs(marketplace.costs || [])}</div>
                   <div>{calculateTotalCommission(marketplace.costs || [])}</div>
+                  <div>{calculateTotalShipping(marketplace.costs || [])}</div>
+                  <div>{calculateTotalMarketing(marketplace.costs || [])}</div>
                   {customFields.filter(f => f.enabled).map((field) => (
                     <div key={field.id}>{getFieldValue(field.id)}</div>
                   ))}
