@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './PriceCalculationPage.css';
 import pricingImage from '../assets/prizing.png';
+import { Marketplace } from '../services/marketplaceService';
+import { Product } from '../services/productService';
+import { calculatePricing, savePricing, PricingCalcResponse, PricingVersionDto } from '../services/pricingService';
 
 interface LocationState {
-  brand?: string;
-  product?: string;
-  parentCategory?: string;
-  category?: string;
-  subCategory?: string;
-  marketplace?: string;
+  marketplace?: Marketplace;
+  product?: Product;
 }
 
 const PriceCalculationPage: React.FC = () => {
@@ -17,23 +16,108 @@ const PriceCalculationPage: React.FC = () => {
   const navigate = useNavigate();
   const state = (location.state as LocationState) || {};
 
+  const marketplace = state.marketplace;
+  const product = state.product;
+
   const [activeTab, setActiveTab] = useState('normal');
   const [pricingMode, setPricingMode] = useState('selling');
-  const [sellingPrice, setSellingPrice] = useState('900');
+  const [inputValue, setInputValue] = useState(
+    product?.proposedSellingPriceSales ? String(product.proposedSellingPriceSales) : ''
+  );
 
-  // Sample calculation values
-  const productCost = 400;
-  const commission = 180;
-  const shipping = 50;
-  const marketing = 30;
+  const [pricingResult, setPricingResult] = useState<PricingCalcResponse | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calcError, setCalcError] = useState<string | null>(null);
+
+  const [savedVersion, setSavedVersion] = useState<PricingVersionDto | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Fallback display values - use API result when available, else fallback to 0
+  const productCost = pricingResult?.productCost ?? product?.productCost ?? 0;
+  const commission = pricingResult?.commission ?? 0;
+  const shipping = pricingResult?.shipping ?? 0;
+  const marketing = pricingResult?.marketing ?? 0;
+  const netRealisation = pricingResult?.netRealisation ?? 0;
+  const profit = pricingResult?.profit ?? 0;
+  const profitPercentage = pricingResult ? pricingResult.profitPercentage.toFixed(1) : '0.0';
+  const sellingPrice = pricingResult?.sellingPrice ?? 0;
   const totalCost = productCost + commission + shipping + marketing;
-  const netRealisation = 1060;
-  const profitPercentage = 25;
 
-  const historyData = [
-    { date: '17 Jan 2026', user: 'Arjun Mehta', oldPrice: '₹670', newPrice: '₹999', marketplace: 'Amazon' },
-    { date: '5 Jan 2026', user: 'Neha Sharma', oldPrice: '₹680', newPrice: '₹869', marketplace: 'Flipkart' }
-  ];
+  // Marketplace cost display metadata (for labels, e.g. "15%" or "₹50")
+  const costs = marketplace?.costs ?? [];
+  const commissionCost = costs.find(c => c.costCategory === 'COMMISSION');
+  const shippingCost = costs.find(c => c.costCategory === 'SHIPPING');
+  const marketingCost = costs.find(c => c.costCategory === 'MARKETING');
+
+  // Debounced API call
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerCalculation = (value: string, mode: string) => {
+    if (!product || !marketplace || !value) return;
+    const numVal = parseFloat(value);
+    if (isNaN(numVal) || numVal <= 0) return;
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(async () => {
+      setIsCalculating(true);
+      setCalcError(null);
+      try {
+        const result = await calculatePricing({
+          skuId: product.id,
+          marketplaceId: marketplace.id,
+          mode: mode === 'profit' ? 'PROFIT_PERCENT' : 'SELLING_PRICE',
+          value: numVal,
+        });
+        setPricingResult(result);
+        // When mode is profit, update input to show the calculated selling price
+        if (mode === 'profit') {
+          setInputValue(result.sellingPrice.toFixed(2));
+          setPricingMode('selling');
+        }
+      } catch (err: any) {
+        setCalcError(err?.response?.data?.message ?? 'Calculation failed');
+      } finally {
+        setIsCalculating(false);
+      }
+    }, 500);
+  };
+
+  // Auto-trigger on input change when in selling price mode
+  useEffect(() => {
+    if (pricingMode === 'selling') {
+      triggerCalculation(inputValue, 'selling');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue]);
+
+  // Initial calculation if we have a default value
+  useEffect(() => {
+    if (inputValue) triggerCalculation(inputValue, pricingMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSave = async () => {
+    if (!product || !marketplace || !pricingResult) return;
+    setIsSaving(true);
+    setSaveError(null);
+    setSavedVersion(null);
+    try {
+      const version = await savePricing({
+        skuId: product.id,
+        marketplaceId: marketplace.id,
+        mode: 'SELLING_PRICE',
+        value: pricingResult.sellingPrice,
+      });
+      setSavedVersion(version);
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.message ?? 'Save failed');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const historyData: { date: string; user: string; oldPrice: string; newPrice: string; marketplace: string }[] = [];
 
   return (
     <div className="price-calc-container">
@@ -76,10 +160,16 @@ const PriceCalculationPage: React.FC = () => {
         <div className="product-info-card-calc">
           <img src={pricingImage} alt="Product" className="product-image-calc" />
           <div className="product-details-calc">
-            <h2 className="product-title-calc">Men's Blue T-Shirt → Medium | {state.marketplace || 'Amazon'}</h2>
-            <p className="product-margin-calc">38% avg margin</p>
+            <h2 className="product-title-calc">
+              {product ? `${product.name} (${product.skuCode})` : 'No product selected'} → {marketplace?.name || 'No marketplace selected'}
+            </h2>
+            <p className="product-margin-calc">
+              {pricingResult
+                ? `${profitPercentage}% margin`
+                : 'Enter selling price to see margin'}
+            </p>
           </div>
-          <div className="top-seller-badge">Top Seller</div>
+          {product && <div className="top-seller-badge">{product.currentType === 'T' ? 'Top Seller' : product.currentType === 'A' ? 'Avg Seller' : 'Non-Seller'}</div>}
         </div>
 
         {/* Select Pricing Mode */}
@@ -150,48 +240,82 @@ const PriceCalculationPage: React.FC = () => {
               <input 
                 type="number" 
                 className="price-input"
-                value={sellingPrice}
-                onChange={(e) => setSellingPrice(e.target.value)}
-                placeholder="900"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={pricingMode === 'selling' ? 'Enter selling price' : 'Enter desired profit %'}
               />
               <svg className="dropdown-arrow" width="8" height="4" viewBox="0 0 8 4" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M1 1L4 3L7 1" stroke="#454545" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <button className="calculate-btn">Calculate</button>
+            <button
+              className="calculate-btn"
+              onClick={() => {
+                if (pricingMode === 'profit') {
+                  triggerCalculation(inputValue, 'profit');
+                } else {
+                  triggerCalculation(inputValue, 'selling');
+                }
+              }}
+            >
+              {pricingMode === 'selling' ? 'Calculate' : 'Get Selling Price'}
+            </button>
+            <button
+              className="save-pricing-btn"
+              onClick={handleSave}
+              disabled={!pricingResult || isSaving}
+              style={{
+                marginTop: 10,
+                width: '100%',
+                padding: '10px 0',
+                background: !pricingResult || isSaving ? '#ccc' : '#1a56db',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: !pricingResult || isSaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isSaving ? 'Saving…' : 'Save Pricing'}
+            </button>
           </div>
 
           {/* Right: Net Outcome */}
           <div className="net-outcome-card">
-            <h4 className="card-title-calc">Net Outcome</h4>
+            <h4 className="card-title-calc">
+              Net Outcome
+              {isCalculating && <span style={{ marginLeft: 8, fontSize: 12, color: '#888' }}>calculating…</span>}
+              {calcError && <span style={{ marginLeft: 8, fontSize: 12, color: '#c00' }}>{calcError}</span>}
+            </h4>
             <div className="outcome-grid">
               <div className="cost-summary">
                 <h5 className="summary-title">Cost Summary</h5>
                 <div className="cost-item">
                   <span className="cost-label">Product Cost</span>
-                  <span className="cost-value blue">{productCost}rs</span>
+                  <span className="cost-value blue">₹{productCost.toFixed(2)}</span>
                 </div>
                 <div className="cost-item">
-                  <span className="cost-label">Commission</span>
-                  <span className="cost-value red">{commission}rs</span>
+                  <span className="cost-label">Commission {commissionCost ? `(${commissionCost.costValueType === 'P' ? commissionCost.costValue + '%' : '₹' + commissionCost.costValue})` : ''}</span>
+                  <span className="cost-value red">₹{commission.toFixed(2)}</span>
                 </div>
                 <div className="cost-item">
-                  <span className="cost-label">Shipping</span>
-                  <span className="cost-value blue">{shipping}rs</span>
+                  <span className="cost-label">Shipping {shippingCost ? `(${shippingCost.costValueType === 'P' ? shippingCost.costValue + '%' : '₹' + shippingCost.costValue})` : ''}</span>
+                  <span className="cost-value blue">₹{shipping.toFixed(2)}</span>
                 </div>
                 <div className="cost-item">
-                  <span className="cost-label">Marketing</span>
-                  <span className="cost-value blue">{marketing}rs</span>
+                  <span className="cost-label">Marketing {marketingCost ? `(${marketingCost.costValueType === 'P' ? marketingCost.costValue + '%' : '₹' + marketingCost.costValue})` : ''}</span>
+                  <span className="cost-value blue">₹{marketing.toFixed(2)}</span>
                 </div>
                 <div className="cost-divider" />
                 <div className="cost-item total">
                   <span className="cost-label">Total Cost</span>
-                  <span className="cost-value green">{totalCost}rs</span>
+                  <span className="cost-value green">₹{totalCost.toFixed(2)}</span>
                 </div>
               </div>
               <div className="realisation-section">
                 <h5 className="realisation-title">Net Realisation</h5>
-                <p className="realisation-amount">{netRealisation} rs</p>
+                <p className="realisation-amount">{pricingResult ? `₹${netRealisation.toFixed(2)}` : '—'}</p>
               </div>
               <div className="profit-section">
                 <div className="profit-circle">
@@ -200,7 +324,7 @@ const PriceCalculationPage: React.FC = () => {
                     <path d="M79.2704 104.239C80.1284 106.038 82.289 106.811 84.0295 105.839C89.4425 102.819 94.3291 98.9245 98.4878 94.3058C103.453 88.7919 107.283 82.3541 109.759 75.3599C112.236 68.3658 113.311 60.9524 112.923 53.5429C112.597 47.3363 111.251 41.2344 108.945 35.4807C108.203 33.6306 106.038 32.8716 104.239 33.7296C102.44 34.5877 101.69 36.7376 102.415 38.5945C104.323 43.4871 105.439 48.6608 105.715 53.9206C106.054 60.3836 105.116 66.85 102.956 72.9507C100.795 79.0513 97.4546 84.6667 93.1241 89.4763C89.5998 93.3904 85.4761 96.7085 80.9142 99.3101C79.1829 100.297 78.4123 102.44 79.2704 104.239Z" fill="#E5FCE5"/>
                   </svg>
                   <div className="profit-text">
-                    <span className="profit-percentage">{profitPercentage}%</span>
+                    <span className="profit-percentage">{pricingResult ? profitPercentage + '%' : '—'}</span>
                     <span className="profit-label">profit</span>
                   </div>
                 </div>
@@ -208,6 +332,35 @@ const PriceCalculationPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Save feedback */}
+        {savedVersion && (
+          <div style={{
+            margin: '12px 0',
+            padding: '12px 16px',
+            background: '#f0fdf4',
+            border: '1px solid #86efac',
+            borderRadius: 8,
+            color: '#166534',
+            fontSize: 14,
+            fontWeight: 500,
+          }}>
+            ✓ {savedVersion.activationMessage} &nbsp;·&nbsp; ₹{savedVersion.sellingPrice.toFixed(2)} &nbsp;·&nbsp; {savedVersion.profitPercentage.toFixed(1)}% profit
+          </div>
+        )}
+        {saveError && (
+          <div style={{
+            margin: '12px 0',
+            padding: '12px 16px',
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            borderRadius: 8,
+            color: '#991b1b',
+            fontSize: 14,
+          }}>
+            ✗ {saveError}
+          </div>
+        )}
 
         {/* Pricing History Table */}
         <div className="pricing-history-card">

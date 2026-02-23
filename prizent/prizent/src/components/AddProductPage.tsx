@@ -23,6 +23,7 @@ const AddProductPage: React.FC = () => {
     currentType: 'A'
   });
   const [enabled, setEnabled] = useState(false);
+  const [parentCategoryId, setParentCategoryId] = useState<number>(0);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
 
@@ -245,21 +246,43 @@ const AddProductPage: React.FC = () => {
           <section className="categories-details-section">
             <h2 className="section-title">Categories Details</h2>
             <div className="categories-card">
+              {/* Parent Category - root level (parentCategoryId = null) */}
               <div className="form-input-with-dropdown">
+                <select 
+                  className="form-select"
+                  value={parentCategoryId}
+                  onChange={(e) => {
+                    setParentCategoryId(Number(e.target.value));
+                    // Reset child category when parent changes
+                    setFormData(prev => ({ ...prev, categoryId: 0 }));
+                  }}
+                >
+                  <option value={0}>Parent Category</option>
+                  {categories
+                    .filter(category => category.enabled && category.parentCategoryId === null)
+                    .map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                </select>
+                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
+                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
+                </svg>
+              </div>
+              {/* Categories - children of selected parent */}
+              <div className="form-input-with-dropdown" style={{ marginTop: '12px' }}>
                 <select 
                   className="form-select" 
                   name="categoryId"
                   value={formData.categoryId}
                   onChange={handleInputChange}
                   required
+                  disabled={!parentCategoryId}
                 >
                   <option value={0}>Categories</option>
                   {categories
-                    .filter(category => 
-                      category.enabled && 
-                      !['adda', 'test', 'TO', 'top'].includes(category.name.toLowerCase()) &&
-                      category.parentCategoryId !== null
-                    )
+                    .filter(category => category.enabled && category.parentCategoryId === parentCategoryId)
                     .map(category => (
                       <option key={category.id} value={category.id}>
                         {category.name}

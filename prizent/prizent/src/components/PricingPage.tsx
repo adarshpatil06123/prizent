@@ -1,61 +1,178 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './PricingPage.css';
+import marketplaceService, { Marketplace } from '../services/marketplaceService';
+import productService, { Product } from '../services/productService';
+import categoryService, { Category } from '../services/categoryService';
+import { calculatePricing } from '../services/pricingService';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [selectedParentCategory, setSelectedParentCategory] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSubCategory, setSelectedSubCategory] = useState('');
-  const [selectedMarketplace, setSelectedMarketplace] = useState('');
 
-  const handleGetProductDetails = () => {
-    if (selectedProduct) {
-      navigate('/product-details', {
-        state: {
-          brand: selectedBrand,
-          product: selectedProduct,
-          parentCategory: selectedParentCategory,
-          category: selectedCategory,
-          subCategory: selectedSubCategory,
-          marketplace: selectedMarketplace
+  // --- Data states ---
+  const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // --- Selection states ---
+  const [selectedMarketplaceId, setSelectedMarketplaceId] = useState('');
+  const [selectedSKUProductId, setSelectedSKUProductId] = useState('');
+  const [selectedParentCategoryId, setSelectedParentCategoryId] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedCategoryProductId, setSelectedCategoryProductId] = useState('');
+  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+
+  // --- Calculation states ---
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [calculatedProfit, setCalculatedProfit] = useState('');
+  const [profitPercentage, setProfitPercentage] = useState('');
+  const [calculatedSellingPrice, setCalculatedSellingPrice] = useState('');
+
+  // Load all data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [mpRes, prodRes, catRes] = await Promise.all([
+          marketplaceService.getAllMarketplaces(0, 100),
+          productService.getAllProducts(0, 500),
+          categoryService.getAllCategories(),
+        ]);
+        if (mpRes.marketplaces?.content) {
+          setMarketplaces(mpRes.marketplaces.content.filter((m: Marketplace) => m.enabled));
         }
+        if (prodRes?.content) {
+          const enabledProds = prodRes.content.filter((p: Product) => p.enabled);
+          console.log('Products loaded:', enabledProds.length, enabledProds.slice(0,3).map((p: Product) => ({id: p.id, name: p.name, categoryId: p.categoryId})));
+          setProducts(enabledProds);
+        }
+        if (catRes.categories) {
+          const allCats = catRes.categories.filter((c: Category) => c.enabled);
+          console.log('Categories loaded:', allCats.length, allCats.map((c: Category) => ({id: c.id, name: c.name})));
+          setCategories(allCats);
+        } else {
+          console.warn('No categories in response:', catRes);
+        }
+      } catch (err: any) {
+        setError('Failed to load data. Please refresh.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // --- Derived category lists ---
+  const parentCategories = categories.filter(c => c.parentCategoryId === null);
+  const childCategories = selectedParentCategoryId
+    ? categories.filter(c => c.parentCategoryId === parseInt(selectedParentCategoryId))
+    : [];
+  const categoryFilteredProducts = selectedCategoryId
+    ? products.filter(p => Number(p.categoryId) === parseInt(selectedCategoryId))
+    : [];
+
+  // --- Handlers: SKU path clears category path ---
+  const handleSKUChange = (val: string) => {
+    setSelectedSKUProductId(val);
+    setSelectedParentCategoryId('');
+    setSelectedCategoryId('');
+    setSelectedCategoryProductId('');
+    const found = val ? products.find(p => p.id === parseInt(val)) || null : null;
+    setActiveProduct(found);
+    setCalculatedProfit('');
+    setCalculatedSellingPrice('');
+  };
+
+  // --- Handlers: Category path clears SKU ---
+  const handleParentCategoryChange = (val: string) => {
+    setSelectedParentCategoryId(val);
+    setSelectedCategoryId('');
+    setSelectedCategoryProductId('');
+    setSelectedSKUProductId('');
+    setActiveProduct(null);
+    setCalculatedProfit('');
+    setCalculatedSellingPrice('');
+  };
+
+  const handleCategoryChange = (val: string) => {
+    setSelectedCategoryId(val);
+    setSelectedCategoryProductId('');
+    setSelectedSKUProductId('');
+    setActiveProduct(null);
+    setCalculatedProfit('');
+    setCalculatedSellingPrice('');
+  };
+
+  const handleCategoryProductChange = (val: string) => {
+    setSelectedCategoryProductId(val);
+    setSelectedSKUProductId('');
+    const found = val ? products.find(p => p.id === parseInt(val)) || null : null;
+    setActiveProduct(found);
+    setCalculatedProfit('');
+    setCalculatedSellingPrice('');
+  };
+
+  const costPrice = activeProduct?.productCost ?? 0;
+
+  const handleCalculateProfit = async () => {
+    if (!activeProduct) { alert('Please select a product first'); return; }
+    if (!selectedMarketplaceId) { alert('Please select a marketplace first'); return; }
+    if (!sellingPrice) { alert('Please enter selling price'); return; }
+    try {
+      const result = await calculatePricing({
+        skuId: activeProduct.id,
+        marketplaceId: parseInt(selectedMarketplaceId),
+        mode: 'SELLING_PRICE',
+        value: parseFloat(sellingPrice),
       });
-    } else {
-      alert('Please select a Product before viewing details.');
+      const isLoss = result.profit < 0;
+      setCalculatedProfit(JSON.stringify({
+        isLoss,
+        text: `${Math.abs(result.profitPercentage).toFixed(2)}% (₹${Math.abs(result.profit).toFixed(2)})`,
+      }));
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
+      alert(msg);
     }
   };
 
-  const handleCalculatePrice = () => {
-    if (selectedProduct && selectedMarketplace) {
-      navigate('/price-calculator', {
-        state: {
-          brand: selectedBrand,
-          product: selectedProduct,
-          parentCategory: selectedParentCategory,
-          category: selectedCategory,
-          subCategory: selectedSubCategory,
-          marketplace: selectedMarketplace
-        }
+  const handleCalculateSellingPrice = async () => {
+    if (!activeProduct) { alert('Please select a product first'); return; }
+    if (!selectedMarketplaceId) { alert('Please select a marketplace first'); return; }
+    if (!profitPercentage) { alert('Please enter profit percentage'); return; }
+    try {
+      const result = await calculatePricing({
+        skuId: activeProduct.id,
+        marketplaceId: parseInt(selectedMarketplaceId),
+        mode: 'PROFIT_PERCENT',
+        value: parseFloat(profitPercentage),
       });
-    } else {
-      alert('Please select at least a Product and Marketplace before calculating price.');
+      setCalculatedSellingPrice(`₹${result.sellingPrice.toFixed(2)}`);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
+      alert(msg);
     }
   };
 
-  const marketplaceData = [
-    { marketplace: 'Amazon', avgSellingPrice: '₹999', avgCost: '₹670', avgProfit: '₹329', margin: '33%' },
-    { marketplace: 'Flipkart', avgSellingPrice: '₹949', avgCost: '₹680', avgProfit: '₹269', margin: '28%' },
-    { marketplace: 'Myntra', avgSellingPrice: '₹1199', avgCost: '₹900', avgProfit: '₹299', margin: '25%' },
-  ];
+  if (loading) {
+    return (
+      <div className="pricing-bg">
+        <main className="pricing-main">
+          <p style={{ padding: '40px', color: '#454545' }}>Loading pricing data...</p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="pricing-bg">
       <main className="pricing-main">
         <header className="pricing-header">
-          <h1 className="pricing-title">Prizing</h1>
+          <h1 className="pricing-title">Pricing</h1>
           <div className="header-actions">
             <button className="icon-btn">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -80,132 +197,196 @@ const PricingPage: React.FC = () => {
 
         <div className="pricing-divider" />
 
-        <section className="select-section">
-          <h2 className="section-title">Select Product & Marketplace</h2>
+        {error && (
+          <div style={{ color: 'red', padding: '10px 0', marginBottom: '16px' }}>{error}</div>
+        )}
 
-          <div className="selection-card">
-            <div className="dropdowns-grid">
-              <div className="dropdown-wrapper">
-                <select 
-                  className="dropdown-select"
-                  value={selectedBrand}
-                  onChange={(e) => setSelectedBrand(e.target.value)}
-                >
-                  <option value="">Select Brand</option>
-                  <option value="brand1">Brand 1</option>
-                  <option value="brand2">Brand 2</option>
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="dropdown-wrapper">
-                <select 
-                  className="dropdown-select"
-                  value={selectedProduct}
-                  onChange={(e) => setSelectedProduct(e.target.value)}
-                >
-                  <option value="">Select Product</option>
-                  <option value="product1">Product 1</option>
-                  <option value="product2">Product 2</option>
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="dropdown-wrapper">
-                <select 
-                  className="dropdown-select"
-                  value={selectedParentCategory}
-                  onChange={(e) => setSelectedParentCategory(e.target.value)}
-                >
-                  <option value="">Select Parent Category</option>
-                  <option value="category1">Category 1</option>
-                  <option value="category2">Category 2</option>
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="dropdown-wrapper">
-                <select 
-                  className="dropdown-select"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                >
-                  <option value="">Select Category</option>
-                  <option value="cat1">Category 1</option>
-                  <option value="cat2">Category 2</option>
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="dropdown-wrapper">
-                <select 
-                  className="dropdown-select"
-                  value={selectedSubCategory}
-                  onChange={(e) => setSelectedSubCategory(e.target.value)}
-                >
-                  <option value="">Select Sub-Category</option>
-                  <option value="sub1">Sub-Category 1</option>
-                  <option value="sub2">Sub-Category 2</option>
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="dropdown-wrapper">
-                <select 
-                  className="dropdown-select"
-                  value={selectedMarketplace}
-                  onChange={(e) => setSelectedMarketplace(e.target.value)}
-                >
-                  <option value="">Select Marketplace</option>
-                  <option value="amazon">Amazon</option>
-                  <option value="flipkart">Flipkart</option>
-                  <option value="myntra">Myntra</option>
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+        {/* Select Marketplace Section */}
+        <section className="marketplace-section">
+          <h2 className="section-title">Select Marketplace</h2>
+          <div className="marketplace-card">
+            <div className="dropdown-wrapper">
+              <select
+                className="dropdown-select"
+                value={selectedMarketplaceId}
+                onChange={(e) => setSelectedMarketplaceId(e.target.value)}
+              >
+                <option value="">Select Marketplace</option>
+                {marketplaces.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
-          </div>
-
-          <div className="action-buttons">
-            <button className="btn-secondary" onClick={handleGetProductDetails}>Get Product Details</button>
-            <button className="btn-primary" onClick={handleCalculatePrice}>Calculate Price</button>
           </div>
         </section>
 
-        <section className="summary-section">
-          <h2 className="section-title">Marketplace Performance Summary</h2>
-
-          <div className="summary-card">
-            <div className="summary-table">
-              <div className="summary-table-row summary-table-header">
-                <div>Marketplace</div>
-                <div>Avg Selling Price</div>
-                <div>Avg Cost</div>
-                <div>Avg Profit</div>
-                <div>Margin %</div>
+        {/* Select Product Section */}
+        <section className="product-section">
+          <h2 className="section-title">Select Product</h2>
+          <div className="product-card">
+            <div className="product-dropdowns">
+              {/* SKU / Product Name */}
+              <div className="dropdown-wrapper">
+                <label className="dropdown-label">SKU / Product Name</label>
+                <select
+                  className="dropdown-select"
+                  value={selectedSKUProductId}
+                  onChange={(e) => handleSKUChange(e.target.value)}
+                >
+                  <option value="">Select SKU</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.skuCode} — {p.name}
+                    </option>
+                  ))}
+                </select>
+                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
-              {marketplaceData.map((item, idx) => (
-                <div className="summary-table-row" key={idx}>
-                  <div>{item.marketplace}</div>
-                  <div>{item.avgSellingPrice}</div>
-                  <div>{item.avgCost}</div>
-                  <div>{item.avgProfit}</div>
-                  <div>{item.margin}</div>
-                </div>
-              ))}
+
+              <div className="or-divider">OR</div>
+
+              {/* Parent Category */}
+              <div className="dropdown-wrapper">
+                <label className="dropdown-label">Parent Category</label>
+                <select
+                  className="dropdown-select"
+                  value={selectedParentCategoryId}
+                  onChange={(e) => handleParentCategoryChange(e.target.value)}
+                >
+                  <option value="">Select Parent Category</option>
+                  {parentCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              {/* Category */}
+              <div className="dropdown-wrapper">
+                <label className="dropdown-label">Category</label>
+                <select
+                  className="dropdown-select"
+                  value={selectedCategoryId}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  disabled={!selectedParentCategoryId}
+                >
+                  <option value="">Select Category</option>
+                  {childCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+
+              {/* Product under Category */}
+              <div className="dropdown-wrapper">
+                <label className="dropdown-label">Product</label>
+                <select
+                  className="dropdown-select"
+                  value={selectedCategoryProductId}
+                  onChange={(e) => handleCategoryProductChange(e.target.value)}
+                  disabled={!selectedCategoryId}
+                >
+                  <option value="">Select Product</option>
+                  {categoryFilteredProducts.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             </div>
+
+            {/* Selected product summary */}
+            {activeProduct && (
+              <div style={{ marginTop: '14px', padding: '10px 16px', background: '#F5F9FA', borderRadius: '8px', display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#454545' }}>
+                <span><strong>SKU:</strong> {activeProduct.skuCode}</span>
+                <span><strong>MRP:</strong> ₹{activeProduct.mrp}</span>
+                <span><strong>Cost:</strong> ₹{activeProduct.productCost}</span>
+                <span><strong>Proposed SP:</strong> ₹{activeProduct.proposedSellingPriceSales}</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Calculation Section */}
+        <section className="calculation-section">
+          <div className="calc-container">
+            {/* Calculate Profit */}
+            <div className="calc-card">
+              <h3 className="calc-title">Calculate Profit</h3>
+              <div className="calc-content">
+                <div className="input-group">
+                  <label className="input-label">
+                    Selling Price
+                    {activeProduct && <span style={{ color: '#7C7C7C', fontWeight: 400 }}> (Cost: ₹{costPrice})</span>}
+                  </label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="Enter selling price"
+                    value={sellingPrice}
+                    onChange={(e) => setSellingPrice(e.target.value)}
+                  />
+                </div>
+                <button className="calc-button" onClick={handleCalculateProfit}>
+                  Calculate
+                </button>
+                {calculatedProfit && (() => {
+                  const p = JSON.parse(calculatedProfit);
+                  return (
+                    <div className="result-display">
+                      <span className="result-label" style={{ color: p.isLoss ? '#c00' : undefined }}>
+                        {p.isLoss ? 'Loss:' : 'Profit:'}
+                      </span>
+                      <span className="result-value" style={{ color: p.isLoss ? '#c00' : '#008000' }}>
+                        {p.text}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Calculate Selling Price */}
+            <div className="calc-card">
+              <h3 className="calc-title">Calculate Selling Price</h3>
+              <div className="calc-content">
+                <div className="input-group">
+                  <label className="input-label">
+                    Profit %
+                    {activeProduct && <span style={{ color: '#7C7C7C', fontWeight: 400 }}> (Cost: ₹{costPrice})</span>}
+                  </label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="Enter profit %"
+                    value={profitPercentage}
+                    onChange={(e) => setProfitPercentage(e.target.value)}
+                  />
+                </div>
+                <button className="calc-button" onClick={handleCalculateSellingPrice}>
+                  Calculate
+                </button>
+                {calculatedSellingPrice && (
+                  <div className="result-display">
+                    <span className="result-label">Selling Price:</span>
+                    <span className="result-value">{calculatedSellingPrice}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </section>
       </main>

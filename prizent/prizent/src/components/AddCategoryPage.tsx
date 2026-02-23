@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AddCategoryPage.css';
 import { useCategories } from '../contexts/CategoryContext';
-import { Category } from '../services/categoryService';
 import { getCustomFields, saveCustomFieldValue, CustomFieldResponse } from '../services/customFieldService';
 
 const AddCategoryPage: React.FC = () => {
   const navigate = useNavigate();
-  const { categories, createCategory, loading } = useCategories();
+  const { createCategory } = useCategories();
   const [categoryName, setCategoryName] = useState('');
   const [categoryType, setCategoryType] = useState('Parent category');
-  const [parentCategory, setParentCategory] = useState('');
   const [enableCategory, setEnableCategory] = useState(true);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
@@ -38,16 +36,11 @@ const AddCategoryPage: React.FC = () => {
       return;
     }
 
-    if (categoryType === 'Category' && !parentCategory) {
-      setValidationError('Please select a parent category');
-      return;
-    }
-    
     try {
       setSaving(true);
       setValidationError('');
       
-      const parentId = categoryType === 'Category' && parentCategory ? parseInt(parentCategory) : null;
+      const parentId = null;
       
       // CategoryContext will automatically refresh all components
       const response = await createCategory(categoryName.trim(), parentId);
@@ -149,34 +142,13 @@ const AddCategoryPage: React.FC = () => {
               name="categoryType"
               className="form-select"
               value={categoryType}
-              onChange={(e) => { setCategoryType(e.target.value); setParentCategory(''); }}
+              onChange={(e) => { setCategoryType(e.target.value); }}
               disabled={saving}
             >
               <option value="Parent category">Parent category</option>
               <option value="Category">Category</option>
             </select>
-            {categoryType === 'Category' ? (
-              <select
-                name="parentCategory"
-                className="form-select"
-                value={parentCategory}
-                onChange={(e) => setParentCategory(e.target.value)}
-                disabled={saving || loading}
-              >
-                <option value="">parent categories</option>
-                {categories.filter(cat =>
-                  cat.parentCategoryId === null &&
-                  cat.enabled &&
-                  !['adda', 'test', 'to', 'top', 'dasd', 'adasd', 'ad', 'god'].includes(cat.name.toLowerCase())
-                ).map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input type="text" className="form-input" value="-" readOnly disabled />
-            )}
+
             <div className="checkbox-container">
               <input
                 type="checkbox"

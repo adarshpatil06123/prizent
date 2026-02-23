@@ -278,7 +278,7 @@
 }
 
 .switch input:checked + .slider {
-  background-color: #C1C1C1;
+  background-color: #1E1E1E;
 }
 
 .switch input:checked + .slider:before {

@@ -322,11 +322,7 @@ const EditProductPage: React.FC = () => {
                 >
                   <option value={0}>Categories</option>
                   {categories
-                    .filter(category => 
-                      category.enabled && 
-                      !['adda', 'test', 'TO', 'top'].includes(category.name.toLowerCase()) &&
-                      category.parentCategoryId !== null
-                    )
+                    .filter(category => category.enabled)
                     .map(category => (
                       <option key={category.id} value={category.id}>
                         {category.name}
