@@ -22,7 +22,6 @@ const AddProductPage: React.FC = () => {
     proposedSellingPriceNonSales: 0,
     currentType: 'A'
   });
-  const [brandName, setBrandName] = useState('');
   const [enabled, setEnabled] = useState(false);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
@@ -83,6 +82,13 @@ const AddProductPage: React.FC = () => {
       return;
     }
 
+    if (!formData.brandId || formData.brandId === 0) {
+      alert('Please select a brand');
+      return;
+    }
+
+    console.log('Creating product with data:', formData);
+
     try {
       setLoading(true);
       const response = await productService.createProduct(formData);
@@ -106,6 +112,12 @@ const AddProductPage: React.FC = () => {
             }
           })
         );
+
+        // If user unchecked Active product, disable it (backend defaults to enabled)
+        if (!enabled) {
+          await productService.toggleProductStatus(response.id, false);
+          console.log('Product disabled after creation');
+        }
       }
 
       alert('Product created successfully!');
@@ -201,13 +213,20 @@ const AddProductPage: React.FC = () => {
                 onChange={handleInputChange}
                 required
               />
-              <input 
-                type="text" 
-                placeholder="brand name" 
+              <select 
                 className="form-input"
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-              />
+                name="brandId"
+                value={formData.brandId}
+                onChange={handleInputChange}
+                required
+              >
+                <option value={0} disabled>Select brand</option>
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
               <label className="activate-checkbox">
                 <input 
                   type="checkbox" 
@@ -284,6 +303,16 @@ const AddProductPage: React.FC = () => {
                 className="form-input"
                 name="proposedSellingPriceSales"
                 value={formData.proposedSellingPriceSales || ''}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+              />
+              <input 
+                type="number" 
+                placeholder="Proposed selling price (non-sales)" 
+                className="form-input"
+                name="proposedSellingPriceNonSales"
+                value={formData.proposedSellingPriceNonSales || ''}
                 onChange={handleInputChange}
                 min="0"
                 step="0.01"

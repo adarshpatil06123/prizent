@@ -10,6 +10,7 @@ const EditCategoryPage: React.FC = () => {
   const { categories, getCategoryById, updateCategory, loading, error } = useCategories();
   
   const [categoryName, setCategoryName] = useState('');
+  const [categoryType, setCategoryType] = useState('Parent category');
   const [parentCategory, setParentCategory] = useState('');
   const [enableCategory, setEnableCategory] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,6 +44,8 @@ const EditCategoryPage: React.FC = () => {
         
         if (category) {
           setCategoryName(category.name);
+          const hasParent = !!category.parentCategoryId;
+          setCategoryType(hasParent ? 'Category' : 'Parent category');
           setParentCategory(category.parentCategoryId ? category.parentCategoryId.toString() : '');
           setEnableCategory(category.enabled);
 
@@ -199,21 +202,38 @@ const EditCategoryPage: React.FC = () => {
               disabled={saving}
             />
             <select
-              name="parentCategory"
+              name="categoryType"
               className="form-select"
-              value={parentCategory}
-              onChange={(e) => setParentCategory(e.target.value)}
-              disabled={saving || loading}
+              value={categoryType}
+              onChange={(e) => { setCategoryType(e.target.value); setParentCategory(''); }}
+              disabled={saving}
             >
-              <option value="">No Parent (Root Category)</option>
-              {categories
-                .filter(cat => cat.id.toString() !== id) // Prevent category from being its own parent
-                .map((category) => (
+              <option value="Parent category">Parent category</option>
+              <option value="Category">Category</option>
+            </select>
+            {categoryType === 'Category' ? (
+              <select
+                name="parentCategory"
+                className="form-select"
+                value={parentCategory}
+                onChange={(e) => setParentCategory(e.target.value)}
+                disabled={saving || loading}
+              >
+                <option value="">parent categories</option>
+                {categories.filter(cat =>
+                  cat.parentCategoryId === null &&
+                  cat.enabled &&
+                  cat.id.toString() !== id &&
+                  !['adda', 'test', 'to', 'top', 'dasd', 'adasd', 'ad', 'god'].includes(cat.name.toLowerCase())
+                ).map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
                 ))}
-            </select>
+              </select>
+            ) : (
+              <input type="text" className="form-input" value="-" readOnly disabled />
+            )}
             <div className="checkbox-container">
               <input
                 type="checkbox"

@@ -121,6 +121,18 @@ export const formatCostSlabs = (costs: MarketplaceCost[]): string => {
   return ranges.join(', ') || 'No range specified';
 };
 
+// Helper to get all formatted slabs for a specific category
+export const getSlabsForCategory = (costs: MarketplaceCost[], category: 'COMMISSION' | 'SHIPPING' | 'MARKETING'): string[] => {
+  if (!costs || costs.length === 0) return ['-'];
+  const filtered = costs.filter(c => c.costCategory === category);
+  if (filtered.length === 0) return ['-'];
+  return filtered.map(c => {
+    const value = c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`;
+    const range = c.costProductRange ? ` (${c.costProductRange})` : '';
+    return `${value}${range}`;
+  });
+};
+
 const marketplaceService = {
   // Get all marketplaces with pagination
   getAllMarketplaces: async (page: number = 0, size: number = 10): Promise<MarketplaceResponse> => {

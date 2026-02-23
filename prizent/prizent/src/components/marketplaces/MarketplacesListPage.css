@@ -173,6 +173,20 @@
   line-height: 23px;
   color: #454545;
   border-bottom: 0.5px solid #E4E4E4;
+  align-items: flex-start;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.slab-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slab-entry {
+  display: block;
+  white-space: nowrap;
 }
 
 .status-badge {

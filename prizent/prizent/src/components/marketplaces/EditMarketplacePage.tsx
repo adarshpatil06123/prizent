@@ -139,6 +139,45 @@ const EditMarketplacePage: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Update all existing slabs when value type toggle changes
+  const handleProductCostValueTypeChange = (newType: 'P' | 'A') => {
+    console.log('=== COMMISSION VALUE TYPE CHANGE ===');
+    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
+    setProductCostValueType(newType);
+    setProductCostSlabs(prev => {
+      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
+      console.log('Updated commission slabs:', updated);
+      return updated;
+    });
+  };
+
+  const handleMarketingValueTypeChange = (newType: 'P' | 'A') => {
+    console.log('=== MARKETING VALUE TYPE CHANGE ===');
+    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
+    setMarketingValueType(newType);
+    setMarketingSlabs(prev => {
+      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
+      console.log('Updated marketing slabs:', updated);
+      return updated;
+    });
+  };
+
+  const handleShippingValueTypeChange = (newType: 'P' | 'A') => {
+    console.log('=== SHIPPING VALUE TYPE CHANGE ===');
+    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
+    setShippingValueType(newType);
+    setShippingSlabs(prev => {
+      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
+      console.log('Updated shipping slabs:', updated);
+      return updated;
+    });
+  };
+
+  // Validate numeric input - only allow numbers and decimal point
+  const validateNumericInput = (value: string): string => {
+    return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  };
+
   const addProductCostSlab = () => {
     setProductCostSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: productCostValueType }]);
   };
@@ -150,8 +189,9 @@ const EditMarketplacePage: React.FC = () => {
   };
 
   const updateProductCostSlab = (index: number, field: string, value: string) => {
+    const validatedValue = field !== 'valueType' ? validateNumericInput(value) : value;
     setProductCostSlabs(prev => prev.map((slab, i) => 
-      i === index ? { ...slab, [field]: value } : slab
+      i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
 
@@ -166,8 +206,9 @@ const EditMarketplacePage: React.FC = () => {
   };
 
   const updateMarketingSlab = (index: number, field: string, value: string) => {
+    const validatedValue = field !== 'valueType' ? validateNumericInput(value) : value;
     setMarketingSlabs(prev => prev.map((slab, i) => 
-      i === index ? { ...slab, [field]: value } : slab
+      i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
 
@@ -182,8 +223,9 @@ const EditMarketplacePage: React.FC = () => {
   };
 
   const updateShippingSlab = (index: number, field: string, value: string) => {
+    const validatedValue = field !== 'valueType' ? validateNumericInput(value) : value;
     setShippingSlabs(prev => prev.map((slab, i) => 
-      i === index ? { ...slab, [field]: value } : slab
+      i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
 
@@ -206,9 +248,15 @@ const EditMarketplacePage: React.FC = () => {
       // Prepare cost data
       const costs: UpdateMarketplaceCostRequest[] = [];
       
+      console.log('=== PREPARING COSTS FOR UPDATE ===');
+      console.log('Current productCostSlabs:', productCostSlabs);
+      console.log('Current marketingSlabs:', marketingSlabs);
+      console.log('Current shippingSlabs:', shippingSlabs);
+      
       // Add product cost slabs (Commission)
       productCostSlabs.forEach((slab) => {
         if (slab.from && slab.to && slab.value) {
+          console.log('Adding COMMISSION cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'COMMISSION',
             costValueType: slab.valueType,
@@ -221,6 +269,7 @@ const EditMarketplacePage: React.FC = () => {
       // Add marketing slabs
       marketingSlabs.forEach((slab) => {
         if (slab.from && slab.to && slab.value) {
+          console.log('Adding MARKETING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'MARKETING',
             costValueType: slab.valueType,
@@ -233,6 +282,7 @@ const EditMarketplacePage: React.FC = () => {
       // Add shipping slabs
       shippingSlabs.forEach((slab) => {
         if (slab.from && slab.to && slab.value) {
+          console.log('Adding SHIPPING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'SHIPPING',
             costValueType: slab.valueType,
@@ -372,7 +422,7 @@ const EditMarketplacePage: React.FC = () => {
                   <input 
                     type="checkbox" 
                     checked={productCostValueType === 'A'}
-                    onChange={(e) => setProductCostValueType(e.target.checked ? 'A' : 'P')}
+                    onChange={(e) => handleProductCostValueTypeChange(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
@@ -430,7 +480,7 @@ const EditMarketplacePage: React.FC = () => {
                   <input 
                     type="checkbox" 
                     checked={marketingValueType === 'A'}
-                    onChange={(e) => setMarketingValueType(e.target.checked ? 'A' : 'P')}
+                    onChange={(e) => handleMarketingValueTypeChange(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
@@ -488,7 +538,7 @@ const EditMarketplacePage: React.FC = () => {
                   <input 
                     type="checkbox" 
                     checked={shippingValueType === 'A'}
-                    onChange={(e) => setShippingValueType(e.target.checked ? 'A' : 'P')}
+                    onChange={(e) => handleShippingValueTypeChange(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>

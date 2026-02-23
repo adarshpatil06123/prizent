@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MarketplacesListPage.css";
-import marketplaceService, { Marketplace, calculateTotalCommission, calculateTotalShipping, calculateTotalMarketing, formatCostSlabs } from '../../services/marketplaceService';
+import marketplaceService, { Marketplace, getSlabsForCategory } from '../../services/marketplaceService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../../services/customFieldService';
 
 const MarketplacesListPage: React.FC = () => {
@@ -238,9 +238,21 @@ const MarketplacesListPage: React.FC = () => {
                 return (
                 <div className="marketplaces-table-row" key={marketplace.id}>
                   <div>{marketplace.name}</div>
-                  <div>{calculateTotalCommission(marketplace.costs || [])}</div>
-                  <div>{calculateTotalShipping(marketplace.costs || [])}</div>
-                  <div>{calculateTotalMarketing(marketplace.costs || [])}</div>
+                  <div className="slab-cell">
+                    {getSlabsForCategory(marketplace.costs || [], 'COMMISSION').map((slab, i) => (
+                      <span key={i} className="slab-entry">{slab}</span>
+                    ))}
+                  </div>
+                  <div className="slab-cell">
+                    {getSlabsForCategory(marketplace.costs || [], 'SHIPPING').map((slab, i) => (
+                      <span key={i} className="slab-entry">{slab}</span>
+                    ))}
+                  </div>
+                  <div className="slab-cell">
+                    {getSlabsForCategory(marketplace.costs || [], 'MARKETING').map((slab, i) => (
+                      <span key={i} className="slab-entry">{slab}</span>
+                    ))}
+                  </div>
                   {customFields.filter(f => f.enabled).map((field) => (
                     <div key={field.id}>{getFieldValue(field.id)}</div>
                   ))}

@@ -28,6 +28,45 @@ const AddMarketplacePage: React.FC = () => {
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
 
+  // Update all existing slabs when value type toggle changes
+  const handleProductCostValueTypeChange = (newType: 'P' | 'A') => {
+    console.log('=== COMMISSION VALUE TYPE CHANGE ===');
+    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
+    setProductCostValueType(newType);
+    setProductCostSlabs(prev => {
+      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
+      console.log('Updated commission slabs:', updated);
+      return updated;
+    });
+  };
+
+  const handleMarketingValueTypeChange = (newType: 'P' | 'A') => {
+    console.log('=== MARKETING VALUE TYPE CHANGE ===');
+    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
+    setMarketingValueType(newType);
+    setMarketingSlabs(prev => {
+      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
+      console.log('Updated marketing slabs:', updated);
+      return updated;
+    });
+  };
+
+  const handleShippingValueTypeChange = (newType: 'P' | 'A') => {
+    console.log('=== SHIPPING VALUE TYPE CHANGE ===');
+    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
+    setShippingValueType(newType);
+    setShippingSlabs(prev => {
+      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
+      console.log('Updated shipping slabs:', updated);
+      return updated;
+    });
+  };
+
+  // Validate numeric input - only allow numbers and decimal point
+  const validateNumericInput = (value: string): string => {
+    return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  };
+
   // Fetch custom fields for marketplaces
   useEffect(() => {
     const fetchCustomFields = async () => {
@@ -58,8 +97,9 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const updateProductCostSlab = (index: number, field: string, value: string) => {
+    const validatedValue = field !== 'valueType' ? validateNumericInput(value) : value;
     setProductCostSlabs(prev => prev.map((slab, i) => 
-      i === index ? { ...slab, [field]: value } : slab
+      i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
 
@@ -74,8 +114,9 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const updateMarketingSlab = (index: number, field: string, value: string) => {
+    const validatedValue = field !== 'valueType' ? validateNumericInput(value) : value;
     setMarketingSlabs(prev => prev.map((slab, i) => 
-      i === index ? { ...slab, [field]: value } : slab
+      i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
 
@@ -90,8 +131,9 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const updateShippingSlab = (index: number, field: string, value: string) => {
+    const validatedValue = field !== 'valueType' ? validateNumericInput(value) : value;
     setShippingSlabs(prev => prev.map((slab, i) => 
-      i === index ? { ...slab, [field]: value } : slab
+      i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
 
@@ -103,15 +145,63 @@ const AddMarketplacePage: React.FC = () => {
       // Validate required fields
       if (!formData.name.trim()) {
         setError('Marketplace name is required');
+        setLoading(false);
+        return;
+      }
+
+      // Validate slab ranges
+      const validateSlabs = (slabs: typeof productCostSlabs, name: string): string | null => {
+        for (const slab of slabs) {
+          if (slab.from || slab.to || slab.value) {
+            if (!slab.from || !slab.to || !slab.value) {
+              return `${name}: All fields (From, To, Value) are required for each slab`;
+            }
+            const fromVal = parseFloat(slab.from);
+            const toVal = parseFloat(slab.to);
+            if (fromVal >= toVal) {
+              return `${name}: "From cost" must be less than "To cost"`;
+            }
+            if (parseFloat(slab.value) <= 0) {
+              return `${name}: Value must be greater than 0`;
+            }
+          }
+        }
+        return null;
+      };
+
+      const commissionError = validateSlabs(productCostSlabs, 'Commission');
+      if (commissionError) {
+        setError(commissionError);
+        setLoading(false);
+        return;
+      }
+
+      const marketingError = validateSlabs(marketingSlabs, 'Marketing');
+      if (marketingError) {
+        setError(marketingError);
+        setLoading(false);
+        return;
+      }
+
+      const shippingError = validateSlabs(shippingSlabs, 'Shipping');
+      if (shippingError) {
+        setError(shippingError);
+        setLoading(false);
         return;
       }
       
       // Prepare cost data
       const costs: CreateMarketplaceCostRequest[] = [];
       
+      console.log('=== PREPARING COSTS FOR SAVE ===');
+      console.log('Current productCostSlabs:', productCostSlabs);
+      console.log('Current marketingSlabs:', marketingSlabs);
+      console.log('Current shippingSlabs:', shippingSlabs);
+      
       // Add product cost slabs
       productCostSlabs.forEach((slab) => {
         if (slab.from && slab.to && slab.value) {
+          console.log('Adding COMMISSION cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'COMMISSION',
             costValueType: slab.valueType,
@@ -124,6 +214,7 @@ const AddMarketplacePage: React.FC = () => {
       // Add marketing slabs
       marketingSlabs.forEach((slab) => {
         if (slab.from && slab.to && slab.value) {
+          console.log('Adding MARKETING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'MARKETING',
             costValueType: slab.valueType,
@@ -136,6 +227,7 @@ const AddMarketplacePage: React.FC = () => {
       // Add shipping slabs
       shippingSlabs.forEach((slab) => {
         if (slab.from && slab.to && slab.value) {
+          console.log('Adding SHIPPING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'SHIPPING',
             costValueType: slab.valueType,
@@ -267,7 +359,7 @@ const AddMarketplacePage: React.FC = () => {
                   <input 
                     type="checkbox" 
                     checked={productCostValueType === 'A'}
-                    onChange={(e) => setProductCostValueType(e.target.checked ? 'A' : 'P')}
+                    onChange={(e) => handleProductCostValueTypeChange(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
@@ -325,7 +417,7 @@ const AddMarketplacePage: React.FC = () => {
                   <input 
                     type="checkbox" 
                     checked={marketingValueType === 'A'}
-                    onChange={(e) => setMarketingValueType(e.target.checked ? 'A' : 'P')}
+                    onChange={(e) => handleMarketingValueTypeChange(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
@@ -383,7 +475,7 @@ const AddMarketplacePage: React.FC = () => {
                   <input 
                     type="checkbox" 
                     checked={shippingValueType === 'A'}
-                    onChange={(e) => setShippingValueType(e.target.checked ? 'A' : 'P')}
+                    onChange={(e) => handleShippingValueTypeChange(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>

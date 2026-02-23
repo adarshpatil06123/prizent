@@ -143,7 +143,7 @@
 .products-table-row {
   display: grid;
   grid-auto-flow: column;
-  grid-template-columns: minmax(320px, 2fr) minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(80px, 0.6fr);
+  grid-template-columns: minmax(280px, 2fr) minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(80px, 0.6fr);
   grid-auto-columns: minmax(80px, 0.8fr);
   column-gap: 0px;
   align-items: center;
@@ -245,55 +245,21 @@
   color: #BF2020;
 }
 
-/* Flag Dropdown */
+.product-status.active {
+  background: #CFFACF;
+  border: 1px solid #008000;
+  color: #008000;
+}
+
+.product-status.inactive {
+  background: #F8D1D1;
+  border: 1px solid #BF2020;
+  color: #BF2020;
+}
+
+/* Status Cell */
 .status-cell {
   position: relative;
-}
-
-.flag-dropdown {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #FFFFFF;
-  border: 1px solid #E4E4E4;
-  border-radius: 8px;
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 12px;
-  z-index: 100;
-  min-width: 150px;
-}
-
-.flag-dropdown-header {
-  font-family: 'Murecho', sans-serif;
-  font-weight: 500;
-  font-size: 14px;
-  color: #1A1A1A;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #E4E4E4;
-}
-
-.flag-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  cursor: pointer;
-}
-
-.flag-option input[type="radio"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: #007bff;
-}
-
-.flag-option .product-status {
-  min-width: auto;
-  padding: 3px 12px;
-  font-size: 12px;
-  height: auto;
 }
 
 .action-buttons {

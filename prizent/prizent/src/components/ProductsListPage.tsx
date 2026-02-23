@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ProductsListPage.css';
 import productThumb from '../assets/brand_logo.png';
-import productService, { Product, PagedResponse, getProductStatusDisplay } from '../services/productService';
+import productService, { Product, PagedResponse } from '../services/productService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 import categoryService, { Category } from '../services/categoryService';
+import brandService, { Brand } from '../services/brandService';
 
 const ProductsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,9 +18,8 @@ const ProductsListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [productFieldValues, setProductFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
-  const [openFlagDropdown, setOpenFlagDropdown] = useState<number | null>(null);
-  const flagDropdownRef = useRef<HTMLDivElement>(null);
   const [categoryMap, setCategoryMap] = useState<Map<number, string>>(new Map());
+  const [brandMap, setBrandMap] = useState<Map<number, string>>(new Map());
 
   // Fetch categories on mount
   useEffect(() => {
@@ -40,29 +40,38 @@ const ProductsListPage: React.FC = () => {
     fetchCategories();
   }, []);
 
-  // Close dropdown when clicking outside
+  // Fetch brands on mount
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (flagDropdownRef.current && !flagDropdownRef.current.contains(event.target as Node)) {
-        setOpenFlagDropdown(null);
+    const fetchBrands = async () => {
+      try {
+        const response = await brandService.getAllBrands();
+        console.log('Brands API response:', response);
+        if (response.brands) {
+          const map = new Map<number, string>();
+          response.brands.forEach((brand: Brand) => {
+            map.set(brand.id, brand.name);
+          });
+          setBrandMap(map);
+          console.log('Brand map created:', Array.from(map.entries()));
+        }
+      } catch (err) {
+        console.error('Failed to fetch brands:', err);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    fetchBrands();
   }, []);
 
-  // Handle flag change
-  const handleFlagChange = async (productId: number, newFlag: 'T' | 'A' | 'N') => {
+  // Handle toggle product status
+  const handleToggleStatus = async (productId: number, currentEnabled: boolean) => {
     try {
-      await productService.updateProductFlag(productId, newFlag);
+      await productService.toggleProductStatus(productId, !currentEnabled);
       // Update the local state
       setProducts(prev => prev.map(p => 
-        p.id === productId ? { ...p, currentType: newFlag } : p
+        p.id === productId ? { ...p, enabled: !currentEnabled } : p
       ));
-      setOpenFlagDropdown(null);
     } catch (err) {
-      console.error('Failed to update product flag:', err);
-      alert('Failed to update product flag');
+      console.error('Failed to toggle product status:', err);
+      alert('Failed to update product status');
     }
   };
 
@@ -190,9 +199,9 @@ const ProductsListPage: React.FC = () => {
           <div className="products-table">
             <div className="products-table-row products-table-header">
               <div>Product</div>
+              <div>Brand</div>
               <div>SKU Code</div>
               <div>Category</div>
-              <div>Units</div>
               {customFields.map((field) => (
                 <div key={field.id}>{field.name}</div>
               ))}
@@ -229,6 +238,7 @@ const ProductsListPage: React.FC = () => {
                   const value = fieldValues.find(v => v.customFieldId === fieldId);
                   return value ? value.value : '-';
                 };
+                console.log(`Product ${product.name} - brandId: ${product.brandId}, brand lookup: ${brandMap.get(product.brandId)}`);
                 
                 return (
                 <div className="products-table-row" key={product.id}>
@@ -236,52 +246,20 @@ const ProductsListPage: React.FC = () => {
                     <img className="product-thumb" src={productThumb} alt="" />
                     <span className="product-name">{product.name}</span>
                   </div>
+                  <div>{brandMap.get(product.brandId) || '-'}</div>
                   <div>{product.skuCode}</div>
                   <div>{categoryMap.get(product.categoryId) || `Category ${product.categoryId}`}</div>
-                  <div>{product.mrp ? Math.floor(product.mrp).toString().slice(0, 3) : '-'}</div>
                   {customFields.map((field) => (
                     <div key={field.id}>{getFieldValue(field.id)}</div>
                   ))}
-                  <div className="status-cell" style={{ position: 'relative' }}>
+                  <div className="status-cell">
                     <span 
-                      className={`product-status ${getProductStatusDisplay(product.currentType).toLowerCase().replace(/\s/g, '-')}`}
-                      onClick={() => setOpenFlagDropdown(openFlagDropdown === product.id ? null : product.id)}
+                      className={`product-status ${product.enabled ? 'active' : 'inactive'}`}
+                      onClick={() => handleToggleStatus(product.id, product.enabled)}
                       style={{ cursor: 'pointer' }}
                     >
-                      {getProductStatusDisplay(product.currentType)}
+                      {product.enabled ? 'Active' : 'Inactive'}
                     </span>
-                    {openFlagDropdown === product.id && (
-                      <div className="flag-dropdown" ref={flagDropdownRef}>
-                        <div className="flag-dropdown-header">Mark flag</div>
-                        <label className="flag-option">
-                          <input 
-                            type="radio" 
-                            name={`flag-${product.id}`} 
-                            checked={product.currentType === 'T'} 
-                            onChange={() => handleFlagChange(product.id, 'T')}
-                          />
-                          <span className="product-status top-seller">Top Seller</span>
-                        </label>
-                        <label className="flag-option">
-                          <input 
-                            type="radio" 
-                            name={`flag-${product.id}`} 
-                            checked={product.currentType === 'A'} 
-                            onChange={() => handleFlagChange(product.id, 'A')}
-                          />
-                          <span className="product-status avg-seller">Avg Seller</span>
-                        </label>
-                        <label className="flag-option">
-                          <input 
-                            type="radio" 
-                            name={`flag-${product.id}`} 
-                            checked={product.currentType === 'N'} 
-                            onChange={() => handleFlagChange(product.id, 'N')}
-                          />
-                          <span className="product-status non-seller">Non-Seller</span>
-                        </label>
-                      </div>
-                    )}
                   </div>
                   <div className="action-buttons">
                     <button 
