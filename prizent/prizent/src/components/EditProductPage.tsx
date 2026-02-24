@@ -5,6 +5,7 @@ import productService, { UpdateProductRequest } from '../services/productService
 import { useCategories } from '../contexts/CategoryContext';
 import brandService, { Brand } from '../services/brandService';
 import { getCustomFields, saveCustomFieldValue, getCustomFieldValues, CustomFieldResponse } from '../services/customFieldService';
+import marketplaceService, { Marketplace } from '../services/marketplaceService';
 
 const EditProductPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,8 +27,12 @@ const EditProductPage: React.FC = () => {
   });
   const [enabled, setEnabled] = useState(false);
   const [originalEnabled, setOriginalEnabled] = useState(false);
+  const [parentCategoryId, setParentCategoryId] = useState<number>(0);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
+  const [allMarketplaces, setAllMarketplaces] = useState<Marketplace[]>([]);
+  const [selectedMarketplaceIds, setSelectedMarketplaceIds] = useState<number[]>([]);
+  const [productMarketplaceNames, setProductMarketplaceNames] = useState<{ [id: number]: string }>({});
 
   // Fetch brands on component mount
   useEffect(() => {
@@ -45,6 +50,39 @@ const EditProductPage: React.FC = () => {
     fetchBrands();
   }, []);
 
+  // Fetch all active marketplaces
+  useEffect(() => {
+    const fetchMarketplaces = async () => {
+      try {
+        const response = await marketplaceService.getAllMarketplaces(0, 100);
+        if (response.marketplaces?.content) {
+          setAllMarketplaces(response.marketplaces.content.filter(m => m.enabled));
+        }
+      } catch (error) {
+        console.error('Failed to fetch marketplaces:', error);
+      }
+    };
+    fetchMarketplaces();
+  }, []);
+
+  // Load existing marketplace mappings for this product
+  useEffect(() => {
+    if (!id) return;
+    const fetchMappings = async () => {
+      try {
+        const mappings = await productService.getMarketplaceMappings(Number(id));
+        const ids = mappings.map(m => m.marketplaceId);
+        const names: { [id: number]: string } = {};
+        mappings.forEach(m => { names[m.marketplaceId] = m.productMarketplaceName; });
+        setSelectedMarketplaceIds(ids);
+        setProductMarketplaceNames(names);
+      } catch (error) {
+        console.error('Failed to load marketplace mappings:', error);
+      }
+    };
+    fetchMappings();
+  }, [id]);
+
   // Fetch custom fields for products
   useEffect(() => {
     const fetchCustomFields = async () => {
@@ -59,6 +97,16 @@ const EditProductPage: React.FC = () => {
     };
     fetchCustomFields();
   }, []);
+
+  // Re-derive parentCategoryId when categories context loads or categoryId changes
+  useEffect(() => {
+    if (formData.categoryId && categories.length > 0 && parentCategoryId === 0) {
+      const child = categories.find(c => c.id === formData.categoryId);
+      if (child && child.parentCategoryId) {
+        setParentCategoryId(child.parentCategoryId);
+      }
+    }
+  }, [categories, formData.categoryId]);
 
   // Fetch product data
   useEffect(() => {
@@ -83,6 +131,14 @@ const EditProductPage: React.FC = () => {
         setEnabled(product.enabled || false);
         setOriginalEnabled(product.enabled || false);
         console.log('Loaded product brandId:', product.brandId);
+
+        // Derive parent category from loaded categoryId
+        if (product.categoryId) {
+          const child = categories.find(c => c.id === product.categoryId);
+          if (child && child.parentCategoryId) {
+            setParentCategoryId(child.parentCategoryId);
+          }
+        }
 
         // Load custom field values
         try {
@@ -175,6 +231,19 @@ const EditProductPage: React.FC = () => {
       } catch (fieldError) {
         console.error('Error saving custom field values:', fieldError);
         // Continue with success message even if custom fields fail
+      }
+
+      // Save marketplace mappings
+      try {
+        const mappings = selectedMarketplaceIds.map(mid => ({
+          marketplaceId: mid,
+          marketplaceName: allMarketplaces.find(m => m.id === mid)?.name || '',
+          productMarketplaceName: productMarketplaceNames[mid] || ''
+        }));
+        await productService.saveMarketplaceMappings(Number(id), mappings);
+        console.log('Marketplace mappings saved');
+      } catch (mappingError) {
+        console.error('Error saving marketplace mappings:', mappingError);
       }
 
       alert('Product updated successfully!');
@@ -306,35 +375,76 @@ const EditProductPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Bottom Sections: Categories and Pricing */}
+        {/* Bottom Sections: Categories, Marketplace and Pricing */}
         <div className="bottom-sections">
           {/* Categories Details Section */}
           <section className="categories-details-section">
             <h2 className="section-title">Categories Details</h2>
             <div className="categories-card">
-              <div className="form-input-with-dropdown">
-                <select 
-                  className="form-select" 
-                  name="categoryId"
-                  value={formData.categoryId}
-                  onChange={handleInputChange}
-                  required
-                >
-                  <option value={0}>Categories</option>
-                  {categories
-                    .filter(category => category.enabled)
-                    .map(category => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                </select>
-                <svg width="10" height="5" viewBox="0 0 10 5" fill="none">
-                  <path d="M0 0L5 5L10 0H0Z" fill="#1E1E1E"/>
-                </svg>
-              </div>
+              <select
+                className="form-input"
+                value={parentCategoryId}
+                onChange={(e) => {
+                  setParentCategoryId(Number(e.target.value));
+                  setFormData(prev => ({ ...prev, categoryId: 0 }));
+                }}
+              >
+                <option value={0}>Parent Category</option>
+                {categories
+                  .filter(category => category.enabled && category.parentCategoryId === null)
+                  .map(category => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+              </select>
+              <select
+                className="form-input"
+                name="categoryId"
+                value={formData.categoryId}
+                onChange={handleInputChange}
+                required
+                disabled={!parentCategoryId}
+                style={{ marginTop: '12px' }}
+              >
+                <option value={0}>Categories</option>
+                {categories
+                  .filter(category => category.enabled && category.parentCategoryId === parentCategoryId)
+                  .map(category => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+              </select>
             </div>
           </section>
+
+          {/* Marketplace Details Section */}
+          {allMarketplaces.length > 0 && (
+            <section className="marketplace-config-section">
+              <h2 className="section-title">Marketplace Details</h2>
+              <div className="categories-card">
+                <select
+                  className="form-input"
+                  value={selectedMarketplaceIds[0] || 0}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val) {
+                      setSelectedMarketplaceIds([val]);
+                    } else {
+                      setSelectedMarketplaceIds([]);
+                      setProductMarketplaceNames({});
+                    }
+                  }}
+                >
+                  <option value={0}>Select Marketplace</option>
+                  {allMarketplaces.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            </section>
+          )}
 
           {/* Pricing Attributes Section */}
           <section className="pricing-attributes-section">

@@ -4,12 +4,16 @@ import com.elowen.product.client.AdminServiceClient;
 import com.elowen.product.dto.CreateProductRequest;
 import com.elowen.product.dto.CustomFieldValueResponse;
 import com.elowen.product.dto.PagedResponse;
+import com.elowen.product.dto.ProductMarketplaceMappingRequest;
+import com.elowen.product.dto.ProductMarketplaceMappingResponse;
 import com.elowen.product.dto.ProductResponse;
 import com.elowen.product.dto.UpdateProductRequest;
 import com.elowen.product.entity.Product;
+import com.elowen.product.entity.ProductMarketplaceMapping;
 import com.elowen.product.entity.ProductType;
 import com.elowen.product.exception.DuplicateSkuException;
 import com.elowen.product.exception.ProductNotFoundException;
+import com.elowen.product.repository.ProductMarketplaceMappingRepository;
 import com.elowen.product.repository.ProductRepository;
 import com.elowen.product.security.UserPrincipal;
 import org.slf4j.Logger;
@@ -41,6 +45,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final AdminServiceClient adminServiceClient;
+    private final ProductMarketplaceMappingRepository mappingRepository;
     
     // Whitelist of allowed sort fields for security
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
@@ -48,9 +53,11 @@ public class ProductService {
     );
 
     @Autowired
-    public ProductService(ProductRepository productRepository, AdminServiceClient adminServiceClient) {
+    public ProductService(ProductRepository productRepository, AdminServiceClient adminServiceClient,
+                          ProductMarketplaceMappingRepository mappingRepository) {
         this.productRepository = productRepository;
         this.adminServiceClient = adminServiceClient;
+        this.mappingRepository = mappingRepository;
     }
 
     /**
@@ -650,6 +657,65 @@ public class ProductService {
             case "DESC", "DESCENDING" -> Sort.Direction.DESC;
             default -> Sort.Direction.DESC; // Default for invalid direction
         };
+    }
+
+    /**
+     * Save (replace) marketplace mappings for a product.
+     * Deletes existing mappings for the client+product pair, then inserts fresh ones.
+     */
+    @Transactional
+    public List<ProductMarketplaceMappingResponse> saveMarketplaceMappings(
+            Long productId, ProductMarketplaceMappingRequest request) {
+
+        UserPrincipal userPrincipal = getCurrentUserPrincipal();
+        Long clientId = userPrincipal.getClientId().longValue();
+        Long userId = userPrincipal.getId();
+
+        // Verify product belongs to this client
+        Product product = productRepository.findByIdAndClientId(productId, clientId.intValue())
+                .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + productId));
+
+        // Delete existing mappings for this product
+        mappingRepository.deleteByClientIdAndProductId(clientId, productId);
+
+        // Insert new mappings
+        List<ProductMarketplaceMapping> saved = new java.util.ArrayList<>();
+        if (request.getMappings() != null) {
+            for (ProductMarketplaceMappingRequest.MappingEntry entry : request.getMappings()) {
+                ProductMarketplaceMapping mapping = new ProductMarketplaceMapping(
+                        clientId,
+                        productId,
+                        product.getName(),
+                        entry.getMarketplaceId(),
+                        entry.getMarketplaceName(),
+                        entry.getProductMarketplaceName(),
+                        userId
+                );
+                saved.add(mappingRepository.save(mapping));
+            }
+        }
+
+        List<ProductMarketplaceMappingResponse> result = new java.util.ArrayList<>();
+        for (ProductMarketplaceMapping m : saved) {
+            result.add(ProductMarketplaceMappingResponse.from(m));
+        }
+        return result;
+    }
+
+    /**
+     * Get all marketplace mappings for a product (tenant-scoped).
+     */
+    @Transactional(readOnly = true)
+    public List<ProductMarketplaceMappingResponse> getMarketplaceMappings(Long productId) {
+        UserPrincipal userPrincipal = getCurrentUserPrincipal();
+        Long clientId = userPrincipal.getClientId().longValue();
+
+        List<ProductMarketplaceMapping> mappings = mappingRepository.findByClientIdAndProductId(clientId, productId);
+        List<ProductMarketplaceMappingResponse> result = new java.util.ArrayList<>();
+        for (ProductMarketplaceMapping m : mappings) {
+            result.add(ProductMarketplaceMappingResponse.from(m));
+        }
+        return result;
     }
 
     /**

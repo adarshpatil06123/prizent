@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.elowen.admin.dto.BrandMappingRequest;
+import com.elowen.admin.dto.BrandMappingResponse;
 import com.elowen.admin.dto.CreateMarketplaceRequest;
 import com.elowen.admin.dto.MarketplaceResponse;
 import com.elowen.admin.dto.PagedResponse;
@@ -159,6 +161,42 @@ public class MarketplaceController {
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("costs", costs);
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Get brand mappings for a marketplace
+     * GET /api/admin/marketplaces/{id}/brand-mappings
+     */
+    @GetMapping("/{id}/brand-mappings")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getBrandMappings(@PathVariable Long id) {
+        List<BrandMappingResponse> mappings = marketplaceService.getBrandMappings(id);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("mappings", mappings);
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Save brand mappings for a marketplace
+     * PUT /api/admin/marketplaces/{id}/brand-mappings
+     */
+    @PutMapping("/{id}/brand-mappings")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> saveBrandMappings(
+            @PathVariable Long id,
+            @Valid @RequestBody BrandMappingRequest request) {
+        
+        List<BrandMappingResponse> mappings = marketplaceService.saveBrandMappings(id, request);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Brand mappings saved successfully");
+        response.put("mappings", mappings);
         
         return ResponseEntity.ok(response);
     }

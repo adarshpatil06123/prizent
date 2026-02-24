@@ -18,6 +18,8 @@ public class MarketplaceResponse {
     private Boolean enabled;
     private LocalDateTime createDateTime;
     private List<CostResponse> costs;
+    private List<CostResponse> brandCostsSummary;
+    private Boolean hasBrandMappings = false;
     
     // Constructors
     public MarketplaceResponse() {}
@@ -85,6 +87,22 @@ public class MarketplaceResponse {
         this.costs = costs;
     }
     
+    public Boolean getHasBrandMappings() {
+        return hasBrandMappings;
+    }
+
+    public void setHasBrandMappings(Boolean hasBrandMappings) {
+        this.hasBrandMappings = hasBrandMappings;
+    }
+
+    public List<CostResponse> getBrandCostsSummary() {
+        return brandCostsSummary;
+    }
+
+    public void setBrandCostsSummary(List<CostResponse> brandCostsSummary) {
+        this.brandCostsSummary = brandCostsSummary;
+    }
+
     public static class CostResponse {
         
         private Long id;
@@ -92,6 +110,8 @@ public class MarketplaceResponse {
         private CostValueType costValueType;
         private BigDecimal costValue;
         private String costProductRange;
+        private Long brandId;
+        private String brandName;
         
         // Constructors
         public CostResponse() {}
@@ -102,6 +122,8 @@ public class MarketplaceResponse {
             this.costValueType = cost.getCostValueType();
             this.costValue = cost.getCostValue();
             this.costProductRange = cost.getCostProductRange();
+            this.brandId = cost.getBrandId();
+            this.brandName = cost.getBrandName();
         }
         
         // Getters and Setters
@@ -143,6 +165,22 @@ public class MarketplaceResponse {
         
         public void setCostProductRange(String costProductRange) {
             this.costProductRange = costProductRange;
+        }
+
+        public Long getBrandId() {
+            return brandId;
+        }
+
+        public void setBrandId(Long brandId) {
+            this.brandId = brandId;
+        }
+
+        public String getBrandName() {
+            return brandName;
+        }
+
+        public void setBrandName(String brandName) {
+            this.brandName = brandName;
         }
     }
 }

@@ -22,6 +22,7 @@ export interface CategoryTreeNode {
 export interface CreateCategoryRequest {
   name: string;
   parentCategoryId: number | null;
+  enabled?: boolean;
 }
 
 export interface UpdateCategoryRequest {

@@ -8,6 +8,8 @@ export interface Marketplace {
   enabled: boolean;
   createDateTime: string;
   costs?: MarketplaceCost[];
+  brandCostsSummary?: MarketplaceCost[];
+  hasBrandMappings?: boolean;
 }
 
 export interface MarketplaceCost {
@@ -16,6 +18,8 @@ export interface MarketplaceCost {
   costValueType: 'P' | 'A'; // Percentage or Amount
   costValue: number;
   costProductRange: string;
+  brandId?: number;
+  brandName?: string;
 }
 
 export interface CreateMarketplaceRequest {
@@ -45,6 +49,39 @@ export interface UpdateMarketplaceCostRequest {
   costValueType: 'P' | 'A';
   costValue: number;
   costProductRange: string;
+}
+
+export interface BrandMappingCostRequest {
+  costCategory: 'COMMISSION' | 'SHIPPING' | 'MARKETING';
+  costValueType: 'P' | 'A';
+  costValue: number;
+  costProductRange: string;
+}
+
+export interface BrandMappingRequest {
+  brandId: number;
+  costs: BrandMappingCostRequest[];
+}
+
+export interface BrandMappingCost {
+  id?: number;
+  costCategory: 'COMMISSION' | 'SHIPPING' | 'MARKETING';
+  costValueType: 'P' | 'A';
+  costValue: number;
+  costProductRange: string;
+}
+
+export interface BrandMapping {
+  id?: number;
+  brandId: number;
+  brandName?: string;
+  costs: BrandMappingCost[];
+}
+
+export interface BrandMappingResponse {
+  success: boolean;
+  message: string;
+  mappings?: BrandMapping[];
 }
 
 export interface PagedResponse<T> {
@@ -236,6 +273,28 @@ const marketplaceService = {
       return response.data;
     } catch (error: any) {
       console.error('Error deleting marketplace:', error);
+      throw error;
+    }
+  },
+
+  // Get brand mappings for a marketplace
+  getBrandMappings: async (marketplaceId: number): Promise<BrandMappingResponse> => {
+    try {
+      const response = await apiClient.get(`admin/marketplaces/${marketplaceId}/brand-mappings`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching brand mappings:', error);
+      throw error;
+    }
+  },
+
+  // Save / replace brand mappings for a marketplace
+  saveBrandMappings: async (marketplaceId: number, mappings: BrandMappingRequest[]): Promise<BrandMappingResponse> => {
+    try {
+      const response = await apiClient.put(`admin/marketplaces/${marketplaceId}/brand-mappings`, { mappings });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error saving brand mappings:', error);
       throw error;
     }
   }

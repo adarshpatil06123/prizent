@@ -2,27 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AddCategoryPage.css';
 import { useCategories } from '../contexts/CategoryContext';
+import { Category } from '../services/categoryService';
 import { getCustomFields, saveCustomFieldValue, CustomFieldResponse } from '../services/customFieldService';
 
 const AddCategoryPage: React.FC = () => {
   const navigate = useNavigate();
-  const { createCategory } = useCategories();
+  const { createCategory, categories } = useCategories();
   const [categoryName, setCategoryName] = useState('');
-  const [categoryType, setCategoryType] = useState('Parent category');
+  const [categoryType, setCategoryType] = useState('');
+  const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
   const [enableCategory, setEnableCategory] = useState(true);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
 
-  // Fetch custom fields for categories
+  // Root-level categories available as parents (one level deep only)
+  const rootCategories: Category[] = categories.filter(
+    (c: Category) => c.parentCategoryId === null && c.enabled
+  );
+
   useEffect(() => {
     const fetchCustomFields = async () => {
       try {
         const fields = await getCustomFields('c');
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded category custom fields:', enabledFields);
       } catch (error) {
         console.error('Failed to fetch custom fields:', error);
       }
@@ -30,23 +35,34 @@ const AddCategoryPage: React.FC = () => {
     fetchCustomFields();
   }, []);
 
+  const handleTypeChange = (type: string) => {
+    setCategoryType(type);
+    if (type === 'Category') {
+      setSelectedParentId(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!categoryName.trim()) {
       setValidationError('Category name is required');
+      return;
+    }
+    if (!categoryType) {
+      setValidationError('Please select a category type');
+      return;
+    }
+    if (categoryType === 'Parent category' && selectedParentId === null) {
+      setValidationError('Please select a parent category');
       return;
     }
 
     try {
       setSaving(true);
       setValidationError('');
-      
-      const parentId = null;
-      
-      // CategoryContext will automatically refresh all components
-      const response = await createCategory(categoryName.trim(), parentId);
-      console.log('Category created successfully via context');
-      
-      // Save custom field values
+
+      const parentId = categoryType === 'Parent category' ? selectedParentId : null;
+      const response = await createCategory(categoryName.trim(), parentId, enableCategory);
+
       if (Object.keys(customFieldValues).length > 0 && response.category) {
         try {
           await Promise.all(
@@ -62,18 +78,14 @@ const AddCategoryPage: React.FC = () => {
               }
             })
           );
-          console.log('Custom field values saved');
         } catch (fieldError) {
           console.error('Error saving custom field values:', fieldError);
-          // Continue with navigation even if custom fields fail
         }
       }
-      
-      // Navigate immediately - context handles the refresh
+
       navigate('/categories');
     } catch (err: any) {
       setValidationError(err.response?.data?.message || 'Failed to create category');
-      console.error('Error creating category:', err);
     } finally {
       setSaving(false);
     }
@@ -142,12 +154,28 @@ const AddCategoryPage: React.FC = () => {
               name="categoryType"
               className="form-select"
               value={categoryType}
-              onChange={(e) => { setCategoryType(e.target.value); }}
+              onChange={(e) => handleTypeChange(e.target.value)}
               disabled={saving}
             >
+              <option value="" disabled hidden>Parent category</option>
               <option value="Parent category">Parent category</option>
               <option value="Category">Category</option>
             </select>
+
+            {categoryType === 'Parent category' && (
+              <select
+                name="parentCategory"
+                className="form-select"
+                value={selectedParentId ?? ''}
+                onChange={(e) => setSelectedParentId(e.target.value ? Number(e.target.value) : null)}
+                disabled={saving}
+              >
+                <option value="">Select parent category</option>
+                {rootCategories.map((cat: Category) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            )}
 
             <div className="checkbox-container">
               <input

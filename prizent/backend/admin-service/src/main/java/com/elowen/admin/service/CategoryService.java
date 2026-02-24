@@ -45,6 +45,9 @@ public class CategoryService {
         validateNameUniqueness(categoryName, parentCategoryId, clientId, null);
         
         Category category = new Category(clientId, categoryName, parentCategoryId);
+        if (request.getEnabled() != null) {
+            category.setEnabled(request.getEnabled());
+        }
         Category savedCategory = categoryRepository.save(category);
         
         log.info("Created category ID {} for client {}", savedCategory.getId(), clientId);

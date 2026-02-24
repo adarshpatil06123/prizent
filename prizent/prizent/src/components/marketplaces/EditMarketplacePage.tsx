@@ -3,6 +3,20 @@ import { useNavigate, useParams } from "react-router-dom";
 import "./EditMarketplacePage.css";
 import marketplaceService, { UpdateMarketplaceRequest, UpdateMarketplaceCostRequest } from '../../services/marketplaceService';
 import { getCustomFields, saveCustomFieldValue, getCustomFieldValues, CustomFieldResponse } from '../../services/customFieldService';
+import brandService, { Brand } from '../../services/brandService';
+
+// Brand mapping types
+interface BrandSlab { from: string; to: string; value: string; valueType: 'P' | 'A'; }
+interface BrandMapping {
+  localId: string;
+  brandId: string;
+  commissionSlabs: BrandSlab[];
+  marketingSlabs: BrandSlab[];
+  shippingSlabs: BrandSlab[];
+  commissionValueType: 'P' | 'A';
+  marketingValueType: 'P' | 'A';
+  shippingValueType: 'P' | 'A';
+}
 
 const EditMarketplacePage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,6 +43,21 @@ const EditMarketplacePage: React.FC = () => {
   const [shippingValueType, setShippingValueType] = useState<'P' | 'A'>('A');
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandMappings, setBrandMappings] = useState<BrandMapping[]>([]);
+
+  // Fetch brands
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const res = await brandService.getAllBrands();
+        if (res.success && res.brands) setBrands(res.brands.filter(b => b.enabled));
+      } catch (e) {
+        console.error('Failed to fetch brands:', e);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   // Fetch custom fields for marketplaces
   useEffect(() => {
@@ -121,6 +150,32 @@ const EditMarketplacePage: React.FC = () => {
           } catch (error) {
             console.error('Failed to load custom field values:', error);
           }
+
+          // Load existing brand mappings
+          try {
+            const bmRes = await marketplaceService.getBrandMappings(Number(id));
+            if (bmRes.success && bmRes.mappings && bmRes.mappings.length > 0) {
+              const loaded: BrandMapping[] = bmRes.mappings.map(m => {
+                const toSlab = (c: any) => ({ from: String(c.costProductRange?.split('-')[0] || ''), to: String(c.costProductRange?.split('-')[1] || ''), value: String(c.costValue), valueType: c.costValueType as 'P' | 'A' });
+                const commSlabs = m.costs.filter(c => c.costCategory === 'COMMISSION').map(toSlab);
+                const mktSlabs = m.costs.filter(c => c.costCategory === 'MARKETING').map(toSlab);
+                const shipSlabs = m.costs.filter(c => c.costCategory === 'SHIPPING').map(toSlab);
+                return {
+                  localId: String(m.id || Date.now() + Math.random()),
+                  brandId: String(m.brandId),
+                  commissionSlabs: commSlabs.length ? commSlabs : [{ from: '', to: '', value: '', valueType: 'A' }],
+                  marketingSlabs: mktSlabs.length ? mktSlabs : [{ from: '', to: '', value: '', valueType: 'A' }],
+                  shippingSlabs: shipSlabs.length ? shipSlabs : [{ from: '', to: '', value: '', valueType: 'A' }],
+                  commissionValueType: commSlabs[0]?.valueType || 'A',
+                  marketingValueType: mktSlabs[0]?.valueType || 'A',
+                  shippingValueType: shipSlabs[0]?.valueType || 'A',
+                };
+              });
+              setBrandMappings(loaded);
+            }
+          } catch (bmErr: any) {
+            console.error('Error loading brand mappings:', bmErr?.response?.data || bmErr?.message || bmErr);
+          }
         } else {
           setError('Failed to load marketplace data');
         }
@@ -211,6 +266,68 @@ const EditMarketplacePage: React.FC = () => {
       i === index ? { ...slab, [field]: validatedValue } : slab
     ));
   };
+
+  // ── Brand mapping handlers ────────────────────────────────────────────────
+  const emptySlabs = (valueType: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '', to: '', value: '', valueType }];
+
+  const addBrandMapping = () => {
+    setBrandMappings(prev => [...prev, {
+      localId: Date.now().toString(),
+      brandId: '',
+      commissionSlabs: emptySlabs(),
+      marketingSlabs: emptySlabs(),
+      shippingSlabs: emptySlabs(),
+      commissionValueType: 'A',
+      marketingValueType: 'A',
+      shippingValueType: 'A',
+    }]);
+  };
+
+  const removeBrandMapping = (localId: string) => {
+    setBrandMappings(prev => prev.filter(m => m.localId !== localId));
+  };
+
+  const updateBrandMapping = (localId: string, field: keyof BrandMapping, value: any) => {
+    setBrandMappings(prev => prev.map(m => m.localId === localId ? { ...m, [field]: value } : m));
+  };
+
+  const updateBrandValueType = (localId: string, category: 'commission' | 'marketing' | 'shipping', type: 'P' | 'A') => {
+    const slabKey = `${category}Slabs` as keyof BrandMapping;
+    const typeKey = `${category}ValueType` as keyof BrandMapping;
+    setBrandMappings(prev => prev.map(m => {
+      if (m.localId !== localId) return m;
+      return { ...m, [typeKey]: type, [slabKey]: (m[slabKey] as BrandSlab[]).map(s => ({ ...s, valueType: type })) };
+    }));
+  };
+
+  const addBrandSlab = (localId: string, category: 'commission' | 'marketing' | 'shipping') => {
+    const typeKey = `${category}ValueType` as keyof BrandMapping;
+    const slabKey = `${category}Slabs` as keyof BrandMapping;
+    setBrandMappings(prev => prev.map(m => {
+      if (m.localId !== localId) return m;
+      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '', to: '', value: '', valueType: m[typeKey] as 'P' | 'A' }] };
+    }));
+  };
+
+  const removeBrandSlab = (localId: string, category: 'commission' | 'marketing' | 'shipping', index: number) => {
+    const slabKey = `${category}Slabs` as keyof BrandMapping;
+    setBrandMappings(prev => prev.map(m => {
+      if (m.localId !== localId) return m;
+      const slabs = (m[slabKey] as BrandSlab[]);
+      if (slabs.length <= 1) return m;
+      return { ...m, [slabKey]: slabs.filter((_, i) => i !== index) };
+    }));
+  };
+
+  const updateBrandSlab = (localId: string, category: 'commission' | 'marketing' | 'shipping', index: number, field: string, value: string) => {
+    const slabKey = `${category}Slabs` as keyof BrandMapping;
+    const validated = field !== 'valueType' ? validateNumericInput(value) : value;
+    setBrandMappings(prev => prev.map(m => {
+      if (m.localId !== localId) return m;
+      return { ...m, [slabKey]: (m[slabKey] as BrandSlab[]).map((s, i) => i === index ? { ...s, [field]: validated } : s) };
+    }));
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const addShippingSlab = () => {
     setShippingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: shippingValueType }]);
@@ -326,6 +443,27 @@ const EditMarketplacePage: React.FC = () => {
           // Continue with navigation even if custom fields fail
         }
 
+        // Save brand mappings (always call to support clearing existing ones)
+        try {
+          const mappingRequests = brandMappings
+            .filter(m => m.brandId)
+            .map(m => {
+              const costs: any[] = [];
+              m.commissionSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+              m.marketingSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+              m.shippingSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+              return { brandId: Number(m.brandId), costs };
+            });
+          await marketplaceService.saveBrandMappings(Number(id), mappingRequests);
+          console.log('Brand mappings saved');
+        } catch (brandError: any) {
+          const msg = brandError?.response?.data?.message || brandError?.message || 'Failed to save brand mappings';
+          console.error('Error saving brand mappings:', msg, brandError);
+          setError(`Marketplace saved but brand mappings failed: ${msg}`);
+          setLoading(false);
+          return;
+        }
+
         navigate('/marketplaces');
       } else {
         setError(response.message || 'Failed to update marketplace');
@@ -412,182 +550,6 @@ const EditMarketplacePage: React.FC = () => {
           </label>
         </div>
 
-        <div className="grid-3">
-          <div className="panel">
-            <div className="panel-header">
-              <span>Commission</span>
-              <div className="panel-units">
-                <span>%</span>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={productCostValueType === 'A'}
-                    onChange={(e) => handleProductCostValueTypeChange(e.target.checked ? 'A' : 'P')}
-                  />
-                  <span className="slider" />
-                </label>
-                <span>Rs</span>
-              </div>
-            </div>
-            <div className="panel-divider" />
-            <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-              <span>From cost</span>
-              <span>To cost</span>
-              <span>Value</span>
-              <span></span>
-            </div>
-            {productCostSlabs.map((slab, index) => (
-              <div className="panel-form-grid" key={index} style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                <input 
-                  className="small-input" 
-                  placeholder="0" 
-                  value={slab.from}
-                  onChange={(e) => updateProductCostSlab(index, 'from', e.target.value)}
-                />
-                <input 
-                  className="small-input" 
-                  placeholder="1750" 
-                  value={slab.to}
-                  onChange={(e) => updateProductCostSlab(index, 'to', e.target.value)}
-                />
-                <input 
-                  className="small-input" 
-                  placeholder="10" 
-                  value={slab.value}
-                  onChange={(e) => updateProductCostSlab(index, 'value', e.target.value)}
-                />
-                {productCostSlabs.length > 1 && (
-                  <button 
-                    className="delete-btn" 
-                    onClick={() => removeProductCostSlab(index)} 
-                    type="button"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-            <button className="link-btn" onClick={addProductCostSlab} type="button">+ Add slab</button>
-          </div>
-
-          <div className="panel">
-            <div className="panel-header">
-              <span>Marketing</span>
-              <div className="panel-units">
-                <span>%</span>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={marketingValueType === 'A'}
-                    onChange={(e) => handleMarketingValueTypeChange(e.target.checked ? 'A' : 'P')}
-                  />
-                  <span className="slider" />
-                </label>
-                <span>Rs</span>
-              </div>
-            </div>
-            <div className="panel-divider" />
-            <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-              <span>From cost</span>
-              <span>To cost</span>
-              <span>Value</span>
-              <span></span>
-            </div>
-            {marketingSlabs.map((slab, index) => (
-              <div className="panel-form-grid" key={index} style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                <input 
-                  className="small-input" 
-                  placeholder="0" 
-                  value={slab.from}
-                  onChange={(e) => updateMarketingSlab(index, 'from', e.target.value)}
-                />
-                <input 
-                  className="small-input" 
-                  placeholder="750" 
-                  value={slab.to}
-                  onChange={(e) => updateMarketingSlab(index, 'to', e.target.value)}
-                />
-                <input 
-                  className="small-input" 
-                  placeholder="100" 
-                  value={slab.value}
-                  onChange={(e) => updateMarketingSlab(index, 'value', e.target.value)}
-                />
-                {marketingSlabs.length > 1 && (
-                  <button 
-                    className="delete-btn" 
-                    onClick={() => removeMarketingSlab(index)} 
-                    type="button"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-            <button className="link-btn" onClick={addMarketingSlab} type="button">+ Add slab</button>
-          </div>
-
-          <div className="panel">
-            <div className="panel-header">
-              <span>Shipping</span>
-              <div className="panel-units">
-                <span>%</span>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={shippingValueType === 'A'}
-                    onChange={(e) => handleShippingValueTypeChange(e.target.checked ? 'A' : 'P')}
-                  />
-                  <span className="slider" />
-                </label>
-                <span>Rs</span>
-              </div>
-            </div>
-            <div className="panel-divider" />
-            <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-              <span>From cost</span>
-              <span>To cost</span>
-              <span>Value</span>
-              <span></span>
-            </div>
-            {shippingSlabs.map((slab, index) => (
-              <div className="panel-form-grid" key={index} style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                <input 
-                  className="small-input" 
-                  placeholder="0" 
-                  value={slab.from}
-                  onChange={(e) => updateShippingSlab(index, 'from', e.target.value)}
-                />
-                <input 
-                  className="small-input" 
-                  placeholder="750" 
-                  value={slab.to}
-                  onChange={(e) => updateShippingSlab(index, 'to', e.target.value)}
-                />
-                <input 
-                  className="small-input" 
-                  placeholder="13" 
-                  value={slab.value}
-                  onChange={(e) => updateShippingSlab(index, 'value', e.target.value)}
-                />
-                {shippingSlabs.length > 1 && (
-                  <button 
-                    className="delete-btn" 
-                    onClick={() => removeShippingSlab(index)} 
-                    type="button"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-            <button className="link-btn" onClick={addShippingSlab} type="button">+ Add slab</button>
-          </div>
-        </div>
-
         {/* Custom Fields Section */}
         {customFields.length > 0 && (
           <div className="panel" style={{ marginTop: '32px' }}>
@@ -626,6 +588,129 @@ const EditMarketplacePage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Brand Mapping Section */}
+        <div className="brand-mapping-section">
+          <div className="brand-mapping-header">
+            <h3 className="section-title" style={{ margin: 0 }}>Brand Mapping</h3>
+            <button className="add-brand-btn" onClick={addBrandMapping} type="button">+ Add New Brand</button>
+          </div>
+
+          {brandMappings.map(mapping => (
+            <div key={mapping.localId} className="brand-mapping-card">
+              <div className="brand-mapping-card-header">
+                <span className="brand-label">BRAND</span>
+                <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">✕</button>
+              </div>
+
+              <select
+                className="brand-select"
+                value={mapping.brandId}
+                onChange={e => updateBrandMapping(mapping.localId, 'brandId', e.target.value)}
+              >
+                <option value="">Select Brand</option>
+                {brands.map(b => (
+                  <option key={b.id} value={String(b.id)}>{b.name}</option>
+                ))}
+              </select>
+
+              <div className="grid-3" style={{ marginTop: '16px' }}>
+                {/* Commission */}
+                <div className="panel">
+                  <div className="panel-header">
+                    <span>Commission</span>
+                    <div className="panel-units">
+                      <span>%</span>
+                      <label className="switch">
+                        <input type="checkbox" checked={mapping.commissionValueType === 'A'}
+                          onChange={e => updateBrandValueType(mapping.localId, 'commission', e.target.checked ? 'A' : 'P')} />
+                        <span className="slider" />
+                      </label>
+                      <span>Rs</span>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                    <span>From cost</span><span>To cost</span><span>Value</span><span></span>
+                  </div>
+                  {mapping.commissionSlabs.map((slab, i) => (
+                    <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'from', e.target.value)} />
+                      <input className="small-input" placeholder="1750" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'to', e.target.value)} />
+                      <input className="small-input" placeholder="10" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'value', e.target.value)} />
+                      {mapping.commissionSlabs.length > 1 && (
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                  <button className="link-btn" onClick={() => addBrandSlab(mapping.localId, 'commission')} type="button">+ Add slab</button>
+                </div>
+
+                {/* Marketing */}
+                <div className="panel">
+                  <div className="panel-header">
+                    <span>Marketing</span>
+                    <div className="panel-units">
+                      <span>%</span>
+                      <label className="switch">
+                        <input type="checkbox" checked={mapping.marketingValueType === 'A'}
+                          onChange={e => updateBrandValueType(mapping.localId, 'marketing', e.target.checked ? 'A' : 'P')} />
+                        <span className="slider" />
+                      </label>
+                      <span>Rs</span>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                    <span>From cost</span><span>To cost</span><span>Value</span><span></span>
+                  </div>
+                  {mapping.marketingSlabs.map((slab, i) => (
+                    <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'from', e.target.value)} />
+                      <input className="small-input" placeholder="750" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'to', e.target.value)} />
+                      <input className="small-input" placeholder="100" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'value', e.target.value)} />
+                      {mapping.marketingSlabs.length > 1 && (
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                  <button className="link-btn" onClick={() => addBrandSlab(mapping.localId, 'marketing')} type="button">+ Add slab</button>
+                </div>
+
+                {/* Shipping */}
+                <div className="panel">
+                  <div className="panel-header">
+                    <span>Shipping</span>
+                    <div className="panel-units">
+                      <span>%</span>
+                      <label className="switch">
+                        <input type="checkbox" checked={mapping.shippingValueType === 'A'}
+                          onChange={e => updateBrandValueType(mapping.localId, 'shipping', e.target.checked ? 'A' : 'P')} />
+                        <span className="slider" />
+                      </label>
+                      <span>Rs</span>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                    <span>From cost</span><span>To cost</span><span>Value</span><span></span>
+                  </div>
+                  {mapping.shippingSlabs.map((slab, i) => (
+                    <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'from', e.target.value)} />
+                      <input className="small-input" placeholder="750" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'to', e.target.value)} />
+                      <input className="small-input" placeholder="13" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'value', e.target.value)} />
+                      {mapping.shippingSlabs.length > 1 && (
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
+                      )}
+                    </div>
+                  ))}
+                  <button className="link-btn" onClick={() => addBrandSlab(mapping.localId, 'shipping')} type="button">+ Add slab</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <div className="footer-actions">
           <button 

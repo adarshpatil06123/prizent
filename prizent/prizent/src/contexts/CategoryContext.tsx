@@ -8,7 +8,7 @@ interface CategoryContextType {
   error: string | null;
   fetchCategories: () => Promise<void>;
   fetchCategoryTree: () => Promise<void>;
-  createCategory: (name: string, parentCategoryId: number | null) => Promise<any>;
+  createCategory: (name: string, parentCategoryId: number | null, enabled?: boolean) => Promise<any>;
   updateCategory: (id: number, data: UpdateCategoryRequest) => Promise<any>;
   deleteCategory: (id: number) => Promise<any>;
   getCategoryById: (id: number) => Category | undefined;
@@ -63,12 +63,12 @@ export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) 
     }
   }, []);
 
-  const createCategory = useCallback(async (name: string, parentCategoryId: number | null) => {
+  const createCategory = useCallback(async (name: string, parentCategoryId: number | null, enabled: boolean = true) => {
     setLoading(true);
     setError(null);
     try {
-      console.log('CategoryContext: Creating category:', name, 'parent:', parentCategoryId);
-      const response = await categoryService.createCategory({ name, parentCategoryId });
+      console.log('CategoryContext: Creating category:', name, 'parent:', parentCategoryId, 'enabled:', enabled);
+      const response = await categoryService.createCategory({ name, parentCategoryId, enabled });
       if (response.success) {
         console.log('CategoryContext: Category created successfully, refreshing...');
         await fetchCategories(); // Refresh the shared state

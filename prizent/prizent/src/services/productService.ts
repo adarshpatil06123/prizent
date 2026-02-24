@@ -17,6 +17,19 @@ export interface CustomFieldValueResponse {
   fieldType?: string;
 }
 
+export interface ProductMarketplaceMappingResponse {
+  id: number;
+  clientId: number;
+  productId: number;
+  productName: string;
+  marketplaceId: number;
+  marketplaceName: string;
+  productMarketplaceName: string;
+  createDateTime: string;
+  updatedDateTime: string;
+  updatedBy: number;
+}
+
 // Product interface matching the backend response
 export interface Product {
   id: number;
@@ -276,6 +289,31 @@ const productService = {
       return response.data;
     } catch (error: any) {
       console.error('Error filtering products:', error);
+      throw error;
+    }
+  },
+
+  // Save marketplace mappings for a product (replaces existing)
+  saveMarketplaceMappings: async (
+    productId: number,
+    mappings: Array<{ marketplaceId: number; marketplaceName: string; productMarketplaceName: string }>
+  ): Promise<ProductMarketplaceMappingResponse[]> => {
+    try {
+      const response = await apiClient.post(`products/${productId}/marketplace-mappings`, { mappings });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error saving marketplace mappings:', error);
+      throw error;
+    }
+  },
+
+  // Get marketplace mappings for a product
+  getMarketplaceMappings: async (productId: number): Promise<ProductMarketplaceMappingResponse[]> => {
+    try {
+      const response = await apiClient.get(`products/${productId}/marketplace-mappings`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching marketplace mappings:', error);
       throw error;
     }
   }

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./MarketplacesListPage.css";
 import marketplaceService, { Marketplace, getSlabsForCategory } from '../../services/marketplaceService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../../services/customFieldService';
 
 const MarketplacesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
   const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
@@ -31,10 +32,10 @@ const MarketplacesListPage: React.FC = () => {
     fetchCustomFieldsData();
   }, []);
 
-  // Fetch marketplaces on component mount and page change
+  // Fetch marketplaces on component mount, page change, or when navigating back
   useEffect(() => {
     fetchMarketplaces();
-  }, [currentPage]);
+  }, [currentPage, location.key]);
 
   const fetchMarketplaces = async () => {
     try {
@@ -239,19 +240,49 @@ const MarketplacesListPage: React.FC = () => {
                 <div className="marketplaces-table-row" key={marketplace.id}>
                   <div>{marketplace.name}</div>
                   <div className="slab-cell">
-                    {getSlabsForCategory(marketplace.costs || [], 'COMMISSION').map((slab, i) => (
-                      <span key={i} className="slab-entry">{slab}</span>
-                    ))}
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'COMMISSION').length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'COMMISSION').length > 0
+                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'COMMISSION').map((c, i) => (
+                            <span key={i} className="slab-entry">
+                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                            </span>
+                          ))
+                        : <span className="slab-entry">-</span>
+                    ) : (
+                      getSlabsForCategory(marketplace.costs || [], 'COMMISSION').map((slab, i) => (
+                        <span key={i} className="slab-entry">{slab}</span>
+                      ))
+                    )}
                   </div>
                   <div className="slab-cell">
-                    {getSlabsForCategory(marketplace.costs || [], 'SHIPPING').map((slab, i) => (
-                      <span key={i} className="slab-entry">{slab}</span>
-                    ))}
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'SHIPPING').length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'SHIPPING').length > 0
+                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'SHIPPING').map((c, i) => (
+                            <span key={i} className="slab-entry">
+                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                            </span>
+                          ))
+                        : <span className="slab-entry">-</span>
+                    ) : (
+                      getSlabsForCategory(marketplace.costs || [], 'SHIPPING').map((slab, i) => (
+                        <span key={i} className="slab-entry">{slab}</span>
+                      ))
+                    )}
                   </div>
                   <div className="slab-cell">
-                    {getSlabsForCategory(marketplace.costs || [], 'MARKETING').map((slab, i) => (
-                      <span key={i} className="slab-entry">{slab}</span>
-                    ))}
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'MARKETING').length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'MARKETING').length > 0
+                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'MARKETING').map((c, i) => (
+                            <span key={i} className="slab-entry">
+                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                            </span>
+                          ))
+                        : <span className="slab-entry">-</span>
+                    ) : (
+                      getSlabsForCategory(marketplace.costs || [], 'MARKETING').map((slab, i) => (
+                        <span key={i} className="slab-entry">{slab}</span>
+                      ))
+                    )}
                   </div>
                   {customFields.filter(f => f.enabled).map((field) => (
                     <div key={field.id}>{getFieldValue(field.id)}</div>

@@ -2,9 +2,12 @@ package com.elowen.product.controller;
 
 import com.elowen.product.dto.CreateProductRequest;
 import com.elowen.product.dto.PagedResponse;
+import com.elowen.product.dto.ProductMarketplaceMappingRequest;
+import com.elowen.product.dto.ProductMarketplaceMappingResponse;
 import com.elowen.product.dto.ProductResponse;
 import com.elowen.product.dto.UpdateProductRequest;
 import com.elowen.product.service.ProductService;
+import java.util.List;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -145,6 +148,29 @@ public class ProductController {
     public ResponseEntity<ProductService.ProductStats> getProductStats() {
         ProductService.ProductStats stats = productService.getProductStats();
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * Save marketplace mappings for a product (replaces existing)
+     * POST /api/products/{id}/marketplace-mappings
+     */
+    @PostMapping("/{id}/marketplace-mappings")
+    public ResponseEntity<List<ProductMarketplaceMappingResponse>> saveMarketplaceMappings(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductMarketplaceMappingRequest request) {
+        List<ProductMarketplaceMappingResponse> result = productService.saveMarketplaceMappings(id, request);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Get marketplace mappings for a product
+     * GET /api/products/{id}/marketplace-mappings
+     */
+    @GetMapping("/{id}/marketplace-mappings")
+    public ResponseEntity<List<ProductMarketplaceMappingResponse>> getMarketplaceMappings(
+            @PathVariable Long id) {
+        List<ProductMarketplaceMappingResponse> result = productService.getMarketplaceMappings(id);
+        return ResponseEntity.ok(result);
     }
 
     /**

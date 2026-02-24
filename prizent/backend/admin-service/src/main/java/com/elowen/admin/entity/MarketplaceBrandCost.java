@@ -7,8 +7,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "p_marketplace_costs")
-public class MarketplaceCost {
+@Table(name = "p_marketplace_brand_costs")
+public class MarketplaceBrandCost {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,11 +20,8 @@ public class MarketplaceCost {
     @Column(name = "marketplace_id", nullable = false)
     private Long marketplaceId;
     
-    @Column(name = "brand_id")
+    @Column(name = "brand_id", nullable = false)
     private Long brandId;
-    
-    @Column(name = "brand_name", length = 100)
-    private String brandName;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "marketplace_id", insertable = false, updatable = false)
@@ -58,12 +55,14 @@ public class MarketplaceCost {
     private Long updatedBy;
     
     // Constructors
-    public MarketplaceCost() {}
+    public MarketplaceBrandCost() {}
     
-    public MarketplaceCost(Integer clientId, Long marketplaceId, MarketplaceCostCategory costCategory, 
-                          CostValueType costValueType, BigDecimal costValue, String costProductRange) {
+    public MarketplaceBrandCost(Integer clientId, Long marketplaceId, Long brandId, 
+                                MarketplaceCostCategory costCategory, CostValueType costValueType, 
+                                BigDecimal costValue, String costProductRange) {
         this.clientId = clientId;
         this.marketplaceId = marketplaceId;
+        this.brandId = brandId;
         this.costCategory = costCategory;
         this.costValueType = costValueType;
         this.costValue = costValue;
@@ -100,14 +99,6 @@ public class MarketplaceCost {
         this.marketplaceId = marketplaceId;
     }
     
-    public Marketplace getMarketplace() {
-        return marketplace;
-    }
-    
-    public void setMarketplace(Marketplace marketplace) {
-        this.marketplace = marketplace;
-    }
-    
     public Long getBrandId() {
         return brandId;
     }
@@ -116,12 +107,12 @@ public class MarketplaceCost {
         this.brandId = brandId;
     }
     
-    public String getBrandName() {
-        return brandName;
+    public Marketplace getMarketplace() {
+        return marketplace;
     }
     
-    public void setBrandName(String brandName) {
-        this.brandName = brandName;
+    public void setMarketplace(Marketplace marketplace) {
+        this.marketplace = marketplace;
     }
     
     public Brand getBrand() {

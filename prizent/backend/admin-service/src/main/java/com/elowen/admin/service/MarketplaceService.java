@@ -3,6 +3,7 @@ package com.elowen.admin.service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -18,14 +19,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.elowen.admin.context.ClientContext;
+import com.elowen.admin.dto.BrandMappingRequest;
+import com.elowen.admin.dto.BrandMappingResponse;
 import com.elowen.admin.dto.CreateMarketplaceRequest;
 import com.elowen.admin.dto.MarketplaceResponse;
 import com.elowen.admin.dto.PagedResponse;
 import com.elowen.admin.dto.UpdateMarketplaceRequest;
+import com.elowen.admin.entity.Brand;
 import com.elowen.admin.entity.Marketplace;
 import com.elowen.admin.entity.MarketplaceCost;
 import com.elowen.admin.exception.DuplicateMarketplaceException;
 import com.elowen.admin.exception.MarketplaceNotFoundException;
+import com.elowen.admin.repository.BrandRepository;
 import com.elowen.admin.repository.MarketplaceCostRepository;
 import com.elowen.admin.repository.MarketplaceRepository;
 import com.elowen.admin.security.UserPrincipal;
@@ -37,12 +42,15 @@ public class MarketplaceService {
     
     private final MarketplaceRepository marketplaceRepository;
     private final MarketplaceCostRepository marketplaceCostRepository;
+    private final BrandRepository brandRepository;
     
     @Autowired
     public MarketplaceService(MarketplaceRepository marketplaceRepository,
-                             MarketplaceCostRepository marketplaceCostRepository) {
+                             MarketplaceCostRepository marketplaceCostRepository,
+                             BrandRepository brandRepository) {
         this.marketplaceRepository = marketplaceRepository;
         this.marketplaceCostRepository = marketplaceCostRepository;
+        this.brandRepository = brandRepository;
     }
     
     @Transactional
@@ -257,14 +265,113 @@ public class MarketplaceService {
     private MarketplaceResponse toResponseWithCosts(Marketplace marketplace) {
         MarketplaceResponse response = new MarketplaceResponse(marketplace);
         
+        // Get only marketplace-level costs (brand_id IS NULL)
         List<MarketplaceCost> costs = marketplaceCostRepository
-            .findByClientIdAndMarketplaceIdAndEnabledTrue(marketplace.getClientId(), marketplace.getId());
+            .findMarketplaceLevelCosts(marketplace.getClientId(), marketplace.getId());
         
         response.setCosts(costs.stream()
             .map(MarketplaceResponse.CostResponse::new)
             .collect(Collectors.toList()));
+
+        // Flag whether brand-specific mappings exist (so UI can show "Brand-specific" instead of -)
+        List<MarketplaceCost> brandCosts = marketplaceCostRepository
+            .findBrandCostsByMarketplace(marketplace.getClientId(), marketplace.getId());
+        response.setHasBrandMappings(!brandCosts.isEmpty());
+
+        // Include brand costs summary so list page can show actual brand-specific values
+        if (!brandCosts.isEmpty()) {
+            response.setBrandCostsSummary(brandCosts.stream()
+                .map(MarketplaceResponse.CostResponse::new)
+                .collect(Collectors.toList()));
+        }
         
         return response;
+    }
+    
+    // ==================== BRAND MAPPING METHODS ====================
+    
+    /**
+     * Get all brand mappings for a marketplace
+     */
+    public List<BrandMappingResponse> getBrandMappings(Long marketplaceId) {
+        Integer clientId = getClientId();
+        
+        // Verify marketplace exists
+        marketplaceRepository.findByIdAndClientId(marketplaceId, clientId)
+            .orElseThrow(() -> new MarketplaceNotFoundException("Marketplace not found"));
+        
+        // Get all brand-specific costs for this marketplace
+        List<MarketplaceCost> brandCosts = marketplaceCostRepository
+            .findBrandCostsByMarketplace(clientId, marketplaceId);
+        
+        // Group costs by brandId
+        Map<Long, List<MarketplaceCost>> costsByBrand = brandCosts.stream()
+            .collect(Collectors.groupingBy(MarketplaceCost::getBrandId));
+        
+        // Convert to response objects
+        return costsByBrand.entrySet().stream()
+            .map(entry -> {
+                Long brandId = entry.getKey();
+                List<MarketplaceCost> costs = entry.getValue();
+                String brandName = costs.isEmpty() ? null : costs.get(0).getBrandName();
+                return new BrandMappingResponse(brandId, brandName, costs);
+            })
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Save brand mappings for a marketplace (replaces all existing brand mappings)
+     */
+    @Transactional
+    public List<BrandMappingResponse> saveBrandMappings(Long marketplaceId, BrandMappingRequest request) {
+        Integer clientId = getClientId();
+        Long userId = getUserId();
+        
+        // Verify marketplace exists
+        marketplaceRepository.findByIdAndClientId(marketplaceId, clientId)
+            .orElseThrow(() -> new MarketplaceNotFoundException("Marketplace not found"));
+        
+        // Disable all existing brand-specific costs for this marketplace
+        marketplaceCostRepository.disableBrandCostsByMarketplace(clientId, marketplaceId);
+        
+        // Save new brand mappings
+        if (request.getMappings() != null && !request.getMappings().isEmpty()) {
+            List<MarketplaceCost> costsToSave = new ArrayList<>();
+            
+            for (BrandMappingRequest.BrandMapping mapping : request.getMappings()) {
+                Long brandId = mapping.getBrandId();
+                
+                // Get brand name for denormalization
+                String brandName = brandRepository.findById(brandId)
+                    .map(Brand::getName)
+                    .orElse(null);
+                
+                if (mapping.getCosts() != null) {
+                    for (BrandMappingRequest.CostRequest costReq : mapping.getCosts()) {
+                        MarketplaceCost cost = new MarketplaceCost();
+                        cost.setClientId(clientId);
+                        cost.setMarketplaceId(marketplaceId);
+                        cost.setBrandId(brandId);
+                        cost.setBrandName(brandName);
+                        cost.setCostCategory(costReq.getCostCategory());
+                        cost.setCostValueType(costReq.getCostValueType());
+                        cost.setCostValue(costReq.getCostValue());
+                        cost.setCostProductRange(costReq.getCostProductRange());
+                        cost.setEnabled(true);
+                        cost.setUpdatedBy(userId);
+                        costsToSave.add(cost);
+                    }
+                }
+            }
+            
+            if (!costsToSave.isEmpty()) {
+                marketplaceCostRepository.saveAll(costsToSave);
+            }
+        }
+        
+        log.info("Saved brand mappings for marketplace ID {} for client {}", marketplaceId, clientId);
+        
+        return getBrandMappings(marketplaceId);
     }
     
     private Integer getClientId() {

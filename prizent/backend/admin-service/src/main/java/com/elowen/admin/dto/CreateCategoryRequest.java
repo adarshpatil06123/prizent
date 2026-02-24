@@ -21,6 +21,11 @@ public class CreateCategoryRequest {
      * Must be a valid category ID belonging to the same client
      */
     private Integer parentCategoryId;
+
+    /**
+     * Whether the category is enabled on creation (defaults to true)
+     */
+    private Boolean enabled = true;
     
     // Constructors
     public CreateCategoryRequest() {}
@@ -46,7 +51,15 @@ public class CreateCategoryRequest {
     public void setParentCategoryId(Integer parentCategoryId) {
         this.parentCategoryId = parentCategoryId;
     }
-    
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
     @Override
     public String toString() {
         return "CreateCategoryRequest{" +

@@ -4,6 +4,7 @@ import './PricingPage.css';
 import marketplaceService, { Marketplace } from '../services/marketplaceService';
 import productService, { Product } from '../services/productService';
 import categoryService, { Category } from '../services/categoryService';
+import brandService, { Brand } from '../services/brandService';
 import { calculatePricing } from '../services/pricingService';
 
 const PricingPage: React.FC = () => {
@@ -13,10 +14,12 @@ const PricingPage: React.FC = () => {
   const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // --- Selection states ---
+  const [selectedBrandId, setSelectedBrandId] = useState('');
   const [selectedMarketplaceId, setSelectedMarketplaceId] = useState('');
   const [selectedSKUProductId, setSelectedSKUProductId] = useState('');
   const [selectedParentCategoryId, setSelectedParentCategoryId] = useState('');
@@ -29,6 +32,9 @@ const PricingPage: React.FC = () => {
   const [calculatedProfit, setCalculatedProfit] = useState('');
   const [profitPercentage, setProfitPercentage] = useState('');
   const [calculatedSellingPrice, setCalculatedSellingPrice] = useState('');
+  const [marketplaceCosts, setMarketplaceCosts] = useState<{ commission: string; shipping: string; marketing: string } | null>(null);
+  // Set of marketplace IDs configured for the selected brand (null = no brand filter)
+  const [brandMarketplaceIds, setBrandMarketplaceIds] = useState<Set<number> | null>(null);
 
   // Load all data on mount
   useEffect(() => {
@@ -36,25 +42,25 @@ const PricingPage: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const [mpRes, prodRes, catRes] = await Promise.all([
+        const [mpRes, prodRes, catRes, brandRes] = await Promise.all([
           marketplaceService.getAllMarketplaces(0, 100),
           productService.getAllProducts(0, 500),
           categoryService.getAllCategories(),
+          brandService.getAllBrands(),
         ]);
         if (mpRes.marketplaces?.content) {
           setMarketplaces(mpRes.marketplaces.content.filter((m: Marketplace) => m.enabled));
         }
         if (prodRes?.content) {
           const enabledProds = prodRes.content.filter((p: Product) => p.enabled);
-          console.log('Products loaded:', enabledProds.length, enabledProds.slice(0,3).map((p: Product) => ({id: p.id, name: p.name, categoryId: p.categoryId})));
           setProducts(enabledProds);
         }
         if (catRes.categories) {
           const allCats = catRes.categories.filter((c: Category) => c.enabled);
-          console.log('Categories loaded:', allCats.length, allCats.map((c: Category) => ({id: c.id, name: c.name})));
           setCategories(allCats);
-        } else {
-          console.warn('No categories in response:', catRes);
+        }
+        if (brandRes.brands) {
+          setBrands(brandRes.brands.filter((b: Brand) => b.enabled));
         }
       } catch (err: any) {
         setError('Failed to load data. Please refresh.');
@@ -66,14 +72,57 @@ const PricingPage: React.FC = () => {
     loadData();
   }, []);
 
-  // --- Derived category lists ---
+  // --- Derived lists ---
+  const displayedMarketplaces = brandMarketplaceIds
+    ? marketplaces.filter(m => brandMarketplaceIds.has(m.id))
+    : marketplaces;
+  const brandFilteredProducts = selectedBrandId
+    ? products.filter(p => Number(p.brandId) === parseInt(selectedBrandId))
+    : products;
   const parentCategories = categories.filter(c => c.parentCategoryId === null);
   const childCategories = selectedParentCategoryId
     ? categories.filter(c => c.parentCategoryId === parseInt(selectedParentCategoryId))
     : [];
   const categoryFilteredProducts = selectedCategoryId
-    ? products.filter(p => Number(p.categoryId) === parseInt(selectedCategoryId))
+    ? brandFilteredProducts.filter(p => Number(p.categoryId) === parseInt(selectedCategoryId))
     : [];
+
+  // --- Handlers: Brand ---
+  const handleBrandChange = async (val: string) => {
+    setSelectedBrandId(val);
+    setSelectedSKUProductId('');
+    setSelectedParentCategoryId('');
+    setSelectedCategoryId('');
+    setSelectedCategoryProductId('');
+    setActiveProduct(null);
+    setCalculatedProfit('');
+    setCalculatedSellingPrice('');
+    setSelectedMarketplaceId('');
+    setMarketplaceCosts(null);
+    if (!val) {
+      setBrandMarketplaceIds(null);
+      return;
+    }
+    // Fetch brand mappings for all marketplaces in parallel, keep only those with this brand
+    const brandId = parseInt(val);
+    try {
+      const results = await Promise.all(
+        marketplaces.map(m =>
+          marketplaceService.getBrandMappings(m.id)
+            .then(res => ({ marketplaceId: m.id, hasBrand: res.mappings?.some((bm: any) => bm.brandId === brandId) ?? false }))
+            .catch(() => ({ marketplaceId: m.id, hasBrand: false }))
+        )
+      );
+      const ids = new Set(results.filter(r => r.hasBrand).map(r => r.marketplaceId));
+      setBrandMarketplaceIds(ids);
+    } catch {
+      setBrandMarketplaceIds(null);
+    }
+    // Re-fetch marketplace costs with new brand context if marketplace already selected
+    if (selectedMarketplaceId) {
+      fetchMarketplaceCosts(parseInt(selectedMarketplaceId), val ? parseInt(val) : undefined);
+    }
+  };
 
   // --- Handlers: SKU path clears category path ---
   const handleSKUChange = (val: string) => {
@@ -81,7 +130,7 @@ const PricingPage: React.FC = () => {
     setSelectedParentCategoryId('');
     setSelectedCategoryId('');
     setSelectedCategoryProductId('');
-    const found = val ? products.find(p => p.id === parseInt(val)) || null : null;
+    const found = val ? brandFilteredProducts.find(p => p.id === parseInt(val)) || null : null;
     setActiveProduct(found);
     setCalculatedProfit('');
     setCalculatedSellingPrice('');
@@ -117,6 +166,41 @@ const PricingPage: React.FC = () => {
   };
 
   const costPrice = activeProduct?.productCost ?? 0;
+
+  const formatCostValue = (cost: import('../services/marketplaceService').MarketplaceCost | import('../services/marketplaceService').BrandMappingCost) =>
+    cost.costValueType === 'P' ? `${cost.costValue}%` : `₹${cost.costValue}`;
+
+  const fetchMarketplaceCosts = async (mpId: number, brandId?: number) => {
+    try {
+      setMarketplaceCosts(null);
+      let costs: import('../services/marketplaceService').MarketplaceCost[] | import('../services/marketplaceService').BrandMappingCost[] = [];
+
+      if (brandId) {
+        const bmRes = await marketplaceService.getBrandMappings(mpId);
+        const mapping = bmRes.mappings?.find((m: any) => m.brandId === brandId);
+        if (mapping?.costs?.length) {
+          costs = mapping.costs;
+        }
+      }
+
+      if (!costs.length) {
+        const mpRes = await marketplaceService.getMarketplaceCosts(mpId);
+        costs = mpRes.costs ?? mpRes.marketplace?.costs ?? [];
+      }
+
+      const get = (cat: string) => {
+        const c = costs.find(x => x.costCategory === cat);
+        return c ? formatCostValue(c) : '—';
+      };
+      setMarketplaceCosts({
+        commission: get('COMMISSION'),
+        shipping: get('SHIPPING'),
+        marketing: get('MARKETING'),
+      });
+    } catch {
+      setMarketplaceCosts(null);
+    }
+  };
 
   const handleCalculateProfit = async () => {
     if (!activeProduct) { alert('Please select a product first'); return; }
@@ -201,19 +285,19 @@ const PricingPage: React.FC = () => {
           <div style={{ color: 'red', padding: '10px 0', marginBottom: '16px' }}>{error}</div>
         )}
 
-        {/* Select Marketplace Section */}
+        {/* Select Brand Section */}
         <section className="marketplace-section">
-          <h2 className="section-title">Select Marketplace</h2>
+          <h2 className="section-title">Select Brand</h2>
           <div className="marketplace-card">
             <div className="dropdown-wrapper">
               <select
                 className="dropdown-select"
-                value={selectedMarketplaceId}
-                onChange={(e) => setSelectedMarketplaceId(e.target.value)}
+                value={selectedBrandId}
+                onChange={(e) => handleBrandChange(e.target.value)}
               >
-                <option value="">Select Marketplace</option>
-                {marketplaces.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
+                <option value="">Select Brand</option>
+                {brands.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
               <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -237,7 +321,7 @@ const PricingPage: React.FC = () => {
                   onChange={(e) => handleSKUChange(e.target.value)}
                 >
                   <option value="">Select SKU</option>
-                  {products.map(p => (
+                  {brandFilteredProducts.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.skuCode} — {p.name}
                     </option>
@@ -314,6 +398,45 @@ const PricingPage: React.FC = () => {
                 <span><strong>MRP:</strong> ₹{activeProduct.mrp}</span>
                 <span><strong>Cost:</strong> ₹{activeProduct.productCost}</span>
                 <span><strong>Proposed SP:</strong> ₹{activeProduct.proposedSellingPriceSales}</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Select Marketplace Section */}
+        <section className="marketplace-section">
+          <h2 className="section-title">Select Marketplace</h2>
+          <div className="marketplace-card">
+            <div className="dropdown-wrapper">
+              <select
+                className="dropdown-select"
+                value={selectedMarketplaceId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedMarketplaceId(val);
+                  setCalculatedProfit('');
+                  setCalculatedSellingPrice('');
+                  if (val) {
+                    fetchMarketplaceCosts(parseInt(val), selectedBrandId ? parseInt(selectedBrandId) : undefined);
+                  } else {
+                    setMarketplaceCosts(null);
+                  }
+                }}
+              >
+                <option value="">Select Marketplace</option>
+                {displayedMarketplaces.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            {marketplaceCosts && (
+              <div style={{ marginTop: '14px', padding: '10px 16px', background: '#F5F9FA', borderRadius: '8px', display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#454545' }}>
+                <span><strong>Commission:</strong> {marketplaceCosts.commission}</span>
+                <span><strong>Shipping:</strong> {marketplaceCosts.shipping}</span>
+                <span><strong>Marketing:</strong> {marketplaceCosts.marketing}</span>
               </div>
             )}
           </div>
