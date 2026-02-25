@@ -223,8 +223,7 @@ const EditCategoryPage: React.FC = () => {
                 {categories.filter(cat =>
                   cat.parentCategoryId === null &&
                   cat.enabled &&
-                  cat.id.toString() !== id &&
-                  !['adda', 'test', 'to', 'top', 'dasd', 'adasd', 'ad', 'god'].includes(cat.name.toLowerCase())
+                  cat.id.toString() !== id
                 ).map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
