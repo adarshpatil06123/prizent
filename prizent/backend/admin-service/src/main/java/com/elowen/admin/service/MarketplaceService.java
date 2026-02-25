@@ -179,6 +179,36 @@ public class MarketplaceService {
                 .map(MarketplaceResponse.CostResponse::new)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Returns effective costs for a marketplace + brand:
+     * brand-specific costs if they exist, else marketplace-level defaults.
+     * Used by the pricing-service engine to resolve the correct cost structure.
+     */
+    public List<MarketplaceResponse.CostResponse> getEffectiveCosts(Long marketplaceId, Long brandId) {
+        Integer clientId = getClientId();
+
+        marketplaceRepository.findByIdAndClientId(marketplaceId, clientId)
+            .orElseThrow(() -> new MarketplaceNotFoundException("Marketplace not found"));
+
+        // Use brand-specific costs if they exist for this (marketplace, brand) pair
+        if (brandId != null) {
+            List<MarketplaceCost> brandCosts = marketplaceCostRepository
+                .findByClientIdAndMarketplaceIdAndBrandIdAndEnabledTrue(clientId, marketplaceId, brandId);
+            if (!brandCosts.isEmpty()) {
+                return brandCosts.stream()
+                    .map(MarketplaceResponse.CostResponse::new)
+                    .collect(Collectors.toList());
+            }
+        }
+
+        // Fall back to marketplace-level costs
+        List<MarketplaceCost> costs = marketplaceCostRepository
+            .findMarketplaceLevelCosts(clientId, marketplaceId);
+        return costs.stream()
+            .map(MarketplaceResponse.CostResponse::new)
+            .collect(Collectors.toList());
+    }
     
     @Transactional
     public void deleteMarketplace(Long id) {

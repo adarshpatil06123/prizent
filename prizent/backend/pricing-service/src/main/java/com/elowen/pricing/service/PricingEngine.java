@@ -29,6 +29,11 @@ public class PricingEngine {
     private static final Set<String> VALID_CATEGORIES =
             Set.of("COMMISSION", "SHIPPING", "MARKETING");
 
+    // GST slab: 5% when SP < ₹2064, 18% when SP >= ₹2064
+    private static final double GST_THRESHOLD = 2064.0;
+    private static final double GST_RATE_LOW  = 0.05;
+    private static final double GST_RATE_HIGH = 0.18;
+
     private final ProductServiceClient productClient;
     private final AdminServiceClient adminClient;
 
@@ -53,11 +58,21 @@ public class PricingEngine {
         MarketplaceDto marketplace = resolveAndValidateMarketplace(request.getMarketplaceId(), authToken);
 
         double productCost = safeDouble(product.getProductCost(), "productCost");
+
+        // Resolve effective costs: brand-specific if configured, else marketplace-level defaults
+        List<MarketplaceCostDto> effectiveCosts = adminClient.getEffectiveMarketplaceCosts(
+                marketplace.getId(), product.getBrandId(), authToken);
+        marketplace.setCosts(effectiveCosts);
+
         validateMarketplaceCosts(marketplace);
 
+        double inputGst = request.getInputGst();
+        if (inputGst < 0)
+            throw new IllegalArgumentException("inputGst must be >= 0.");
+
         return request.getMode() == PricingRequest.Mode.PROFIT_PERCENT
-                ? calculateFromProfitPercent(product, marketplace, productCost, request.getValue())
-                : calculateFromSellingPrice(product, marketplace, productCost, request.getValue());
+                ? calculateFromProfitPercent(product, marketplace, productCost, request.getValue(), inputGst)
+                : calculateFromSellingPrice(product, marketplace, productCost, request.getValue(), inputGst);
     }
 
     // ── Lifecycle resolution & validation ────────────────────────────────────
@@ -104,7 +119,8 @@ public class PricingEngine {
     private PricingResponse calculateFromSellingPrice(ProductDto product,
                                                       MarketplaceDto marketplace,
                                                       double productCost,
-                                                      double sellingPrice) {
+                                                      double sellingPrice,
+                                                      double inputGst) {
         if (sellingPrice < 0)
             throw new IllegalArgumentException("Selling price must be >= 0.");
 
@@ -112,73 +128,111 @@ public class PricingEngine {
         double commission    = extractCost(costs, "COMMISSION", sellingPrice);
         double shipping      = extractCost(costs, "SHIPPING",   sellingPrice);
         double marketing     = extractCost(costs, "MARKETING",  sellingPrice);
-        double netRealisation = sellingPrice - commission - shipping - marketing;
-        double profit         = netRealisation - productCost;
-        double profitPct      = productCost > 0 ? (profit / productCost) * 100 : 0;
+
+        // GST accounting
+        double outputGst     = sellingPrice * computeGstRate(sellingPrice);
+        double gstDifference = outputGst - inputGst;  // positive = GST payable, negative = credit
+
+        // Net realisation: SP minus all marketplace deductions and output GST
+        double netRealisation = sellingPrice - commission - shipping - marketing - outputGst;
+
+        // Profit: net realisation minus cost, then adjust by GST difference
+        double profit    = netRealisation - productCost + gstDifference;
+        double profitPct = productCost > 0 ? (profit / productCost) * 100 : 0;
 
         return PricingResponse.of(
                 product.getId(), product.getName(), product.getSkuCode(), productCost,
                 marketplace.getId(), marketplace.getName(),
                 sellingPrice, commission, shipping, marketing,
+                outputGst, inputGst, gstDifference,
                 netRealisation, profit, profitPct
         );
     }
 
     // ── Mode: PROFIT_PERCENT ─────────────────────────────────────────────────
     //
-    //  Derivation:
-    //    Net = SP - Σ(pct_costs × SP / 100) - Σ(fixed_costs)
-    //    Net = SP × (1 - Σpct/100) - Σfixed
+    //  Derivation (with GST):
+    //    outputGst        = SP × gstRate
+    //    gstDifference    = outputGst - inputGst
+    //    netRealisation   = SP - Σ%costs×SP - Σfixed - outputGst
+    //    profit           = netRealisation - cost + gstDifference
+    //                     = SP(1 - Σ%/100 - gstRate) - Σfixed - cost + inputGst + target
+    //    → SP = (targetProfit + Σfixed + cost - inputGst) / (1 - Σ%/100 - gstRate)
     //
-    //  Target Net = productCost × (1 + desiredProfit / 100)
-    //
-    //  SP × (1 - Σpct/100) = TargetNet + Σfixed
-    //  SP = (TargetNet + Σfixed) / (1 - Σpct/100)
+    //  Two-pass slab solve handles the circular dependency between SP and gstRate.
     //
     private PricingResponse calculateFromProfitPercent(ProductDto product,
                                                        MarketplaceDto marketplace,
                                                        double productCost,
-                                                       double desiredProfitPct) {
+                                                       double desiredProfitPct,
+                                                       double inputGst) {
         if (desiredProfitPct < 0)
             throw new IllegalArgumentException("Desired profit percentage must be >= 0.");
 
         List<MarketplaceCostDto> costs = safeCosts(marketplace);
 
-        double sumPctRates = costs.stream()
+        // Separate percentage-based and absolute costs — never assume all-percent
+        double totalPercentRate = costs.stream()
                 .filter(c -> "P".equalsIgnoreCase(c.getCostValueType()) && c.getCostValue() != null)
                 .mapToDouble(MarketplaceCostDto::getCostValue)
                 .sum();
 
-        double sumFixed = costs.stream()
+        double flatCosts = costs.stream()
                 .filter(c -> "A".equalsIgnoreCase(c.getCostValueType()) && c.getCostValue() != null)
                 .mapToDouble(MarketplaceCostDto::getCostValue)
                 .sum();
 
-        double divisor = 1.0 - (sumPctRates / 100.0);
-        if (divisor <= 0 || Math.abs(divisor) < 1e-6)
+        double targetProfitAmount = productCost * desiredProfitPct / 100.0;
+        double numerator          = targetProfitAmount + flatCosts + productCost - inputGst;
+
+        // Pass 1: estimate SP ignoring GST to determine the correct slab
+        double estimatedSP = numerator / (1.0 - totalPercentRate / 100.0);
+        double gstRate     = computeGstRate(estimatedSP);
+
+        // Pass 2: solve with the slab rate included in the denominator
+        double denominator = 1.0 - (totalPercentRate / 100.0) - gstRate;
+        if (denominator <= 0)
             throw new IllegalArgumentException(
-                "Combined percentage costs (" + sumPctRates +
-                "%) sum to 100% or more. Cannot derive a valid selling price.");
+                "Combined percentage costs (" + totalPercentRate +
+                "%) plus GST rate (" + (gstRate * 100) + "%) leave no room for a valid selling price.");
 
-        double targetNet   = productCost * (1.0 + desiredProfitPct / 100.0);
-        double sellingPrice = (targetNet + sumFixed) / divisor;
+        double sellingPrice = numerator / denominator;
 
-        return calculateFromSellingPrice(product, marketplace, productCost, sellingPrice);
+        // Slab boundary correction: re-solve if SP crossed the ₹2064 threshold
+        double actualRate = computeGstRate(sellingPrice);
+        if (Double.compare(actualRate, gstRate) != 0) {
+            denominator = 1.0 - (totalPercentRate / 100.0) - actualRate;
+            if (denominator <= 0)
+                throw new IllegalArgumentException(
+                    "Combined percentage costs (" + totalPercentRate +
+                    "%) plus GST rate (" + (actualRate * 100) + "%) leave no room for a valid selling price.");
+            sellingPrice = numerator / denominator;
+        }
+
+        return calculateFromSellingPrice(product, marketplace, productCost, sellingPrice, inputGst);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Returns ₹ amount for a cost category. P→ base×rate/100, A→ fixed. */
+    /** Returns the GST slab rate: 5% if SP < ₹2064, 18% otherwise. */
+    private double computeGstRate(double sellingPrice) {
+        return sellingPrice < GST_THRESHOLD ? GST_RATE_LOW : GST_RATE_HIGH;
+    }
+
+    /** Returns ₹ amount for a cost category.
+     *  When multiple rows exist for the same category, uses the latest one (highest id).
+     *  P→ base×rate/100, A→ fixed. */
     private double extractCost(List<MarketplaceCostDto> costs, String category, double base) {
         return costs.stream()
                 .filter(c -> category.equalsIgnoreCase(c.getCostCategory()))
-                .mapToDouble(c -> {
+                .max(java.util.Comparator.comparingLong(c -> c.getId() != null ? c.getId() : 0L))
+                .map(c -> {
                     double rate = c.getCostValue() != null ? c.getCostValue() : 0;
                     return "P".equalsIgnoreCase(c.getCostValueType())
                             ? base * rate / 100.0
                             : rate;
                 })
-                .sum();
+                .orElse(0.0);
     }
 
     private List<MarketplaceCostDto> safeCosts(MarketplaceDto marketplace) {

@@ -17,6 +17,7 @@ public class ProductDto {
     private Double proposedSellingPriceSales;
     private String currentType;  // "T", "A", "N"
     private Boolean enabled;
+    private Long brandId;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -41,4 +42,7 @@ public class ProductDto {
 
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
+
+    public Long getBrandId() { return brandId; }
+    public void setBrandId(Long brandId) { this.brandId = brandId; }
 }

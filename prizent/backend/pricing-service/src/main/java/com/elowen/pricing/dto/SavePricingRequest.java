@@ -35,4 +35,10 @@ public class SavePricingRequest {
 
     public Double getValue() { return value; }
     public void setValue(Double value) { this.value = value; }
+
+    // Optional Input GST (flat ₹ purchase tax paid by seller); defaults to 0 if absent
+    private Double inputGst;
+
+    public Double getInputGst() { return inputGst != null ? inputGst : 0.0; }
+    public void setInputGst(Double inputGst) { this.inputGst = inputGst; }
 }

@@ -28,6 +28,7 @@ const PriceCalculationPage: React.FC = () => {
   const [pricingResult, setPricingResult] = useState<PricingCalcResponse | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calcError, setCalcError] = useState<string | null>(null);
+  const [inputGstStr, setInputGstStr] = useState('');
 
   const [savedVersion, setSavedVersion] = useState<PricingVersionDto | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,6 +39,9 @@ const PriceCalculationPage: React.FC = () => {
   const commission = pricingResult?.commission ?? 0;
   const shipping = pricingResult?.shipping ?? 0;
   const marketing = pricingResult?.marketing ?? 0;
+  const outputGst = pricingResult?.outputGst ?? 0;
+  const inputGst  = pricingResult?.inputGst ?? 0;
+  const gstDifference = pricingResult?.gstDifference ?? 0;
   const netRealisation = pricingResult?.netRealisation ?? 0;
   const profit = pricingResult?.profit ?? 0;
   const profitPercentage = pricingResult ? pricingResult.profitPercentage.toFixed(1) : '0.0';
@@ -53,7 +57,7 @@ const PriceCalculationPage: React.FC = () => {
   // Debounced API call
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const triggerCalculation = (value: string, mode: string) => {
+  const triggerCalculation = (value: string, mode: string, gstStr: string = '') => {
     if (!product || !marketplace || !value) return;
     const numVal = parseFloat(value);
     if (isNaN(numVal) || numVal <= 0) return;
@@ -63,11 +67,13 @@ const PriceCalculationPage: React.FC = () => {
       setIsCalculating(true);
       setCalcError(null);
       try {
+        const inputGstAmount = (product.productCost ?? 0) * (parseFloat(gstStr) || 0) / 100;
         const result = await calculatePricing({
           skuId: product.id,
           marketplaceId: marketplace.id,
           mode: mode === 'profit' ? 'PROFIT_PERCENT' : 'SELLING_PRICE',
           value: numVal,
+          inputGst: inputGstAmount,
         });
         setPricingResult(result);
         // When mode is profit, update input to show the calculated selling price
@@ -86,14 +92,14 @@ const PriceCalculationPage: React.FC = () => {
   // Auto-trigger on input change when in selling price mode
   useEffect(() => {
     if (pricingMode === 'selling') {
-      triggerCalculation(inputValue, 'selling');
+      triggerCalculation(inputValue, 'selling', inputGstStr);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue]);
 
   // Initial calculation if we have a default value
   useEffect(() => {
-    if (inputValue) triggerCalculation(inputValue, pricingMode);
+    if (inputValue) triggerCalculation(inputValue, pricingMode, inputGstStr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -108,6 +114,7 @@ const PriceCalculationPage: React.FC = () => {
         marketplaceId: marketplace.id,
         mode: 'SELLING_PRICE',
         value: pricingResult.sellingPrice,
+        inputGst: (product.productCost ?? 0) * (parseFloat(inputGstStr) || 0) / 100,
       });
       setSavedVersion(version);
     } catch (err: any) {
@@ -248,13 +255,25 @@ const PriceCalculationPage: React.FC = () => {
                 <path d="M1 1L4 3L7 1" stroke="#454545" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
+            <div style={{ marginTop: 10 }}>
+              <label style={{ fontSize: 12, color: '#7C7C7C', display: 'block', marginBottom: 4 }}>Input GST (%)</label>
+              <input
+                type="number"
+                className="price-input"
+                value={inputGstStr}
+                onChange={(e) => setInputGstStr(e.target.value)}
+                placeholder="0"
+                min="0"
+                max="100"
+              />
+            </div>
             <button
               className="calculate-btn"
               onClick={() => {
                 if (pricingMode === 'profit') {
-                  triggerCalculation(inputValue, 'profit');
+                  triggerCalculation(inputValue, 'profit', inputGstStr);
                 } else {
-                  triggerCalculation(inputValue, 'selling');
+                  triggerCalculation(inputValue, 'selling', inputGstStr);
                 }
               }}
             >
@@ -306,6 +325,18 @@ const PriceCalculationPage: React.FC = () => {
                 <div className="cost-item">
                   <span className="cost-label">Marketing {marketingCost ? `(${marketingCost.costValueType === 'P' ? marketingCost.costValue + '%' : '₹' + marketingCost.costValue})` : ''}</span>
                   <span className="cost-value blue">₹{marketing.toFixed(2)}</span>
+                </div>
+                <div className="cost-item">
+                  <span className="cost-label">Output GST</span>
+                  <span className="cost-value red">₹{outputGst.toFixed(2)}</span>
+                </div>
+                <div className="cost-item">
+                  <span className="cost-label">Input GST Credit</span>
+                  <span className="cost-value green">₹{inputGst.toFixed(2)}</span>
+                </div>
+                <div className="cost-item">
+                  <span className="cost-label">GST Difference</span>
+                  <span className="cost-value" style={{ color: gstDifference < 0 ? '#008000' : '#c00' }}>₹{gstDifference.toFixed(2)}</span>
                 </div>
                 <div className="cost-divider" />
                 <div className="cost-item total">

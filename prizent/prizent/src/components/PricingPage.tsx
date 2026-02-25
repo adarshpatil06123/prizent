@@ -33,6 +33,7 @@ const PricingPage: React.FC = () => {
   const [profitPercentage, setProfitPercentage] = useState('');
   const [calculatedSellingPrice, setCalculatedSellingPrice] = useState('');
   const [marketplaceCosts, setMarketplaceCosts] = useState<{ commission: string; shipping: string; marketing: string } | null>(null);
+  const [inputGst, setInputGst] = useState('');
   // Set of marketplace IDs configured for the selected brand (null = no brand filter)
   const [brandMarketplaceIds, setBrandMarketplaceIds] = useState<Set<number> | null>(null);
 
@@ -212,11 +213,15 @@ const PricingPage: React.FC = () => {
         marketplaceId: parseInt(selectedMarketplaceId),
         mode: 'SELLING_PRICE',
         value: parseFloat(sellingPrice),
+        inputGst: activeProduct.productCost * (parseFloat(inputGst) || 0) / 100,
       });
       const isLoss = result.profit < 0;
       setCalculatedProfit(JSON.stringify({
         isLoss,
         text: `${Math.abs(result.profitPercentage).toFixed(2)}% (₹${Math.abs(result.profit).toFixed(2)})`,
+        outputGst: result.outputGst,
+        inputGst: result.inputGst,
+        gstDifference: result.gstDifference,
       }));
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
@@ -234,8 +239,14 @@ const PricingPage: React.FC = () => {
         marketplaceId: parseInt(selectedMarketplaceId),
         mode: 'PROFIT_PERCENT',
         value: parseFloat(profitPercentage),
+        inputGst: activeProduct.productCost * (parseFloat(inputGst) || 0) / 100,
       });
-      setCalculatedSellingPrice(`₹${result.sellingPrice.toFixed(2)}`);
+      setCalculatedSellingPrice(JSON.stringify({
+        sp: result.sellingPrice,
+        outputGst: result.outputGst,
+        inputGst: result.inputGst,
+        gstDifference: result.gstDifference,
+      }));
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
       alert(msg);
@@ -442,6 +453,26 @@ const PricingPage: React.FC = () => {
           </div>
         </section>
 
+        {/* Input GST Section */}
+        <section className="marketplace-section">
+          <h2 className="section-title">Input GST (%)</h2>
+          <div className="marketplace-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input
+                type="number"
+                className="input-field"
+                placeholder="0"
+                value={inputGst}
+                onChange={(e) => { setInputGst(e.target.value); setCalculatedProfit(''); setCalculatedSellingPrice(''); }}
+                style={{ maxWidth: 220 }}
+                min="0"
+                max="100"
+              />
+              <span style={{ fontSize: 13, color: '#7C7C7C' }}>% of product cost paid as Input GST on purchase</span>
+            </div>
+          </div>
+        </section>
+
         {/* Calculation Section */}
         <section className="calculation-section">
           <div className="calc-container">
@@ -468,14 +499,21 @@ const PricingPage: React.FC = () => {
                 {calculatedProfit && (() => {
                   const p = JSON.parse(calculatedProfit);
                   return (
-                    <div className="result-display">
-                      <span className="result-label" style={{ color: p.isLoss ? '#c00' : undefined }}>
-                        {p.isLoss ? 'Loss:' : 'Profit:'}
-                      </span>
-                      <span className="result-value" style={{ color: p.isLoss ? '#c00' : '#008000' }}>
-                        {p.text}
-                      </span>
-                    </div>
+                    <>
+                      <div className="result-display">
+                        <span className="result-label" style={{ color: p.isLoss ? '#c00' : undefined }}>
+                          {p.isLoss ? 'Loss:' : 'Profit:'}
+                        </span>
+                        <span className="result-value" style={{ color: p.isLoss ? '#c00' : '#008000' }}>
+                          {p.text}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#F5F9FA', borderRadius: 6, fontSize: 12, color: '#454545', lineHeight: '1.8' }}>
+                        <div><strong>Output GST:</strong> ₹{(p.outputGst ?? 0).toFixed(2)}</div>
+                        <div><strong>Input GST:</strong> ₹{(p.inputGst ?? 0).toFixed(2)}</div>
+                        <div><strong>GST Difference:</strong> <span style={{ color: (p.gstDifference ?? 0) < 0 ? '#008000' : '#c00' }}>₹{(p.gstDifference ?? 0).toFixed(2)}</span></div>
+                      </div>
+                    </>
                   );
                 })()}
               </div>
@@ -501,12 +539,22 @@ const PricingPage: React.FC = () => {
                 <button className="calc-button" onClick={handleCalculateSellingPrice}>
                   Calculate
                 </button>
-                {calculatedSellingPrice && (
-                  <div className="result-display">
-                    <span className="result-label">Selling Price:</span>
-                    <span className="result-value">{calculatedSellingPrice}</span>
-                  </div>
-                )}
+                {calculatedSellingPrice && (() => {
+                  const s = JSON.parse(calculatedSellingPrice);
+                  return (
+                    <>
+                      <div className="result-display">
+                        <span className="result-label">Selling Price:</span>
+                        <span className="result-value">₹{(s.sp ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#F5F9FA', borderRadius: 6, fontSize: 12, color: '#454545', lineHeight: '1.8' }}>
+                        <div><strong>Output GST:</strong> ₹{(s.outputGst ?? 0).toFixed(2)}</div>
+                        <div><strong>Input GST:</strong> ₹{(s.inputGst ?? 0).toFixed(2)}</div>
+                        <div><strong>GST Difference:</strong> <span style={{ color: (s.gstDifference ?? 0) < 0 ? '#008000' : '#c00' }}>₹{(s.gstDifference ?? 0).toFixed(2)}</span></div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 

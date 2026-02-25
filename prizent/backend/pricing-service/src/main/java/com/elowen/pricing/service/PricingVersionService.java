@@ -50,6 +50,7 @@ public class PricingVersionService {
         calcReq.setMarketplaceId(request.getMarketplaceId());
         calcReq.setMode(request.getMode());
         calcReq.setValue(request.getValue());
+        calcReq.setInputGst(request.getInputGst());
 
         // Re-calculate from scratch — never trust frontend values
         PricingResponse result = engine.calculate(calcReq, authToken);

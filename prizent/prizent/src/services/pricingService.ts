@@ -13,6 +13,8 @@ export interface PricingCalcRequest {
   mode: PricingMode;
   /** selling price when mode = SELLING_PRICE, or desired profit % when mode = PROFIT_PERCENT */
   value: number;
+  /** flat ₹ Input GST (purchase tax paid by seller); omit or 0 if not applicable */
+  inputGst?: number;
 }
 
 export interface PricingCalcResponse {
@@ -26,6 +28,10 @@ export interface PricingCalcResponse {
   commission: number;
   shipping: number;
   marketing: number;
+  totalCost: number;
+  outputGst: number;        // SP × GST slab rate
+  inputGst: number;         // flat ₹ purchase GST paid by seller
+  gstDifference: number;    // outputGst - inputGst
   netRealisation: number;
   profit: number;
   profitPercentage: number;

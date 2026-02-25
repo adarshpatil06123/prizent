@@ -164,6 +164,25 @@ public class MarketplaceController {
         
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Get effective costs for a marketplace + optional brand.
+     * Returns brand-specific costs if configured, else marketplace-level defaults.
+     * GET /api/admin/marketplaces/{id}/effective-costs?brandId={brandId}
+     */
+    @GetMapping("/{id}/effective-costs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getEffectiveCosts(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long brandId) {
+        List<MarketplaceResponse.CostResponse> costs = marketplaceService.getEffectiveCosts(id, brandId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("costs", costs);
+
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Get brand mappings for a marketplace
