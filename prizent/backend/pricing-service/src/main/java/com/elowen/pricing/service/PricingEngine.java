@@ -182,32 +182,18 @@ public class PricingEngine {
                 .mapToDouble(MarketplaceCostDto::getCostValue)
                 .sum();
 
+        // Output GST cancels out in the profit equation:
+        // profit = SP×(1 - totalPct%) - flatCosts - productCost - inputGst
+        // => SP = (targetProfit + flatCosts + productCost + inputGst) / (1 - totalPct%)
         double targetProfitAmount = productCost * desiredProfitPct / 100.0;
-        double numerator          = targetProfitAmount + flatCosts + productCost - inputGst;
+        double numerator          = targetProfitAmount + flatCosts + productCost + inputGst;
+        double denominator        = 1.0 - (totalPercentRate / 100.0);
 
-        // Pass 1: estimate SP ignoring GST to determine the correct slab
-        double estimatedSP = numerator / (1.0 - totalPercentRate / 100.0);
-        double gstRate     = computeGstRate(estimatedSP);
-
-        // Pass 2: solve with the slab rate included in the denominator
-        double denominator = 1.0 - (totalPercentRate / 100.0) - gstRate;
         if (denominator <= 0)
             throw new IllegalArgumentException(
-                "Combined percentage costs (" + totalPercentRate +
-                "%) plus GST rate (" + (gstRate * 100) + "%) leave no room for a valid selling price.");
+                "Combined percentage costs (" + totalPercentRate + "%) leave no room for a valid selling price.");
 
         double sellingPrice = numerator / denominator;
-
-        // Slab boundary correction: re-solve if SP crossed the ₹2064 threshold
-        double actualRate = computeGstRate(sellingPrice);
-        if (Double.compare(actualRate, gstRate) != 0) {
-            denominator = 1.0 - (totalPercentRate / 100.0) - actualRate;
-            if (denominator <= 0)
-                throw new IllegalArgumentException(
-                    "Combined percentage costs (" + totalPercentRate +
-                    "%) plus GST rate (" + (actualRate * 100) + "%) leave no room for a valid selling price.");
-            sellingPrice = numerator / denominator;
-        }
 
         return calculateFromSellingPrice(product, marketplace, productCost, sellingPrice, inputGst);
     }
