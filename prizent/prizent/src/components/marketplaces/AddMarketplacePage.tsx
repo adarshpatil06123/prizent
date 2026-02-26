@@ -28,9 +28,9 @@ const AddMarketplacePage: React.FC = () => {
   });
   
   // Cost slabs state
-  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
-  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
-  const [shippingSlabs, setShippingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
+  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
+  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
+  const [shippingSlabs, setShippingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -111,7 +111,7 @@ const AddMarketplacePage: React.FC = () => {
   }, []);
 
   // ── Brand mapping handlers ──────────────────────────────────────────────────
-  const emptySlabs = (vt: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '', to: '', value: '', valueType: vt }];
+  const emptySlabs = (vt: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '0', to: '0', value: '0', valueType: vt }];
 
   const addBrandMapping = () => {
     setBrandMappings(prev => [...prev, {
@@ -145,7 +145,7 @@ const AddMarketplacePage: React.FC = () => {
     const slabKey = `${category}Slabs` as keyof BrandMapping;
     setBrandMappings(prev => prev.map(m => {
       if (m.localId !== localId) return m;
-      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '', to: '', value: '', valueType: m[typeKey] as 'P' | 'A' }] };
+      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '0', to: '0', value: '0', valueType: m[typeKey] as 'P' | 'A' }] };
     }));
   };
 
@@ -174,7 +174,7 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addProductCostSlab = () => {
-    setProductCostSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: productCostValueType }]);
+    setProductCostSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: productCostValueType }]);
   };
 
   const removeProductCostSlab = (index: number) => {
@@ -191,7 +191,7 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addMarketingSlab = () => {
-    setMarketingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: marketingValueType }]);
+    setMarketingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: marketingValueType }]);
   };
 
   const removeMarketingSlab = (index: number) => {
@@ -208,7 +208,7 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addShippingSlab = () => {
-    setShippingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: shippingValueType }]);
+    setShippingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: shippingValueType }]);
   };
 
   const removeShippingSlab = (index: number) => {
@@ -287,12 +287,12 @@ const AddMarketplacePage: React.FC = () => {
       
       // Add product cost slabs
       productCostSlabs.forEach((slab) => {
-        if (slab.from && slab.to && slab.value) {
+        if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
           console.log('Adding COMMISSION cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'COMMISSION',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.value) || 0,
+            costValue: parseFloat(slab.value),
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
@@ -300,12 +300,12 @@ const AddMarketplacePage: React.FC = () => {
       
       // Add marketing slabs
       marketingSlabs.forEach((slab) => {
-        if (slab.from && slab.to && slab.value) {
+        if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
           console.log('Adding MARKETING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'MARKETING',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.value) || 0,
+            costValue: parseFloat(slab.value),
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
@@ -313,12 +313,12 @@ const AddMarketplacePage: React.FC = () => {
       
       // Add shipping slabs
       shippingSlabs.forEach((slab) => {
-        if (slab.from && slab.to && slab.value) {
+        if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
           console.log('Adding SHIPPING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'SHIPPING',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.value) || 0,
+            costValue: parseFloat(slab.value),
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
@@ -367,9 +367,9 @@ const AddMarketplacePage: React.FC = () => {
               .filter(m => m.brandId)
               .map(m => {
                 const costs: any[] = [];
-                m.commissionSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-                m.marketingSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-                m.shippingSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+                m.commissionSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+                m.marketingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+                m.shippingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
                 return { brandId: Number(m.brandId), costs };
               });
             await marketplaceService.saveBrandMappings(response.marketplace.id, mappingRequests);

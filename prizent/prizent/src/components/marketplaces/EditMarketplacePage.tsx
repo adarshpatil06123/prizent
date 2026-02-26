@@ -30,9 +30,9 @@ const EditMarketplacePage: React.FC = () => {
   });
   
   // Cost slabs state
-  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
-  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
-  const [shippingSlabs, setShippingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
+  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
+  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
+  const [shippingSlabs, setShippingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -234,7 +234,7 @@ const EditMarketplacePage: React.FC = () => {
   };
 
   const addProductCostSlab = () => {
-    setProductCostSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: productCostValueType }]);
+    setProductCostSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: productCostValueType }]);
   };
 
   const removeProductCostSlab = (index: number) => {
@@ -251,7 +251,7 @@ const EditMarketplacePage: React.FC = () => {
   };
 
   const addMarketingSlab = () => {
-    setMarketingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: marketingValueType }]);
+    setMarketingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: marketingValueType }]);
   };
 
   const removeMarketingSlab = (index: number) => {
@@ -268,7 +268,7 @@ const EditMarketplacePage: React.FC = () => {
   };
 
   // ── Brand mapping handlers ────────────────────────────────────────────────
-  const emptySlabs = (valueType: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '', to: '', value: '', valueType }];
+  const emptySlabs = (valueType: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '0', to: '0', value: '0', valueType }];
 
   const addBrandMapping = () => {
     setBrandMappings(prev => [...prev, {
@@ -305,7 +305,7 @@ const EditMarketplacePage: React.FC = () => {
     const slabKey = `${category}Slabs` as keyof BrandMapping;
     setBrandMappings(prev => prev.map(m => {
       if (m.localId !== localId) return m;
-      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '', to: '', value: '', valueType: m[typeKey] as 'P' | 'A' }] };
+      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '0', to: '0', value: '0', valueType: m[typeKey] as 'P' | 'A' }] };
     }));
   };
 
@@ -330,7 +330,7 @@ const EditMarketplacePage: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const addShippingSlab = () => {
-    setShippingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: shippingValueType }]);
+    setShippingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: shippingValueType }]);
   };
 
   const removeShippingSlab = (index: number) => {
@@ -372,12 +372,12 @@ const EditMarketplacePage: React.FC = () => {
       
       // Add product cost slabs (Commission)
       productCostSlabs.forEach((slab) => {
-        if (slab.from && slab.to && slab.value) {
+        if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
           console.log('Adding COMMISSION cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'COMMISSION',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.value) || 0,
+            costValue: parseFloat(slab.value),
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
@@ -385,12 +385,12 @@ const EditMarketplacePage: React.FC = () => {
       
       // Add marketing slabs
       marketingSlabs.forEach((slab) => {
-        if (slab.from && slab.to && slab.value) {
+        if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
           console.log('Adding MARKETING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'MARKETING',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.value) || 0,
+            costValue: parseFloat(slab.value),
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
@@ -398,12 +398,12 @@ const EditMarketplacePage: React.FC = () => {
       
       // Add shipping slabs
       shippingSlabs.forEach((slab) => {
-        if (slab.from && slab.to && slab.value) {
+        if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
           console.log('Adding SHIPPING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'SHIPPING',
             costValueType: slab.valueType,
-            costValue: parseFloat(slab.value) || 0,
+            costValue: parseFloat(slab.value),
             costProductRange: `${slab.from}-${slab.to}`
           });
         }
@@ -449,9 +449,9 @@ const EditMarketplacePage: React.FC = () => {
             .filter(m => m.brandId)
             .map(m => {
               const costs: any[] = [];
-              m.commissionSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-              m.marketingSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-              m.shippingSlabs.forEach(s => { if (s.from && s.to && s.value) costs.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+              m.commissionSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+              m.marketingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
+              m.shippingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
               return { brandId: Number(m.brandId), costs };
             });
           await marketplaceService.saveBrandMappings(Number(id), mappingRequests);
@@ -635,9 +635,9 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                   {mapping.commissionSlabs.map((slab, i) => (
                     <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'from', e.target.value)} />
-                      <input className="small-input" placeholder="1750" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'to', e.target.value)} />
-                      <input className="small-input" placeholder="10" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'value', e.target.value)} />
+                      <input className="small-input" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'from', e.target.value)} />
+                      <input className="small-input" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'to', e.target.value)} />
+                      <input className="small-input" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'value', e.target.value)} />
                       {mapping.commissionSlabs.length > 1 && (
                         <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
                       )}
@@ -666,9 +666,9 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                   {mapping.marketingSlabs.map((slab, i) => (
                     <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'from', e.target.value)} />
-                      <input className="small-input" placeholder="750" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'to', e.target.value)} />
-                      <input className="small-input" placeholder="100" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'value', e.target.value)} />
+                      <input className="small-input" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'from', e.target.value)} />
+                      <input className="small-input" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'to', e.target.value)} />
+                      <input className="small-input" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'value', e.target.value)} />
                       {mapping.marketingSlabs.length > 1 && (
                         <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
                       )}
@@ -697,9 +697,9 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                   {mapping.shippingSlabs.map((slab, i) => (
                     <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'from', e.target.value)} />
-                      <input className="small-input" placeholder="750" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'to', e.target.value)} />
-                      <input className="small-input" placeholder="13" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'value', e.target.value)} />
+                      <input className="small-input" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'from', e.target.value)} />
+                      <input className="small-input" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'to', e.target.value)} />
+                      <input className="small-input" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'value', e.target.value)} />
                       {mapping.shippingSlabs.length > 1 && (
                         <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
                       )}

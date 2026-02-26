@@ -33,9 +33,14 @@ const PricingPage: React.FC = () => {
   const [profitPercentage, setProfitPercentage] = useState('');
   const [calculatedSellingPrice, setCalculatedSellingPrice] = useState('');
   const [marketplaceCosts, setMarketplaceCosts] = useState<{ commission: string; shipping: string; marketing: string } | null>(null);
+  const [rawCosts, setRawCosts] = useState<import('../services/marketplaceService').MarketplaceCost[]>([]);
   const [inputGst, setInputGst] = useState('');
   // Set of marketplace IDs configured for the selected brand (null = no brand filter)
   const [brandMarketplaceIds, setBrandMarketplaceIds] = useState<Set<number> | null>(null);
+
+  // --- Rebate Discount Analysis states ---
+  const [rebateDiscount, setRebateDiscount] = useState('');
+  const [rebateResult, setRebateResult] = useState('');
 
   // Load all data on mount
   useEffect(() => {
@@ -100,6 +105,7 @@ const PricingPage: React.FC = () => {
     setCalculatedSellingPrice('');
     setSelectedMarketplaceId('');
     setMarketplaceCosts(null);
+    setRawCosts([]);
     if (!val) {
       setBrandMarketplaceIds(null);
       return;
@@ -171,24 +177,38 @@ const PricingPage: React.FC = () => {
   const formatCostValue = (cost: import('../services/marketplaceService').MarketplaceCost | import('../services/marketplaceService').BrandMappingCost) =>
     cost.costValueType === 'P' ? `${cost.costValue}%` : `₹${cost.costValue}`;
 
+  /** Parse a range string like "0-300" into [from, to], or null if unparseable. */
+  const parseRangeBounds = (range: string | undefined): [number, number] | null => {
+    if (!range) return null;
+    const dashIdx = range.indexOf('-', 1);
+    if (dashIdx < 0) return null;
+    const from = parseFloat(range.substring(0, dashIdx).trim());
+    const to   = parseFloat(range.substring(dashIdx + 1).trim());
+    return isNaN(from) || isNaN(to) ? null : [from, to];
+  };
+
   const fetchMarketplaceCosts = async (mpId: number, brandId?: number) => {
     try {
       setMarketplaceCosts(null);
-      let costs: import('../services/marketplaceService').MarketplaceCost[] | import('../services/marketplaceService').BrandMappingCost[] = [];
+      setRawCosts([]);
+      let costs: import('../services/marketplaceService').MarketplaceCost[] = [];
 
       if (brandId) {
         const bmRes = await marketplaceService.getBrandMappings(mpId);
         const mapping = bmRes.mappings?.find((m: any) => m.brandId === brandId);
         if (mapping?.costs?.length) {
-          costs = mapping.costs;
+          costs = mapping.costs as import('../services/marketplaceService').MarketplaceCost[];
         }
       }
 
       if (!costs.length) {
         const mpRes = await marketplaceService.getMarketplaceCosts(mpId);
-        costs = mpRes.costs ?? mpRes.marketplace?.costs ?? [];
+        costs = (mpRes.costs ?? mpRes.marketplace?.costs ?? []) as import('../services/marketplaceService').MarketplaceCost[];
       }
 
+      setRawCosts(costs);
+
+      // Summary display (used for the simple one-liner fallback)
       const get = (cat: string) => {
         const c = costs.find(x => x.costCategory === cat);
         return c ? formatCostValue(c) : '—';
@@ -200,6 +220,7 @@ const PricingPage: React.FC = () => {
       });
     } catch {
       setMarketplaceCosts(null);
+      setRawCosts([]);
     }
   };
 
@@ -246,6 +267,50 @@ const PricingPage: React.FC = () => {
         outputGst: result.outputGst,
         inputGst: result.inputGst,
         gstDifference: result.gstDifference,
+      }));
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
+      alert(msg);
+    }
+  };
+
+  const handleCalculateRebate = async () => {
+    if (!activeProduct) { alert('Please select a product first'); return; }
+    if (!selectedMarketplaceId) { alert('Please select a marketplace first'); return; }
+    if (!rebateDiscount) { alert('Please enter rebate discount %'); return; }
+    // Base SP: use whatever the user entered in Calculate Profit, else proposed SP, else MRP
+    const baseSP = parseFloat(sellingPrice) || activeProduct.proposedSellingPriceSales || activeProduct.mrp;
+    // Derive commission rate from the slab that matches the rebate SP
+    const rebateSP = baseSP * (1 - parseFloat(rebateDiscount) / 100);
+    if (rebateSP <= 0) { alert('Rebate SP must be positive'); return; }
+    const commissionCosts = rawCosts.filter(x => x.costCategory === 'COMMISSION');
+    const matchedCommission = commissionCosts.find(x => {
+      const bounds = parseRangeBounds(x.costProductRange);
+      return bounds ? baseSP >= bounds[0] && baseSP <= bounds[1] : false;
+    }) ?? commissionCosts[0];
+    const commissionRatePct = matchedCommission?.costValue ?? 0;
+    try {
+      const result = await calculatePricing({
+        skuId: activeProduct.id,
+        marketplaceId: parseInt(selectedMarketplaceId),
+        mode: 'SELLING_PRICE',
+        value: rebateSP,
+        inputGst: activeProduct.productCost * (parseFloat(inputGst) || 0) / 100,
+        commissionRebatePct: commissionRatePct,
+        rebateMode: 'NET',
+      });
+      const isLoss = result.profit < 0;
+      setRebateResult(JSON.stringify({
+        isLoss,
+        sp: result.sellingPrice,
+        profit: result.profit,
+        profitPct: result.profitPercentage,
+        commission: result.commission,
+        commissionBeforeRebate: result.commissionBeforeRebate,
+        pendingRebateGross: result.pendingRebateGross,
+        mode: 'NET',
+        commissionRatePct,
+        commissionValueType: matchedCommission?.costValueType ?? 'P',
       }));
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
@@ -431,6 +496,7 @@ const PricingPage: React.FC = () => {
                     fetchMarketplaceCosts(parseInt(val), selectedBrandId ? parseInt(selectedBrandId) : undefined);
                   } else {
                     setMarketplaceCosts(null);
+                    setRawCosts([]);
                   }
                 }}
               >
@@ -443,6 +509,7 @@ const PricingPage: React.FC = () => {
                 <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
+
             {marketplaceCosts && (
               <div style={{ marginTop: '14px', padding: '10px 16px', background: '#F5F9FA', borderRadius: '8px', display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#454545' }}>
                 <span><strong>Commission:</strong> {marketplaceCosts.commission}</span>
@@ -450,6 +517,7 @@ const PricingPage: React.FC = () => {
                 <span><strong>Marketing:</strong> {marketplaceCosts.marketing}</span>
               </div>
             )}
+
           </div>
         </section>
 
@@ -558,6 +626,57 @@ const PricingPage: React.FC = () => {
               </div>
             </div>
 
+          </div>
+        </section>
+
+        {/* Rebate Discount Analysis Section */}
+        <section className="calculation-section">
+          <div className="calc-container">
+            <div className="calc-card">
+              <h3 className="calc-title">Rebate Discount Analysis</h3>
+              <div className="calc-content">
+                <div className="input-group">
+                  <label className="input-label">
+                    Rebate Discount (%)
+                  </label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="Enter value"
+                    value={rebateDiscount}
+                    onChange={e => { setRebateDiscount(e.target.value); setRebateResult(''); }}
+                    min="0" max="100"
+                  />
+                </div>
+                <button className="calc-button" onClick={handleCalculateRebate}>
+                  Calculate Rebate
+                </button>
+                {rebateResult && (() => {
+                  const r = JSON.parse(rebateResult);
+                  return (
+                    <>
+                      <div className="result-display">
+                        <span className="result-label" style={{ color: r.isLoss ? '#c00' : undefined }}>
+                          {r.isLoss ? 'Loss:' : 'Profit:'}
+                        </span>
+                        <span className="result-value" style={{ color: r.isLoss ? '#c00' : '#008000' }}>
+                          {Math.abs(r.profitPct ?? 0).toFixed(2)}% (₹{Math.abs(r.profit ?? 0).toFixed(2)})
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#F5F9FA', borderRadius: 6, fontSize: 12, color: '#454545', lineHeight: '1.8' }}>
+                        <div><strong>Rebate SP:</strong> ₹{(r.sp ?? 0).toFixed(2)}</div>
+                        {r.commissionBeforeRebate != null && (
+                          <div>
+                            <strong>Commission:</strong> ₹{(r.commission ?? 0).toFixed(2)}{' '}
+                            <span style={{ color: '#7C7C7C' }}>(reduced from ₹{r.commissionBeforeRebate.toFixed(2)} — {r.commissionRatePct}{r.commissionValueType === 'P' ? '%' : '₹'} rebate)</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         </section>
       </main>

@@ -21,6 +21,12 @@ public class PricingResponse {
 
     // Pricing breakdown
     private Double sellingPrice;
+
+    // Rebate fields (populated only when a rebate is requested)
+    /** NET mode: original commission ₹ before rebate reduction */
+    private Double commissionBeforeRebate;
+    /** DEFERRED mode: gross commission amount that will be credited back later */
+    private Double pendingRebateGross;
     private Double commission;
     private Double shipping;
     private Double marketing;
@@ -86,4 +92,10 @@ public class PricingResponse {
     public Double getNetRealisation()  { return netRealisation; }
     public Double getProfit()          { return profit; }
     public Double getProfitPercentage(){ return profitPercentage; }
+
+    public Double getCommissionBeforeRebate() { return commissionBeforeRebate; }
+    public void   setCommissionBeforeRebate(Double v) { this.commissionBeforeRebate = v; }
+
+    public Double getPendingRebateGross() { return pendingRebateGross; }
+    public void   setPendingRebateGross(Double v) { this.pendingRebateGross = v; }
 }

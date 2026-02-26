@@ -7,8 +7,10 @@ import com.elowen.pricing.exception.LifecycleException;
 import com.elowen.pricing.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Core stateless pricing engine.
@@ -70,9 +72,46 @@ public class PricingEngine {
         if (inputGst < 0)
             throw new IllegalArgumentException("inputGst must be >= 0.");
 
-        return request.getMode() == PricingRequest.Mode.PROFIT_PERCENT
+        double commissionRebatePct = request.getCommissionRebatePct();
+        PricingRequest.RebateMode rebateMode = request.getRebateMode();
+
+        if (rebateMode == PricingRequest.RebateMode.NET && commissionRebatePct > 0) {
+            // Clone costs list with COMMISSION values reduced by the rebate %
+            List<MarketplaceCostDto> modifiedCosts = effectiveCosts.stream().map(c -> {
+                if ("COMMISSION".equalsIgnoreCase(c.getCostCategory()) && c.getCostValue() != null) {
+                    MarketplaceCostDto clone = new MarketplaceCostDto();
+                    clone.setId(c.getId());
+                    clone.setCostCategory(c.getCostCategory());
+                    clone.setCostValueType(c.getCostValueType());
+                    clone.setCostValue(c.getCostValue() * (1.0 - commissionRebatePct / 100.0));
+                    clone.setCostProductRange(c.getCostProductRange());
+                    return clone;
+                }
+                return c;
+            }).collect(Collectors.toList());
+            marketplace.setCosts(modifiedCosts);
+
+            PricingResponse result = request.getMode() == PricingRequest.Mode.PROFIT_PERCENT
+                    ? calculateFromProfitPercent(product, marketplace, productCost, request.getValue(), inputGst)
+                    : calculateFromSellingPrice(product, marketplace, productCost, request.getValue(), inputGst);
+
+            // commissionBeforeRebate = reduced commission / (1 - rebatePct/100)
+            if (result.getCommission() != null && commissionRebatePct < 100.0) {
+                result.setCommissionBeforeRebate(round2(result.getCommission() / (1.0 - commissionRebatePct / 100.0)));
+            }
+            return result;
+        }
+
+        PricingResponse result = request.getMode() == PricingRequest.Mode.PROFIT_PERCENT
                 ? calculateFromProfitPercent(product, marketplace, productCost, request.getValue(), inputGst)
                 : calculateFromSellingPrice(product, marketplace, productCost, request.getValue(), inputGst);
+
+        if (rebateMode == PricingRequest.RebateMode.DEFERRED && commissionRebatePct > 0
+                && result.getCommission() != null) {
+            result.setPendingRebateGross(round2(result.getCommission() * commissionRebatePct / 100.0));
+        }
+
+        return result;
     }
 
     // ── Lifecycle resolution & validation ────────────────────────────────────
@@ -159,7 +198,7 @@ public class PricingEngine {
     //                     = SP(1 - Σ%/100 - gstRate) - Σfixed - cost + inputGst + target
     //    → SP = (targetProfit + Σfixed + cost - inputGst) / (1 - Σ%/100 - gstRate)
     //
-    //  Two-pass slab solve handles the circular dependency between SP and gstRate.
+    //  Slab-aware: tries each distinct price range to find one whose computed SP falls within it.
     //
     private PricingResponse calculateFromProfitPercent(ProductDto product,
                                                        MarketplaceDto marketplace,
@@ -170,32 +209,124 @@ public class PricingEngine {
             throw new IllegalArgumentException("Desired profit percentage must be >= 0.");
 
         List<MarketplaceCostDto> costs = safeCosts(marketplace);
-
-        // Separate percentage-based and absolute costs — never assume all-percent
-        double totalPercentRate = costs.stream()
-                .filter(c -> "P".equalsIgnoreCase(c.getCostValueType()) && c.getCostValue() != null)
-                .mapToDouble(MarketplaceCostDto::getCostValue)
-                .sum();
-
-        double flatCosts = costs.stream()
-                .filter(c -> "A".equalsIgnoreCase(c.getCostValueType()) && c.getCostValue() != null)
-                .mapToDouble(MarketplaceCostDto::getCostValue)
-                .sum();
-
-        // Output GST cancels out in the profit equation:
-        // profit = SP×(1 - totalPct%) - flatCosts - productCost - inputGst
-        // => SP = (targetProfit + flatCosts + productCost + inputGst) / (1 - totalPct%)
         double targetProfitAmount = productCost * desiredProfitPct / 100.0;
-        double numerator          = targetProfitAmount + flatCosts + productCost + inputGst;
-        double denominator        = 1.0 - (totalPercentRate / 100.0);
 
-        if (denominator <= 0)
+        // Collect all distinct breakpoints from every non-degenerate slab range across all categories.
+        // This builds composite intervals where the cost structure is constant throughout.
+        // E.g. Commission "0-1000", Shipping "0-500","501-2000" → breakpoints {0,500,501,1000,2000}
+        //   → composite intervals: [0,500], [501,1000], [1001,2000]
+        java.util.TreeSet<Double> breakpoints = new java.util.TreeSet<>();
+        for (MarketplaceCostDto c : costs) {
+            double[] b = parseRangeBounds(c.getCostProductRange());
+            if (b != null && b[1] > b[0]) {
+                breakpoints.add(b[0]);
+                breakpoints.add(b[1]);
+            }
+        }
+
+        if (breakpoints.isEmpty()) {
+            // No price-range slabs — use all costs as a single tier
+            double totalPercentRate = costs.stream()
+                    .filter(c -> "P".equalsIgnoreCase(c.getCostValueType()) && c.getCostValue() != null)
+                    .mapToDouble(MarketplaceCostDto::getCostValue)
+                    .sum();
+            double flatCostsSum = costs.stream()
+                    .filter(c -> "A".equalsIgnoreCase(c.getCostValueType()) && c.getCostValue() != null)
+                    .mapToDouble(MarketplaceCostDto::getCostValue)
+                    .sum();
+            double denominator = 1.0 - (totalPercentRate / 100.0);
+            if (denominator <= 0)
+                throw new IllegalArgumentException(
+                    "Combined percentage costs (" + totalPercentRate + "%) leave no room for a valid selling price.");
+            double sellingPrice = (targetProfitAmount + flatCostsSum + productCost + inputGst) / denominator;
+            return calculateFromSellingPrice(product, marketplace, productCost, sellingPrice, inputGst);
+        }
+
+        // Build composite intervals from consecutive breakpoints, then try each interval.
+        // Within each interval the cost structure is constant, so the formula gives a valid SP.
+        List<Double> pts = new java.util.ArrayList<>(breakpoints);
+        double fallbackSp = 0.0;
+        for (int i = 0; i < pts.size() - 1; i++) {
+            double lo = pts.get(i);
+            double hi = pts.get(i + 1);
+            // Use the interval midpoint to determine which slab applies in each category
+            double midSp = (lo + hi) / 2.0;
+
+            double totalPercentRate = 0.0;
+            double flatCostsSum     = 0.0;
+            for (String cat : List.of("COMMISSION", "MARKETING", "SHIPPING")) {
+                List<MarketplaceCostDto> catCosts = costs.stream()
+                        .filter(c -> cat.equalsIgnoreCase(c.getCostCategory()))
+                        .collect(Collectors.toList());
+                if (catCosts.isEmpty()) continue;
+
+                // Pick the slab whose range contains midSp; fall back to highest upper-bound slab
+                MarketplaceCostDto applicable = catCosts.stream()
+                        .filter(c -> isInRange(c.getCostProductRange(), midSp))
+                        .findFirst()
+                        .orElseGet(() -> catCosts.stream()
+                                .max(Comparator.comparingDouble(c -> {
+                                    double[] b = parseRangeBounds(c.getCostProductRange());
+                                    return b != null ? b[1] : 0.0;
+                                }))
+                                .orElse(null));
+
+                if (applicable != null && applicable.getCostValue() != null) {
+                    if ("P".equalsIgnoreCase(applicable.getCostValueType())) {
+                        totalPercentRate += applicable.getCostValue();
+                    } else {
+                        flatCostsSum += applicable.getCostValue();
+                    }
+                }
+            }
+
+            double denominator = 1.0 - (totalPercentRate / 100.0);
+            if (denominator <= 0) continue;
+            double sp = (targetProfitAmount + flatCostsSum + productCost + inputGst) / denominator;
+            fallbackSp = sp; // keep latest valid candidate as fallback
+            // Accept if the computed SP falls within this composite interval
+            if (sp >= lo && sp <= hi) {
+                return calculateFromSellingPrice(product, marketplace, productCost, sp, inputGst);
+            }
+        }
+        // Also try the last breakpoint upwards (open-ended top range)
+        double lastPt = pts.get(pts.size() - 1);
+        double midSp  = lastPt * 1.5; // representative point above the last boundary
+        double totalPercentRate = 0.0;
+        double flatCostsSum     = 0.0;
+        for (String cat : List.of("COMMISSION", "MARKETING", "SHIPPING")) {
+            List<MarketplaceCostDto> catCosts = costs.stream()
+                    .filter(c -> cat.equalsIgnoreCase(c.getCostCategory()))
+                    .collect(Collectors.toList());
+            if (catCosts.isEmpty()) continue;
+            MarketplaceCostDto applicable = catCosts.stream()
+                    .filter(c -> isInRange(c.getCostProductRange(), midSp))
+                    .findFirst()
+                    .orElseGet(() -> catCosts.stream()
+                            .max(Comparator.comparingDouble(c -> {
+                                double[] b = parseRangeBounds(c.getCostProductRange());
+                                return b != null ? b[1] : 0.0;
+                            }))
+                            .orElse(null));
+            if (applicable != null && applicable.getCostValue() != null) {
+                if ("P".equalsIgnoreCase(applicable.getCostValueType())) totalPercentRate += applicable.getCostValue();
+                else flatCostsSum += applicable.getCostValue();
+            }
+        }
+        double denom = 1.0 - (totalPercentRate / 100.0);
+        if (denom > 0) {
+            double sp = (targetProfitAmount + flatCostsSum + productCost + inputGst) / denom;
+            if (sp >= lastPt) {
+                return calculateFromSellingPrice(product, marketplace, productCost, sp, inputGst);
+            }
+            fallbackSp = sp;
+        }
+
+        // No interval matched — use the last computed SP as fallback
+        if (fallbackSp <= 0)
             throw new IllegalArgumentException(
-                "Combined percentage costs (" + totalPercentRate + "%) leave no room for a valid selling price.");
-
-        double sellingPrice = numerator / denominator;
-
-        return calculateFromSellingPrice(product, marketplace, productCost, sellingPrice, inputGst);
+                "Cannot determine an applicable pricing slab for the given profit percentage.");
+        return calculateFromSellingPrice(product, marketplace, productCost, fallbackSp, inputGst);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -205,24 +336,68 @@ public class PricingEngine {
         return sellingPrice < GST_THRESHOLD ? GST_RATE_LOW : GST_RATE_HIGH;
     }
 
-    /** Returns ₹ amount for a cost category.
-     *  When multiple rows exist for the same category, uses the latest one (highest id).
-     *  P→ base×rate/100, A→ fixed. */
+    /**
+     * Returns the ₹ cost amount for a given category by matching the price-range slab.
+     * If "base" falls within a slab's costProductRange (e.g. "0-300"), that slab is used.
+     * Falls back to the slab with the highest upper bound when no range matches.
+     * P → base × rate / 100, A → fixed amount.
+     */
     private double extractCost(List<MarketplaceCostDto> costs, String category, double base) {
-        return costs.stream()
+        List<MarketplaceCostDto> catCosts = costs.stream()
                 .filter(c -> category.equalsIgnoreCase(c.getCostCategory()))
-                .max(java.util.Comparator.comparingLong(c -> c.getId() != null ? c.getId() : 0L))
-                .map(c -> {
-                    double rate = c.getCostValue() != null ? c.getCostValue() : 0;
-                    return "P".equalsIgnoreCase(c.getCostValueType())
-                            ? base * rate / 100.0
-                            : rate;
-                })
-                .orElse(0.0);
+                .collect(Collectors.toList());
+        if (catCosts.isEmpty()) return 0.0;
+
+        // Prefer the slab whose range contains the selling price
+        java.util.Optional<MarketplaceCostDto> matched = catCosts.stream()
+                .filter(c -> isInRange(c.getCostProductRange(), base))
+                .findFirst();
+
+        if (!matched.isPresent()) {
+            // Fallback: pick the slab whose upper-bound is highest (handles SP above all defined ranges)
+            matched = catCosts.stream()
+                    .max(Comparator.comparingDouble(c -> {
+                        double[] b = parseRangeBounds(c.getCostProductRange());
+                        return b != null ? b[1] : (c.getId() != null ? c.getId().doubleValue() : 0.0);
+                    }));
+        }
+
+        return matched.map(c -> {
+            double rate = c.getCostValue() != null ? c.getCostValue() : 0;
+            return "P".equalsIgnoreCase(c.getCostValueType()) ? base * rate / 100.0 : rate;
+        }).orElse(0.0);
+    }
+
+    /** Returns true if {@code value} falls within the {@code range} string (e.g. "0-300"). */
+    private boolean isInRange(String range, double value) {
+        double[] b = parseRangeBounds(range);
+        return b != null && value >= b[0] && value <= b[1];
+    }
+
+    /**
+     * Parses a range string like "0-300" or "301-500" into [from, to].
+     * Returns null when the string is blank or cannot be parsed.
+     */
+    private double[] parseRangeBounds(String range) {
+        if (range == null || range.isBlank()) return null;
+        // Split on the first '-' that is not the very first character (avoids negative-number ambiguity)
+        int dashIdx = range.indexOf('-', 1);
+        if (dashIdx < 0) return null;
+        try {
+            double from = Double.parseDouble(range.substring(0, dashIdx).trim());
+            double to   = Double.parseDouble(range.substring(dashIdx + 1).trim());
+            return new double[]{from, to};
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private List<MarketplaceCostDto> safeCosts(MarketplaceDto marketplace) {
         return marketplace.getCosts() != null ? marketplace.getCosts() : List.of();
+    }
+
+    private static double round2(double v) {
+        return java.math.BigDecimal.valueOf(v).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
     }
 
     private double safeDouble(Double value, String fieldName) {

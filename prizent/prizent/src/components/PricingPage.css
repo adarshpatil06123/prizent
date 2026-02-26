@@ -381,3 +381,58 @@
     line-height: 18px;
   }
 }
+/* ── Slab display ──────────────────────────────────────────────────────────── */
+.slab-info-box {
+  padding: 10px 16px;
+  background: #F5F9FA;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slab-price-hint {
+  font-size: 11px;
+  color: #7C7C7C;
+  margin-bottom: 2px;
+  font-style: italic;
+}
+
+.slab-category-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.slab-cat-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #454545;
+  min-width: 90px;
+}
+
+.slab-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.slab-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  color: #454545;
+  background: #E8F0F2;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.slab-chip--active {
+  background: #1A7EC8;
+  color: #fff;
+  border-color: #1565A8;
+  font-weight: 600;
+}

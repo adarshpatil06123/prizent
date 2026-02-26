@@ -15,6 +15,10 @@ export interface PricingCalcRequest {
   value: number;
   /** flat ₹ Input GST (purchase tax paid by seller); omit or 0 if not applicable */
   inputGst?: number;
+  /** % of commission that is rebated (0-100). Used in Rebate Discount Analysis. */
+  commissionRebatePct?: number;
+  /** NET = immediately reduces commission; DEFERRED = tracked as future receivable */
+  rebateMode?: 'NET' | 'DEFERRED';
 }
 
 export interface PricingCalcResponse {
@@ -35,6 +39,10 @@ export interface PricingCalcResponse {
   netRealisation: number;
   profit: number;
   profitPercentage: number;
+  /** NET rebate mode: original commission ₹ before rebate reduction */
+  commissionBeforeRebate?: number;
+  /** DEFERRED rebate mode: commission ₹ that will be credited back later */
+  pendingRebateGross?: number;
 }
 
 export interface PricingVersionDto {
