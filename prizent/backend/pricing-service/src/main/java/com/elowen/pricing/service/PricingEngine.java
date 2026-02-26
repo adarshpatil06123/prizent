@@ -286,7 +286,69 @@ public class PricingEngine {
             fallbackSp = sp; // keep latest valid candidate as fallback
             // Accept if the computed SP falls within this composite interval
             if (sp >= lo && sp <= hi) {
-                return calculateFromSellingPrice(product, marketplace, productCost, sp, inputGst);
+                // Self-consistency check: verify the computed SP actually falls within
+                // the same slab as the midpoint for each category. If the SP has crossed
+                // a slab boundary (midpoint used one slab rate but computed SP lands in a
+                // different slab), recompute with the correct slab rates for the actual SP.
+                double correctedPercentRate = 0.0;
+                double correctedFlatCosts   = 0.0;
+                for (String cat : List.of("COMMISSION", "MARKETING", "SHIPPING")) {
+                    List<MarketplaceCostDto> catCosts = costs.stream()
+                            .filter(c -> cat.equalsIgnoreCase(c.getCostCategory()))
+                            .collect(Collectors.toList());
+                    if (catCosts.isEmpty()) continue;
+                    MarketplaceCostDto applicable = catCosts.stream()
+                            .filter(c -> isInRange(c.getCostProductRange(), sp))
+                            .findFirst()
+                            .orElseGet(() -> catCosts.stream()
+                                    .max(Comparator.comparingDouble(c -> {
+                                        double[] b = parseRangeBounds(c.getCostProductRange());
+                                        return b != null ? b[1] : 0.0;
+                                    }))
+                                    .orElse(null));
+                    if (applicable != null && applicable.getCostValue() != null) {
+                        if ("P".equalsIgnoreCase(applicable.getCostValueType())) {
+                            correctedPercentRate += applicable.getCostValue();
+                        } else {
+                            correctedFlatCosts += applicable.getCostValue();
+                        }
+                    }
+                }
+                // If the slab rates differ, recompute SP using the correct (actual) slab rates
+                if (Math.abs(correctedPercentRate - totalPercentRate) > 0.0001
+                        || Math.abs(correctedFlatCosts - flatCostsSum) > 0.0001) {
+                    double correctedDenom = 1.0 - (correctedPercentRate / 100.0);
+                    if (correctedDenom > 0) {
+                        double correctedSp = (targetProfitAmount + correctedFlatCosts + productCost + inputGst)
+                                / correctedDenom;
+                        // Verify the corrected SP is still self-consistent (no further slab crossing)
+                        double verifyCorrectedPercentRate = 0.0;
+                        for (String cat : List.of("COMMISSION", "MARKETING", "SHIPPING")) {
+                            List<MarketplaceCostDto> catCosts = costs.stream()
+                                    .filter(c -> cat.equalsIgnoreCase(c.getCostCategory()))
+                                    .collect(Collectors.toList());
+                            if (catCosts.isEmpty()) continue;
+                            MarketplaceCostDto applicable = catCosts.stream()
+                                    .filter(c -> isInRange(c.getCostProductRange(), correctedSp))
+                                    .findFirst()
+                                    .orElseGet(() -> catCosts.stream()
+                                            .max(Comparator.comparingDouble(c -> {
+                                                double[] b = parseRangeBounds(c.getCostProductRange());
+                                                return b != null ? b[1] : 0.0;
+                                            }))
+                                            .orElse(null));
+                            if (applicable != null && applicable.getCostValue() != null
+                                    && "P".equalsIgnoreCase(applicable.getCostValueType())) {
+                                verifyCorrectedPercentRate += applicable.getCostValue();
+                            }
+                        }
+                        if (Math.abs(verifyCorrectedPercentRate - correctedPercentRate) < 0.0001) {
+                            return calculateFromSellingPrice(product, marketplace, productCost, correctedSp, inputGst);
+                        }
+                    }
+                } else {
+                    return calculateFromSellingPrice(product, marketplace, productCost, sp, inputGst);
+                }
             }
         }
         // Also try the last breakpoint upwards (open-ended top range)
@@ -316,10 +378,40 @@ public class PricingEngine {
         double denom = 1.0 - (totalPercentRate / 100.0);
         if (denom > 0) {
             double sp = (targetProfitAmount + flatCostsSum + productCost + inputGst) / denom;
-            if (sp >= lastPt) {
-                return calculateFromSellingPrice(product, marketplace, productCost, sp, inputGst);
+            // Self-consistency check for open-ended range as well
+            double correctedPercentRate = 0.0;
+            double correctedFlatCosts   = 0.0;
+            for (String cat : List.of("COMMISSION", "MARKETING", "SHIPPING")) {
+                List<MarketplaceCostDto> catCosts = costs.stream()
+                        .filter(c -> cat.equalsIgnoreCase(c.getCostCategory()))
+                        .collect(Collectors.toList());
+                if (catCosts.isEmpty()) continue;
+                MarketplaceCostDto applicable = catCosts.stream()
+                        .filter(c -> isInRange(c.getCostProductRange(), sp))
+                        .findFirst()
+                        .orElseGet(() -> catCosts.stream()
+                                .max(Comparator.comparingDouble(c -> {
+                                    double[] b = parseRangeBounds(c.getCostProductRange());
+                                    return b != null ? b[1] : 0.0;
+                                }))
+                                .orElse(null));
+                if (applicable != null && applicable.getCostValue() != null) {
+                    if ("P".equalsIgnoreCase(applicable.getCostValueType())) correctedPercentRate += applicable.getCostValue();
+                    else correctedFlatCosts += applicable.getCostValue();
+                }
             }
-            fallbackSp = sp;
+            double correctedDenom = 1.0 - (correctedPercentRate / 100.0);
+            double finalSp = sp;
+            if (Math.abs(correctedPercentRate - totalPercentRate) > 0.0001
+                    || Math.abs(correctedFlatCosts - flatCostsSum) > 0.0001) {
+                if (correctedDenom > 0) {
+                    finalSp = (targetProfitAmount + correctedFlatCosts + productCost + inputGst) / correctedDenom;
+                }
+            }
+            if (finalSp >= lastPt) {
+                return calculateFromSellingPrice(product, marketplace, productCost, finalSp, inputGst);
+            }
+            fallbackSp = finalSp;
         }
 
         // No interval matched — use the last computed SP as fallback
