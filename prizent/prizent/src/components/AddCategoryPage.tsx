@@ -141,40 +141,49 @@ const AddCategoryPage: React.FC = () => {
             </div>
           )}
           <div className="form-container">
-            <input
-              type="text"
-              name="categoryName"
-              placeholder="enter category name"
-              className="form-input"
-              value={categoryName}
-              onChange={(e) => setCategoryName(e.target.value)}
-              disabled={saving}
-            />
-            <select
-              name="categoryType"
-              className="form-select"
-              value={categoryType}
-              onChange={(e) => handleTypeChange(e.target.value)}
-              disabled={saving}
-            >
-              <option value="" disabled hidden>Parent category</option>
-              <option value="Parent category">Parent category</option>
-              <option value="Category">Category</option>
-            </select>
-
-            {categoryType === 'Parent category' && (
+            <div className="form-field">
+              <label className="field-label">Category Name</label>
+              <input
+                type="text"
+                name="categoryName"
+                placeholder="enter category name"
+                className="form-input"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                disabled={saving}
+              />
+            </div>
+            <div className="form-field">
+              <label className="field-label">Category Type</label>
               <select
-                name="parentCategory"
+                name="categoryType"
                 className="form-select"
-                value={selectedParentId ?? ''}
-                onChange={(e) => setSelectedParentId(e.target.value ? Number(e.target.value) : null)}
+                value={categoryType}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 disabled={saving}
               >
-                <option value="">Select parent category</option>
-                {rootCategories.map((cat: Category) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
+                <option value="" disabled hidden>Parent category</option>
+                <option value="Parent category">Parent category</option>
+                <option value="Category">Category</option>
               </select>
+            </div>
+
+            {categoryType === 'Parent category' && (
+              <div className="form-field">
+                <label className="field-label">Select Parent Category</label>
+                <select
+                  name="parentCategory"
+                  className="form-select"
+                  value={selectedParentId ?? ''}
+                  onChange={(e) => setSelectedParentId(e.target.value ? Number(e.target.value) : null)}
+                  disabled={saving}
+                >
+                  <option value="">Select parent category</option>
+                  {rootCategories.map((cat: Category) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
             )}
 
             <div className="checkbox-container">
@@ -197,7 +206,8 @@ const AddCategoryPage: React.FC = () => {
             <h3 className="section-title">Custom Fields</h3>
             <div className="form-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
               {customFields.map((field) => (
-                <div key={field.id}>
+                <div key={field.id} className="form-field">
+                  <label className="field-label">{field.name}{field.required ? ' *' : ''}</label>
                   {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
                     <input
                       type="text"

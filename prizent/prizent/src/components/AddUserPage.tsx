@@ -124,34 +124,42 @@ const AddUserPage: React.FC = () => {
           <h3 className="section-title">User Details</h3>
           {error && <div className="error-message" style={{color: 'red', marginBottom: '10px'}}>{error}</div>}
           <div className="form-grid">
-            <input
-              type="text"
-              name="username"
-              placeholder="enter user name"
-              className="form-input"
-              value={formData.username}
-              onChange={handleInputChange}
-            />
-            <select
-              name="role"
-              className="form-select"
-              value={formData.role}
-              onChange={handleInputChange}
-            >
-              <option value="">role</option>
-              <option value="SUPER_ADMIN">Super Admin</option>
-              <option value="ADMIN">Admin</option>
-              <option value="MANAGER">Manager</option>
-              <option value="USER">User</option>
-            </select>
-            <input
-              type="text"
-              name="designation"
-              placeholder="designation"
-              className="form-input"
-              value={formData.designation}
-              onChange={handleInputChange}
-            />
+            <div className="form-field">
+              <label className="field-label">User Name</label>
+              <input
+                type="text"
+                name="username"
+                placeholder="enter user name"
+                className="form-input"
+                value={formData.username}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="form-field">
+              <label className="field-label">Role</label>
+              <select
+                name="role"
+                className="form-select"
+                value={formData.role}
+                onChange={handleInputChange}
+              >
+                <option value="SUPER_ADMIN">Super Admin</option>
+                <option value="ADMIN">Admin</option>
+                <option value="MANAGER">Manager</option>
+                <option value="USER">User</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label className="field-label">Designation</label>
+              <input
+                type="text"
+                name="designation"
+                placeholder="designation"
+                className="form-input"
+                value={formData.designation}
+                onChange={handleInputChange}
+              />
+            </div>
           </div>
         </section>
 
@@ -160,38 +168,50 @@ const AddUserPage: React.FC = () => {
           <h3 className="section-title">User Credentials</h3>
           <div className="credentials-container">
             <div className="credentials-left">
-              <input
-                type="tel"
-                name="phone"
-                placeholder="user phone no."
-                className="form-input"
-                value={formData.phone}
-                onChange={handleInputChange}
-              />
-              <input
-                type="email"
-                name="email"
-                placeholder="user email"
-                className="form-input"
-                value={formData.email}
-                onChange={handleInputChange}
-              />
-              <input
-                type="text"
-                name="loginUsername"
-                placeholder="Username"
-                className="form-input"
-                value={formData.loginUsername}
-                onChange={handleInputChange}
-              />
-              <input
-                type="password"
-                name="password"
-                placeholder="Password"
-                className="form-input"
-                value={formData.password}
-                onChange={handleInputChange}
-              />
+              <div className="form-field">
+                <label className="field-label">Phone Number</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  placeholder="user phone no."
+                  className="form-input"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="form-field">
+                <label className="field-label">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="user email"
+                  className="form-input"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="form-field">
+                <label className="field-label">Login Username</label>
+                <input
+                  type="text"
+                  name="loginUsername"
+                  placeholder="Username"
+                  className="form-input"
+                  value={formData.loginUsername}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="form-field">
+                <label className="field-label">Password</label>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  className="form-input"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                />
+              </div>
             </div>
             <div className="credentials-right">
               <label className="checkbox-container">

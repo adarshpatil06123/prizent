@@ -1,29 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./MarketplacesListPage.css";
 import marketplaceService, { Marketplace, getSlabsForCategory } from '../../services/marketplaceService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../../services/customFieldService';
-import brandService, { Brand } from '../../services/brandService';
 
 const MarketplacesListPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
   const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [filter, setFilter] = useState({ name: '', description: '', enabled: 'all' as 'all' | 'enabled' | 'disabled', brandId: '' });
-  type Slab = { id: number; from: string; to: string; value: string; valueType: 'P' | 'A' };
-  const createEmptySlab = (): Slab => ({ id: Date.now() + Math.floor(Math.random() * 1000000), from: '', to: '', value: '', valueType: 'A' });
-
-  const [brandSections, setBrandSections] = useState<Array<{
-    id: number;
-    brandId: string;
-    commissionSlabs: Slab[];
-    marketingSlabs: Slab[];
-    shippingSlabs: Slab[];
-  }>>([{ id: Date.now(), brandId: '', commissionSlabs: [createEmptySlab()], marketingSlabs: [createEmptySlab()], shippingSlabs: [createEmptySlab()] }]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
@@ -42,22 +30,12 @@ const MarketplacesListPage: React.FC = () => {
       }
     };
     fetchCustomFieldsData();
-    // fetch brands for filter
-    const fetchBrands = async () => {
-      try {
-        const resp = await brandService.getAllBrands();
-        if (resp.success && resp.brands) setBrands(resp.brands);
-      } catch (err) {
-        console.error('Failed to fetch brands for filters', err);
-      }
-    };
-    fetchBrands();
   }, []);
 
-  // Fetch marketplaces on component mount and page change
+  // Fetch marketplaces on component mount, page change, or when navigating back
   useEffect(() => {
     fetchMarketplaces();
-  }, [currentPage]);
+  }, [currentPage, location.key]);
 
   const fetchMarketplaces = async () => {
     try {
@@ -102,92 +80,6 @@ const MarketplacesListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Client-side filtering for quick layout preview (name/description/brand/enabled)
-  const filteredMarketplaces = marketplaces.filter(m => {
-    if (filter.name && !m.name.toLowerCase().includes(filter.name.toLowerCase())) return false;
-    if (filter.description && !m.description.toLowerCase().includes(filter.description.toLowerCase())) return false;
-    if (filter.brandId) {
-      // Brand relationship isn't on marketplace object by default; skip if absent
-      // Leaving placeholder for future backend-provided brand info
-    }
-    if (filter.enabled === 'enabled' && !m.enabled) return false;
-    if (filter.enabled === 'disabled' && m.enabled) return false;
-    return true;
-  });
-
-  // When selected marketplace changes, populate slabs into the first brand section
-  useEffect(() => {
-    const mp = filteredMarketplaces.length > 0 ? filteredMarketplaces[0] : null;
-    if (!mp) {
-      setBrandSections(prev => prev.map((s, i) => i === 0 ? ({ ...s, commissionSlabs: [createEmptySlab()], marketingSlabs: [createEmptySlab()], shippingSlabs: [createEmptySlab()] }) : s));
-      return;
-    }
-    const comm: Slab[] = (mp.costs || []).filter(c => c.costCategory === 'COMMISSION').map((c, idx) => ({ id: Date.now() + idx, from: (c.costProductRange || '').split('-')[0] || '', to: (c.costProductRange || '').split('-')[1] || '', value: String(c.costValue), valueType: c.costValueType }));
-    const mark: Slab[] = (mp.costs || []).filter(c => c.costCategory === 'MARKETING').map((c, idx) => ({ id: Date.now() + idx + 1000, from: (c.costProductRange || '').split('-')[0] || '', to: (c.costProductRange || '').split('-')[1] || '', value: String(c.costValue), valueType: c.costValueType }));
-    const ship: Slab[] = (mp.costs || []).filter(c => c.costCategory === 'SHIPPING').map((c, idx) => ({ id: Date.now() + idx + 2000, from: (c.costProductRange || '').split('-')[0] || '', to: (c.costProductRange || '').split('-')[1] || '', value: String(c.costValue), valueType: c.costValueType }));
-
-    setBrandSections(prev => {
-      if (prev.length === 0) return [{ id: Date.now(), brandId: '', commissionSlabs: comm.length ? comm : [createEmptySlab()], marketingSlabs: mark.length ? mark : [createEmptySlab()], shippingSlabs: ship.length ? ship : [createEmptySlab()] }];
-      return prev.map((s, i) => i === 0 ? ({ ...s, commissionSlabs: comm.length ? comm : [createEmptySlab()], marketingSlabs: mark.length ? mark : [createEmptySlab()], shippingSlabs: ship.length ? ship : [createEmptySlab()] }) : s);
-    });
-  }, [marketplaces, filteredMarketplaces]);
-
-  const validateNumericInput = (value: string) => value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-
-  const updateSlab = (sectionIndex: number, which: 'commission'|'marketing'|'shipping', index:number, field:string, value:string) => {
-    const validated = field === 'value' ? validateNumericInput(value) : value;
-    setBrandSections(prev => prev.map((sec, si) => {
-      if (si !== sectionIndex) return sec;
-      const update = (arr: Slab[]) => arr.map((s,i) => i===index ? ({ ...s, [field]: validated }) : s);
-      if (which === 'commission') return { ...sec, commissionSlabs: update(sec.commissionSlabs) };
-      if (which === 'marketing') return { ...sec, marketingSlabs: update(sec.marketingSlabs) };
-      return { ...sec, shippingSlabs: update(sec.shippingSlabs) };
-    }));
-  };
-
-  const addSlab = (sectionIndex:number, which:'commission'|'marketing'|'shipping') => {
-    setBrandSections(prev => prev.map((sec, si) => si===sectionIndex ? (
-      which === 'commission' ? { ...sec, commissionSlabs: [ ...sec.commissionSlabs, createEmptySlab() ] } : which === 'marketing' ? { ...sec, marketingSlabs: [ ...sec.marketingSlabs, createEmptySlab() ] } : { ...sec, shippingSlabs: [ ...sec.shippingSlabs, createEmptySlab() ] }
-    ) : sec));
-    // focus the newly added slab's first input
-    setTimeout(() => {
-      try {
-        const box = document.querySelector(`.brand-box[data-section="${sectionIndex}"]`);
-        if (!box) return;
-        const rows = box.querySelectorAll('.panel-form-grid');
-        const last = rows[rows.length - 1] as HTMLElement | undefined;
-        if (last) {
-          const input = last.querySelector('input.small-input') as HTMLInputElement | null;
-          if (input) input.focus();
-        }
-      } catch (e) {
-        // ignore focus errors
-      }
-    }, 50);
-  };
-
-  const removeSlab = (sectionIndex:number, which:'commission'|'marketing'|'shipping', index:number) => {
-    setBrandSections(prev => prev.map((sec, si) => {
-      if (si !== sectionIndex) return sec;
-      if (which === 'commission') return { ...sec, commissionSlabs: sec.commissionSlabs.length>1 ? sec.commissionSlabs.filter((_,i)=>i!==index) : sec.commissionSlabs };
-      if (which === 'marketing') return { ...sec, marketingSlabs: sec.marketingSlabs.length>1 ? sec.marketingSlabs.filter((_,i)=>i!==index) : sec.marketingSlabs };
-      return { ...sec, shippingSlabs: sec.shippingSlabs.length>1 ? sec.shippingSlabs.filter((_,i)=>i!==index) : sec.shippingSlabs };
-    }));
-  };
-
-  const addBrandSection = () => {
-    setBrandSections(prev => [...prev, { id: Date.now(), brandId: '', commissionSlabs: [createEmptySlab()], marketingSlabs: [createEmptySlab()], shippingSlabs: [createEmptySlab()] }]);
-  };
-
-  
-
-  const removeBrandSection = (index: number) => {
-    setBrandSections(prev => {
-      if (prev.length <= 1) return prev; // keep at least one section
-      return prev.filter((_, i) => i !== index);
-    });
   };
 
   const handleToggleStatus = async (marketplace: Marketplace) => {
@@ -294,109 +186,50 @@ const MarketplacesListPage: React.FC = () => {
         <div className="marketplaces-toolbar">
           <div className="marketplaces-title-block">
             <h2 className="marketplace-list-title">Marketplace List</h2>
-            <span className="marketplaces-list-count">{loading ? 'Loading...' : 'Add/Edit Marketplace'}</span>
+            <span className="marketplaces-list-count">
+              {loading ? 'Loading...' : `${totalElements} Total number of items`}
+            </span>
           </div>
-          
+
+          <button className="add-marketplace-btn" onClick={() => navigate('/marketplaces/add')}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" width="2" height="10" fill="white" />
+              <rect y="4" width="10" height="2" fill="white" />
+            </svg>
+            Add New Marketplace
+          </button>
         </div>
 
         <div className="marketplaces-card">
           {error && (
-            <div className="error-message" style={{padding: '16px', textAlign: 'center', color: '#C23939'}}>
+            <div className="error-message" style={{padding: '20px', textAlign: 'center', color: '#C23939'}}>
               {error}
             </div>
           )}
-          {/* Top filter / quick-edit area matching hand-drawn layout */}
-          <div className="marketplace-top-form">
-            <input className="mf-input" placeholder="Name" value={filter.name} onChange={(e) => setFilter({...filter, name: e.target.value})} />
-            <input className="mf-input" placeholder="Description" value={filter.description} onChange={(e) => setFilter({...filter, description: e.target.value})} />
-            <label className="mf-enable">
-              <input type="checkbox" checked={filter.enabled !== 'all' && filter.enabled === 'enabled'} onChange={(e) => setFilter({...filter, enabled: e.target.checked ? 'enabled' : 'all'})} />
-              <span>Enable</span>
-            </label>
-          </div>
-
-          <div className="top-add-wrapper">
-            <button className="add-marketplace-btn" onClick={addBrandSection}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="4" width="2" height="10" fill="white" />
-                <rect y="4" width="10" height="2" fill="white" />
-              </svg>
-              Add New Brand
-            </button>
-          </div>
-
           
-          {brandSections.map((section, si) => (
-            <div key={section.id} className="brand-box" data-section={si}>
-              <div className="brand-title-row">
-                <h3 className="brand-title">BRAND</h3>
-                <button className="remove-section-btn" onClick={() => removeBrandSection(si)} type="button">✕</button>
-              </div>
-              <div className="brand-controls">
-                <select className="mf-select" value={section.brandId} onChange={(e) => setBrandSections(prev => prev.map((s, i) => i===si?({...s, brandId: e.target.value}):s))}>
-                  <option value="">Select Brand</option>
-                  {brands.map(b => (<option key={b.id} value={String(b.id)}>{b.name}</option>))}
-                </select>
-              </div>
-
-              <div className="brand-panels">
-                <div className="mc-panel">
-                  <div className="mc-panel-title">Commission</div>
-                  <div className="mc-panel-body">
-                    {section.commissionSlabs.map((s, i) => (
-                      <div key={s.id} className="panel-form-grid" data-slab={i} style={{gridTemplateColumns: '1fr 1fr 1fr auto'}}>
-                        <input className="small-input" placeholder="From cost" value={s.from} onChange={(e)=>updateSlab(si, 'commission', i, 'from', e.target.value)} />
-                        <input className="small-input" placeholder="To cost" value={s.to} onChange={(e)=>updateSlab(si, 'commission', i, 'to', e.target.value)} />
-                        <input className="small-input" placeholder="Value" value={s.value} onChange={(e)=>updateSlab(si, 'commission', i, 'value', e.target.value)} />
-                        {section.commissionSlabs.length>1 && <button className="delete-btn" onClick={()=>removeSlab(si, 'commission', i)} type="button">✕</button>}
-                      </div>
-                    ))}
-                    <button className="link-btn" onClick={()=>addSlab(si, 'commission')} type="button">+ Add slab</button>
-                  </div>
-                </div>
-
-                <div className="mc-panel">
-                  <div className="mc-panel-title">Marketing</div>
-                  <div className="mc-panel-body">
-                    {section.marketingSlabs.map((s, i) => (
-                      <div key={s.id} className="panel-form-grid" data-slab={i} style={{gridTemplateColumns: '1fr 1fr 1fr auto'}}>
-                        <input className="small-input" placeholder="From cost" value={s.from} onChange={(e)=>updateSlab(si, 'marketing', i, 'from', e.target.value)} />
-                        <input className="small-input" placeholder="To cost" value={s.to} onChange={(e)=>updateSlab(si, 'marketing', i, 'to', e.target.value)} />
-                        <input className="small-input" placeholder="Value" value={s.value} onChange={(e)=>updateSlab(si, 'marketing', i, 'value', e.target.value)} />
-                        {section.marketingSlabs.length>1 && <button className="delete-btn" onClick={()=>removeSlab(si, 'marketing', i)} type="button">✕</button>}
-                      </div>
-                    ))}
-                    <button className="link-btn" onClick={()=>addSlab(si, 'marketing')} type="button">+ Add slab</button>
-                  </div>
-                </div>
-
-                <div className="mc-panel">
-                  <div className="mc-panel-title">Shipping</div>
-                  <div className="mc-panel-body">
-                    {section.shippingSlabs.map((s, i) => (
-                      <div key={s.id} className="panel-form-grid" data-slab={i} style={{gridTemplateColumns: '1fr 1fr 1fr auto'}}>
-                        <input className="small-input" placeholder="From cost" value={s.from} onChange={(e)=>updateSlab(si, 'shipping', i, 'from', e.target.value)} />
-                        <input className="small-input" placeholder="To cost" value={s.to} onChange={(e)=>updateSlab(si, 'shipping', i, 'to', e.target.value)} />
-                        <input className="small-input" placeholder="Value" value={s.value} onChange={(e)=>updateSlab(si, 'shipping', i, 'value', e.target.value)} />
-                        {section.shippingSlabs.length>1 && <button className="delete-btn" onClick={()=>removeSlab(si, 'shipping', i)} type="button">✕</button>}
-                      </div>
-                    ))}
-                    <button className="link-btn" onClick={()=>addSlab(si, 'shipping')} type="button">+ Add slab</button>
-                  </div>
-                </div>
-              </div>
+          <div className="marketplaces-table">
+            <div className="marketplaces-table-row marketplaces-table-header">
+              <div>Name</div>
+              <div>Commission</div>
+              <div>Shipping</div>
+              <div>Marketing</div>
+              {customFields.filter(f => f.enabled).map((field) => (
+                <div key={field.id}>{field.name}</div>
+              ))}
+              <div>Status</div>
+              <div>Actions</div>
             </div>
-          ))}
-          {/* History listing removed per design request */}
-          
-          
-            <div className="marketplaces-table">
-              {loading ? (
-                <div style={{padding: '40px', textAlign: 'center'}}>
-                  Loading marketplaces...
-                </div>
-              ) : (
-                filteredMarketplaces.map((marketplace) => {
+            
+            {loading ? (
+              <div style={{padding: '40px', textAlign: 'center'}}>
+                Loading marketplaces...
+              </div>
+            ) : marketplaces.length === 0 ? (
+              <div style={{padding: '40px', textAlign: 'center'}}>
+                No marketplaces found. Click "ADD MARKETPLACE" to create your first marketplace.
+              </div>
+            ) : (
+              marketplaces.map((marketplace) => {
                 const fieldValues = marketplaceFieldValues.get(marketplace.id) || [];
                 const getFieldValue = (fieldId: number) => {
                   const value = fieldValues.find(v => v.customFieldId === fieldId);
@@ -404,41 +237,115 @@ const MarketplacesListPage: React.FC = () => {
                 };
                 
                 return (
-                  <div className="marketplace-card" key={marketplace.id}>
-                    <div className="mc-header">
-                      <div className="mc-name">{marketplace.name}</div>
-                      <div className={`status-badge ${marketplace.enabled ? 'active' : 'inactive'}`}>{marketplace.enabled ? 'Active' : 'Inactive'}</div>
-                    </div>
-                    <div className="mc-description">{marketplace.description}</div>
-                    <div className="mc-brand">Brand: {(marketplace as any).brandName || '-'}</div>
-                    <div className="mc-panels">
-                      <div className="mc-panel">
-                        <div className="mc-panel-title">Commission</div>
-                        <div className="mc-panel-body">
-                          {getSlabsForCategory(marketplace.costs || [], 'COMMISSION').map((s, i) => <div key={i} className="mc-slab">{s}</div>)}
-                        </div>
-                      </div>
-                      <div className="mc-panel">
-                        <div className="mc-panel-title">Marketing</div>
-                        <div className="mc-panel-body">
-                          {getSlabsForCategory(marketplace.costs || [], 'MARKETING').map((s, i) => <div key={i} className="mc-slab">{s}</div>)}
-                        </div>
-                      </div>
-                      <div className="mc-panel">
-                        <div className="mc-panel-title">Shipping</div>
-                        <div className="mc-panel-body">
-                          {getSlabsForCategory(marketplace.costs || [], 'SHIPPING').map((s, i) => <div key={i} className="mc-slab">{s}</div>)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mc-actions">
-                      <button className="action-btn edit-btn" title="Edit" onClick={() => handleEditMarketplace(marketplace)}>Edit</button>
-                      <button className="action-btn delete-btn" title="Delete" onClick={() => handleDeleteMarketplace(marketplace)}>Delete</button>
-                    </div>
+                <div className="marketplaces-table-row" key={marketplace.id}>
+                  <div>{marketplace.name}</div>
+                  <div className="slab-cell">
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'COMMISSION').length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'COMMISSION').length > 0
+                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'COMMISSION').map((c, i) => (
+                            <span key={i} className="slab-entry">
+                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                            </span>
+                          ))
+                        : <span className="slab-entry">-</span>
+                    ) : (
+                      getSlabsForCategory(marketplace.costs || [], 'COMMISSION').map((slab, i) => (
+                        <span key={i} className="slab-entry">{slab}</span>
+                      ))
+                    )}
                   </div>
-                );
+                  <div className="slab-cell">
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'SHIPPING').length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'SHIPPING').length > 0
+                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'SHIPPING').map((c, i) => (
+                            <span key={i} className="slab-entry">
+                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                            </span>
+                          ))
+                        : <span className="slab-entry">-</span>
+                    ) : (
+                      getSlabsForCategory(marketplace.costs || [], 'SHIPPING').map((slab, i) => (
+                        <span key={i} className="slab-entry">{slab}</span>
+                      ))
+                    )}
+                  </div>
+                  <div className="slab-cell">
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'MARKETING').length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'MARKETING').length > 0
+                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'MARKETING').map((c, i) => (
+                            <span key={i} className="slab-entry">
+                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                            </span>
+                          ))
+                        : <span className="slab-entry">-</span>
+                    ) : (
+                      getSlabsForCategory(marketplace.costs || [], 'MARKETING').map((slab, i) => (
+                        <span key={i} className="slab-entry">{slab}</span>
+                      ))
+                    )}
+                  </div>
+                  {customFields.filter(f => f.enabled).map((field) => (
+                    <div key={field.id}>{getFieldValue(field.id)}</div>
+                  ))}
+                  <div>
+                    <span className={`status-badge ${marketplace.enabled ? 'active' : 'inactive'}`}>
+                      {marketplace.enabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                <div className="action-buttons">
+                  <button className="action-btn edit-btn" title="Edit" onClick={() => handleEditMarketplace(marketplace)}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565" />
+                    </svg>
+                  </button>
+                  <button className="action-btn delete-btn" title="Delete" onClick={() => handleDeleteMarketplace(marketplace)}>
+                    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565" />
+                    </svg>
+                  </button>
+                </div>
+                </div>
+              );
               })
             )}
+          </div>
+
+          <div className="pagination">
+            <div className="show-6">
+              Show {itemsPerPage}
+              <svg width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className="page-numbers">
+              <span 
+                className={`page-prev ${currentPage === 1 ? 'disabled' : ''}`}
+                onClick={goToPrevious}
+                style={{ cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                &lt;
+              </span>
+              {getPageNumbers().map((page, index) => (
+                <span
+                  key={index}
+                  className={page === currentPage ? 'page-current' : 'page'}
+                  onClick={() => goToPage(page)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {page}
+                </span>
+              ))}
+              {totalPages > 5 && currentPage < totalPages - 2 && (
+                <span className="page-dots">......</span>
+              )}
+              <span 
+                className={`page-next ${currentPage === totalPages ? 'disabled' : ''}`}
+                onClick={goToNext}
+                style={{ cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                &gt;
+              </span>
+            </div>
           </div>
         </div>
       </main>

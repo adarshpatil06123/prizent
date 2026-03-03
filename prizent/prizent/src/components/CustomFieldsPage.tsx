@@ -282,27 +282,32 @@ const CustomFieldsPage: React.FC = () => {
             
             <div className="field-inputs-row">
               <div className="inputs-container">
-                <input
-                  type="text"
-                  placeholder="enter field name"
-                  value={fieldName}
-                  onChange={(e) => setFieldName(e.target.value)}
-                  className="field-input"
-                />
+                <div className="form-field">
+                  <label className="field-label">Field Name</label>
+                  <input
+                    type="text"
+                    placeholder="enter field name"
+                    value={fieldName}
+                    onChange={(e) => setFieldName(e.target.value)}
+                    className="field-input"
+                  />
+                </div>
                 
-                <div className="select-wrapper">
-                  <select
-                    value={fieldType}
-                    onChange={(e) => setFieldType(e.target.value)}
-                    className="field-select"
-                  >
-                    <option value="">field type</option>
-                    <option value="text">Text</option>
-                    <option value="numeric">Number</option>
-                    <option value="dropdown">Dropdown</option>
-                    <option value="date">Date</option>
-                    <option value="file">File</option>
-                  </select>
+                <div className="form-field">
+                  <label className="field-label">Field Type</label>
+                  <div className="select-wrapper">
+                    <select
+                      value={fieldType}
+                      onChange={(e) => setFieldType(e.target.value)}
+                      className="field-select"
+                    >
+                      <option value="text">Text</option>
+                      <option value="numeric">Number</option>
+                      <option value="dropdown">Dropdown</option>
+                      <option value="date">Date</option>
+                      <option value="file">File</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 

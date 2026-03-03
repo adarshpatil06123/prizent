@@ -99,9 +99,26 @@
   gap: 40px;
 }
 
+.form-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  font-family: 'Murecho', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  margin: 0;
+}
+
 .field-input,
 .field-select {
-  flex: 1;
+  width: 100%;
   padding: 14px 18px;
   height: 56px;
   border: 1px solid #C1C1C1;
@@ -123,7 +140,7 @@
 
 .select-wrapper {
   position: relative;
-  flex: 1;
+  width: 100%;
 }
 
 .field-select {

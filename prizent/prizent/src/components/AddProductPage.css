@@ -185,6 +185,24 @@
   gap: 30px;
 }
 
+/* Form Fields with Labels */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.field-label {
+  font-family: 'Murecho', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  margin: 0;
+}
+
 /* Form Inputs */
 .form-input {
   box-sizing: border-box;

@@ -108,21 +108,27 @@ const AddBrandPage: React.FC = () => {
             </div>
 
             <div className="form-content">
-              <div className="form-fields-row">
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Enter Brand Name"
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Brand Description"
-                  value={brandDescription}
-                  onChange={(e) => setBrandDescription(e.target.value)}
-                />
+              <div className="form-fields-column">
+                <div className="form-field">
+                  <label className="field-label">Brand Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Enter Brand Name"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Brand Description</label>
+                  <textarea
+                    className="form-textarea"
+                    placeholder="Enter Brand Description"
+                    value={brandDescription}
+                    onChange={(e) => setBrandDescription(e.target.value)}
+                    rows={4}
+                  />
+                </div>
               </div>
 
               <div className="activate-section">

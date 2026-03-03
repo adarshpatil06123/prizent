@@ -26,8 +26,6 @@ const AddMarketplacePage: React.FC = () => {
     description: '',
     enabled: false
   });
-
-  
   
   // Cost slabs state
   const [productCostSlabs, setProductCostSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
@@ -110,7 +108,6 @@ const AddMarketplacePage: React.FC = () => {
       }
     };
     fetchCustomFields();
-    
   }, []);
 
   // ── Brand mapping handlers ──────────────────────────────────────────────────
@@ -440,18 +437,24 @@ const AddMarketplacePage: React.FC = () => {
         )}
 
         <div className="details-card">
-          <input 
-            className="text-input" 
-            placeholder="enter marketplace name" 
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-          />
-          <input 
-            className="text-input" 
-            placeholder="description" 
-            value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-          />
+          <div className="form-field">
+            <label className="field-label">Marketplace Name</label>
+            <input 
+              className="text-input" 
+              placeholder="enter marketplace name" 
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+            />
+          </div>
+          <div className="form-field">
+            <label className="field-label">Description</label>
+            <input 
+              className="text-input" 
+              placeholder="description" 
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+            />
+          </div>
           <label className="activate-row">
             <input 
               type="checkbox" 
@@ -460,7 +463,6 @@ const AddMarketplacePage: React.FC = () => {
             />
             <span>Activate marketplace</span>
           </label>
-          
         </div>
 
         {/* Custom Fields Section */}
@@ -469,7 +471,8 @@ const AddMarketplacePage: React.FC = () => {
             <h3 className="panel-title">Custom Fields</h3>
             <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
               {customFields.map((field) => (
-                <div key={field.id}>
+                <div key={field.id} className="form-field">
+                  <label className="field-label">{field.name}{field.required ? ' *' : ''}</label>
                   {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
                     <input
                       type={field.fieldType === 'numeric' ? 'number' : 'text'}
@@ -516,16 +519,19 @@ const AddMarketplacePage: React.FC = () => {
                 <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">✕</button>
               </div>
 
-              <select
-                className="brand-select"
-                value={mapping.brandId}
-                onChange={e => updateBrandMapping(mapping.localId, 'brandId', e.target.value)}
-              >
-                <option value="">Select Brand</option>
-                {brands.map(b => (
-                  <option key={b.id} value={String(b.id)}>{b.name}</option>
-                ))}
-              </select>
+              <div className="form-field">
+                <label className="field-label">Brand</label>
+                <select
+                  className="brand-select"
+                  value={mapping.brandId}
+                  onChange={e => updateBrandMapping(mapping.localId, 'brandId', e.target.value)}
+                >
+                  <option value="">Select Brand</option>
+                  {brands.map(b => (
+                    <option key={b.id} value={String(b.id)}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
 
               <div className="grid-3" style={{ marginTop: '16px' }}>
                 {/* Commission */}

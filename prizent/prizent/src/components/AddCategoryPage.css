@@ -301,9 +301,25 @@
   align-items: center;
 }
 
+.add-category-page .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-category-page .field-label {
+  font-family: 'Murecho', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  margin: 0;
+}
+
 .add-category-page .form-input,
 .add-category-page .form-select {
-  width: 276px;
+  width: 650px;
   height: 46px;
   border: 1px solid #C1C1C1;
   border-radius: 6px;

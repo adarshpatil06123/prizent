@@ -365,6 +365,7 @@ const PricingPage: React.FC = () => {
           <h2 className="section-title">Select Brand</h2>
           <div className="marketplace-card">
             <div className="dropdown-wrapper">
+              <label className="dropdown-label">Brand</label>
               <select
                 className="dropdown-select"
                 value={selectedBrandId}
@@ -381,7 +382,6 @@ const PricingPage: React.FC = () => {
             </div>
           </div>
         </section>
-=======
         {/* Select Product Section */}
         <section className="product-section">
           <h2 className="section-title">Select Product</h2>
@@ -483,6 +483,7 @@ const PricingPage: React.FC = () => {
           <h2 className="section-title">Select Marketplace</h2>
           <div className="marketplace-card">
             <div className="dropdown-wrapper">
+              <label className="dropdown-label">Marketplace</label>
               <select
                 className="dropdown-select"
                 value={selectedMarketplaceId}
@@ -524,18 +525,21 @@ const PricingPage: React.FC = () => {
         <section className="marketplace-section">
           <h2 className="section-title">Input GST (%)</h2>
           <div className="marketplace-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input
-                type="number"
-                className="input-field"
-                placeholder="0"
-                value={inputGst}
-                onChange={(e) => { setInputGst(e.target.value); setCalculatedProfit(''); setCalculatedSellingPrice(''); }}
-                style={{ maxWidth: 220 }}
-                min="0"
-                max="100"
-              />
-              <span style={{ fontSize: 13, color: '#7C7C7C' }}>% of product cost paid as Input GST on purchase</span>
+            <div className="input-group">
+              <label className="input-label">GST Percentage</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <input
+                  type="number"
+                  className="input-field"
+                  placeholder="0"
+                  value={inputGst}
+                  onChange={(e) => { setInputGst(e.target.value); setCalculatedProfit(''); setCalculatedSellingPrice(''); }}
+                  style={{ maxWidth: 220 }}
+                  min="0"
+                  max="100"
+                />
+                <span style={{ fontSize: 13, color: '#7C7C7C' }}>% of product cost paid as Input GST on purchase</span>
+              </div>
             </div>
           </div>
         </section>

@@ -261,6 +261,22 @@
   padding: 24px 43px;
 }
 
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  font-family: 'Murecho', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  margin: 0;
+}
+
 .form-input,
 .form-select {
   box-sizing: border-box;
@@ -288,11 +304,11 @@
 
 .form-select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='10' height='5' viewBox='0 0 10 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0L5 5L10 0H0Z' fill='%23454545'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 10px 5px;
+  background: white url("data:image/svg+xml,%3Csvg width='10' height='5' viewBox='0 0 10 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0L5 5L10 0H0Z' fill='%23454545'/%3E%3C/svg%3E") no-repeat right 14px center !important;
+  background-size: 10px 5px !important;
+  padding-left: 20px;
   padding-right: 40px;
+  border: 1px solid #C1C1C1 !important;
 }
 
 /* Credentials Container */

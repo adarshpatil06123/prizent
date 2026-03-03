@@ -27,8 +27,6 @@ export interface CreateMarketplaceRequest {
   description: string;
   enabled: boolean;
   costs: CreateMarketplaceCostRequest[];
-  // Optional associated brand id
-  brandId?: number;
 }
 
 export interface CreateMarketplaceCostRequest {

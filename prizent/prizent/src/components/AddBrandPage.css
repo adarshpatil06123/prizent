@@ -266,7 +266,7 @@
   font-weight: 500;
   line-height: 17px;
   text-align: center;
-  color: #8a1515;
+  color: #454545;
   margin: 0;
   max-width: 95px;
 }
@@ -279,12 +279,36 @@
   padding-left: 70px;
   padding-top: 50px;
 }
-/* 
+
 .form-fields-row {
   display: flex;
   gap: 30px;
   margin-bottom: auto;
-} */
+}
+
+.form-fields-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: auto;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.field-label {
+  font-family: 'Murecho', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  margin: 0;
+}
 
 .form-input {
   width: 100%;
@@ -302,11 +326,30 @@
   transition: border-color 0.2s;
 }
 
-.form-input::placeholder {
+.form-textarea {
+  width: 96%;
+  min-width: 280px;
+  min-height: 100px;
+  padding: 14px 18px;
+  background: #FFFFFF;
+  border: 1px solid #C1C1C1;
+  border-radius: 6px;
+  font-family: 'Murecho', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: #1E1E1E;
+  transition: border-color 0.2s;
+  resize: vertical;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
   color: #7C7C7C;
 }
 
-.form-input:focus {
+.form-input:focus,
+.form-textarea:focus {
   outline: none;
   border-color: #1E1E1E;
 }
@@ -332,7 +375,7 @@
   font-size: 18px;
   font-weight: 400;
   line-height: 26px;
-  color: #801818;
+  color: #7C7C7C;
   cursor: pointer;
 }
 
