@@ -79,7 +79,7 @@ const AddCategoryPage: React.FC = () => {
         ...prev.map(r => r.rowId === rowId
           ? { ...r, status: 'saved' as const, savedId: savedCategory.id, savedName: row.name.trim(), parentId }
           : r),
-        makeRow(savedCategory.id),
+        makeRow(),
       ]);
       fetchCategories();
     } catch (err: any) {
@@ -154,6 +154,7 @@ const AddCategoryPage: React.FC = () => {
   return (
     <div className="add-category-page">
       <main className="main-content">
+        <div className="scroll-area">
         {/* Header */}
         <header className="header">
           <div className="header-left">
@@ -184,7 +185,6 @@ const AddCategoryPage: React.FC = () => {
         </header>
 
         <div className="content-wrapper">
-          {/* Dynamic rows */}
           <h2 className="section-title">Category Details</h2>
           <div className="brand-form" style={{ flexDirection: 'column', gap: '12px', padding: '30px 40px' }}>
 
@@ -272,8 +272,11 @@ const AddCategoryPage: React.FC = () => {
           </div>
         </div>
 
-          {/* Action Buttons */}
-          <div className="form-actions">
+          </div>{/* end content-wrapper */}
+        </div>{/* end scroll-area */}
+
+        {/* Action Buttons - always visible at bottom */}
+        <div className="actions-footer">
             <button className="cancel-btn" onClick={handleCancel}>
               Cancel
             </button>
@@ -285,7 +288,6 @@ const AddCategoryPage: React.FC = () => {
               {rows.some(r => r.status === 'saving') ? 'SAVING...' : 'SAVE'}
             </button>
           </div>
-        </div>{/* end content-wrapper */}
       </main>
     </div>
   );

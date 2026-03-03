@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ProductsListPage.css';
 import productThumb from '../assets/brand_logo.png';
@@ -20,6 +20,24 @@ const ProductsListPage: React.FC = () => {
   const [productFieldValues, setProductFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
   const [categoryMap, setCategoryMap] = useState<Map<number, string>>(new Map());
   const [brandMap, setBrandMap] = useState<Map<number, string>>(new Map());
+  
+  // Form section state
+  const [showFormSection, setShowFormSection] = useState(false);
+  const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productName, setProductName] = useState('');
+  const [productBrandId, setProductBrandId] = useState<number>(0);
+  const [productSkuCode, setProductSkuCode] = useState('');
+  const [productCategoryId, setProductCategoryId] = useState<number>(0);
+  const [productMrp, setProductMrp] = useState<number>(0);
+  const [productCost, setProductCost] = useState<number>(0);
+  const [productPriceSales, setProductPriceSales] = useState<number>(0);
+  const [productPriceNonSales, setProductPriceNonSales] = useState<number>(0);
+  const [productCurrentType, setProductCurrentType] = useState<'T' | 'A' | 'N'>('N');
+  const [productEnabled, setProductEnabled] = useState(true);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Fetch categories on mount
   useEffect(() => {
@@ -27,6 +45,7 @@ const ProductsListPage: React.FC = () => {
       try {
         const response = await categoryService.getAllCategories();
         if (response.categories) {
+          setCategories(response.categories);
           const map = new Map<number, string>();
           response.categories.forEach((cat: Category) => {
             map.set(cat.id, cat.name);
@@ -47,6 +66,7 @@ const ProductsListPage: React.FC = () => {
         const response = await brandService.getAllBrands();
         console.log('Brands API response:', response);
         if (response.brands) {
+          setBrands(response.brands);
           const map = new Map<number, string>();
           response.brands.forEach((brand: Brand) => {
             map.set(brand.id, brand.name);
@@ -72,6 +92,107 @@ const ProductsListPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to toggle product status:', err);
       alert('Failed to update product status');
+    }
+  };
+
+  // Form handlers
+  const handleAddNewProduct = () => {
+    setFormMode('add');
+    setEditingProduct(null);
+    setProductName('');
+    setProductBrandId(0);
+    setProductSkuCode('');
+    setProductCategoryId(0);
+    setProductMrp(0);
+    setProductCost(0);
+    setProductPriceSales(0);
+    setProductPriceNonSales(0);
+    setProductCurrentType('N');
+    setProductEnabled(true);
+    setShowFormSection(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setFormMode('edit');
+    setEditingProduct(product);
+    setProductName(product.name);
+    setProductBrandId(product.brandId);
+    setProductSkuCode(product.skuCode);
+    setProductCategoryId(product.categoryId);
+    setProductMrp(product.mrp);
+    setProductCost(product.productCost);
+    setProductPriceSales(product.proposedSellingPriceSales);
+    setProductPriceNonSales(product.proposedSellingPriceNonSales);
+    setProductCurrentType(product.currentType);
+    setProductEnabled(product.enabled);
+    setShowFormSection(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCloseForm = () => {
+    setShowFormSection(false);
+    setEditingProduct(null);
+    setProductName('');
+    setProductBrandId(0);
+    setProductSkuCode('');
+    setProductCategoryId(0);
+    setProductMrp(0);
+    setProductCost(0);
+    setProductPriceSales(0);
+    setProductPriceNonSales(0);
+    setProductCurrentType('N');
+    setProductEnabled(true);
+  };
+
+  const handleSaveForm = async () => {
+    if (!productName.trim()) {
+      alert('Please enter product name');
+      return;
+    }
+    if (productBrandId === 0) {
+      alert('Please select a brand');
+      return;
+    }
+    if (productCategoryId === 0) {
+      alert('Please select a category');
+      return;
+    }
+
+    try {
+      setSavingProduct(true);
+      
+      const productData = {
+        name: productName,
+        brandId: productBrandId,
+        skuCode: productSkuCode,
+        categoryId: productCategoryId,
+        mrp: productMrp,
+        productCost: productCost,
+        proposedSellingPriceSales: productPriceSales,
+        proposedSellingPriceNonSales: productPriceNonSales,
+        currentType: productCurrentType
+      };
+
+      if (formMode === 'edit' && editingProduct) {
+        await productService.updateProduct(editingProduct.id, productData);
+        alert('Product updated successfully!');
+      } else {
+        await productService.createProduct(productData);
+        alert('Product created successfully!');
+      }
+      
+      handleCloseForm();
+      // Refresh product list
+      const apiPage = currentPage - 1;
+      const response = await productService.getAllProductsIncludingDisabled(apiPage, itemsPerPage);
+      setProducts(response.content);
+      setTotalPages(response.totalPages);
+      setTotalElements(response.totalElements);
+    } catch (error) {
+      console.error('Failed to save product:', error);
+      alert('Failed to save product. Please try again.');
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -186,7 +307,7 @@ const ProductsListPage: React.FC = () => {
               </svg>
               Import
             </button>
-            <button className="add-product-btn" type="button" onClick={() => navigate('/products/add')}>
+            <button className="add-product-btn" type="button" onClick={handleAddNewProduct}>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M5 0C4.75644 0 4.55882 0.197618 4.55882 0.441176V4.55882H0.441176C0.197618 4.55882 0 4.75644 0 5C0 5.24356 0.197618 5.44118 0.441176 5.44118H4.55882V9.55882C4.55882 9.80238 4.75644 10 5 10C5.24356 10 5.44118 9.80238 5.44118 9.55882V5.44118H9.55882C9.80238 5.44118 10 5.24356 10 5C10 4.75644 9.80238 4.55882 9.55882 4.55882H5.44118V0.441176C5.44118 0.197618 5.24356 0 5 0Z" fill="white" />
               </svg>
@@ -194,6 +315,167 @@ const ProductsListPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Inline Add/Edit Form Section */}
+        {showFormSection && (
+          <div className="form-section">
+            <div className="form-section-header">
+              <h3>{formMode === 'edit' ? 'Edit Product' : 'Add New Product'}</h3>
+              <button className="close-form-btn" onClick={handleCloseForm}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M15 5L5 15M5 5L15 15" stroke="#666" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="form-section-body">
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Product Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="Enter product name"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Brand</label>
+                  <select
+                    className="form-input"
+                    value={productBrandId}
+                    onChange={(e) => setProductBrandId(Number(e.target.value))}
+                  >
+                    <option value={0}>Select Brand</option>
+                    {brands.map((brand) => (
+                      <option key={brand.id} value={brand.id}>{brand.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">SKU Code</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={productSkuCode}
+                    onChange={(e) => setProductSkuCode(e.target.value)}
+                    placeholder="Enter SKU code"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Category</label>
+                  <select
+                    className="form-input"
+                    value={productCategoryId}
+                    onChange={(e) => setProductCategoryId(Number(e.target.value))}
+                  >
+                    <option value={0}>Select Category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">MRP</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={productMrp}
+                    onChange={(e) => setProductMrp(Number(e.target.value))}
+                    placeholder="Enter MRP"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Product Cost</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={productCost}
+                    onChange={(e) => setProductCost(Number(e.target.value))}
+                    placeholder="Enter product cost"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Price (Sales)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={productPriceSales}
+                    onChange={(e) => setProductPriceSales(Number(e.target.value))}
+                    placeholder="Enter sales price"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Price (Non-Sales)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={productPriceNonSales}
+                    onChange={(e) => setProductPriceNonSales(Number(e.target.value))}
+                    placeholder="Enter non-sales price"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Product Type</label>
+                  <select
+                    className="form-input"
+                    value={productCurrentType}
+                    onChange={(e) => setProductCurrentType(e.target.value as 'T' | 'A' | 'N')}
+                  >
+                    <option value="N">Normal</option>
+                    <option value="T">Top Seller</option>
+                    <option value="A">Average</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label className="activate-label">
+                    <input
+                      type="checkbox"
+                      checked={productEnabled}
+                      onChange={(e) => setProductEnabled(e.target.checked)}
+                    />
+                    <span>Activate Product</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-section-footer">
+              <button className="cancel-btn" onClick={handleCloseForm}>
+                Cancel
+              </button>
+              <button 
+                className="save-btn" 
+                onClick={handleSaveForm}
+                disabled={savingProduct}
+              >
+                {savingProduct ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="products-card">
           <div className="products-table">
@@ -265,7 +547,7 @@ const ProductsListPage: React.FC = () => {
                     <button 
                       className="action-btn edit-btn" 
                       title="Edit"
-                      onClick={() => navigate(`/edit-product/${product.id}`)}
+                      onClick={() => handleEditProduct(product)}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565" />

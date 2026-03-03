@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import brandService, { Brand } from '../services/brandService';
 import './BrandsListPage.css';
@@ -12,6 +12,18 @@ const BrandsListPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
+  
+  // Form section state
+  const [showFormSection, setShowFormSection] = useState(false);
+  const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [brandName, setBrandName] = useState('');
+  const [brandDescription, setBrandDescription] = useState('');
+  const [brandLogoUrl, setBrandLogoUrl] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [activateBrand, setActivateBrand] = useState(true);
+  const [savingBrand, setSavingBrand] = useState(false);
 
   useEffect(() => {
     fetchBrands();
@@ -42,6 +54,112 @@ const BrandsListPage: React.FC = () => {
     } catch (err: any) {
       console.error('Error deleting brand:', err);
       alert('Failed to delete brand');
+    }
+  };
+
+  const handleAddNewBrand = () => {
+    setFormMode('add');
+    setEditingBrand(null);
+    setBrandName('');
+    setBrandDescription('');
+    setBrandLogoUrl('');
+    setLogoFile(null);
+    setLogoPreview('');
+    setActivateBrand(true);
+    setShowFormSection(true);
+  };
+
+  const handleEditBrand = (brand: Brand) => {
+    setFormMode('edit');
+    setEditingBrand(brand);
+    setBrandName(brand.name);
+    setBrandDescription(brand.description || '');
+    setBrandLogoUrl(brand.logoUrl || '');
+    setLogoFile(null);
+    setLogoPreview(brand.logoUrl || '');
+    setActivateBrand(brand.enabled);
+    setShowFormSection(true);
+    // Scroll to top to show form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCloseForm = () => {
+    setShowFormSection(false);
+    setEditingBrand(null);
+    setBrandName('');
+    setBrandDescription('');
+    setBrandLogoUrl('');
+    setLogoFile(null);
+    setLogoPreview('');
+    setActivateBrand(true);
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image size should be less than 2MB');
+        return;
+      }
+      setLogoFile(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview('');
+    setBrandLogoUrl('');
+  };
+
+  const handleSaveForm = async () => {
+    if (!brandName.trim()) {
+      alert('Brand name is required');
+      return;
+    }
+
+    try {
+      setSavingBrand(true);
+      
+      // For now, use logoPreview or logoUrl as the logoUrl
+      // In production, you would upload the file to a server/S3 and get a URL
+      const finalLogoUrl = logoPreview || brandLogoUrl || undefined;
+      
+      if (formMode === 'edit' && editingBrand) {
+        await brandService.updateBrand(editingBrand.id, {
+          name: brandName.trim(),
+          description: brandDescription.trim() || undefined,
+          logoUrl: finalLogoUrl,
+          enabled: activateBrand
+        });
+      } else {
+        await brandService.createBrand({
+          name: brandName.trim(),
+          description: brandDescription.trim() || undefined,
+          logoUrl: finalLogoUrl,
+          enabled: activateBrand
+        });
+      }
+      
+      fetchBrands(); // Refresh the list
+      handleCloseForm();
+      alert(`Brand ${formMode === 'edit' ? 'updated' : 'created'} successfully!`);
+    } catch (err: any) {
+      console.error(`Error ${formMode === 'edit' ? 'updating' : 'creating'} brand:`, err);
+      alert(err.response?.data?.message || `Failed to ${formMode === 'edit' ? 'update' : 'create'} brand`);
+    } finally {
+      setSavingBrand(false);
     }
   };
 
@@ -155,13 +273,116 @@ const BrandsListPage: React.FC = () => {
             <h1 className="page-title">Brands List</h1>
             <p className="page-subtitle">{brands.length} Total number of Items</p>
           </div>
-          <button onClick={() => navigate('/add-brand')} className="add-brand-btn">
+          <button onClick={handleAddNewBrand} className="add-brand-btn">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M5 0V10M0 5H10" stroke="#FFFFFF" strokeWidth="2"/>
             </svg>
             Add New Brand
           </button>
         </div>
+
+        {/* Inline Add/Edit Form Section */}
+        {showFormSection && (
+          <div className="form-section">
+            <div className="form-section-header">
+              <h3>{formMode === 'edit' ? 'Edit Brand' : 'Add New Brand'}</h3>
+              <button className="close-form-btn" onClick={handleCloseForm}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M15 5L5 15M5 5L15 15" stroke="#666" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="form-section-body">
+              <div className="form-row">
+                <div className="form-field logo-field">
+                  <label className="field-label">Brand Logo</label>
+                  <div className="logo-upload-section">
+                    {logoPreview ? (
+                      <div className="logo-preview-container">
+                        <img src={logoPreview} alt="Brand logo preview" className="logo-preview" />
+                        <button 
+                          type="button" 
+                          className="remove-logo-btn" 
+                          onClick={handleRemoveLogo}
+                          title="Remove logo"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="logo-upload-label">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoChange}
+                          className="logo-upload-input"
+                        />
+                        <div className="logo-upload-placeholder">
+                          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                            <path d="M20 10V30M10 20H30" stroke="#999" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          <span>Upload Logo</span>
+                          <span className="upload-hint">PNG, JPG (Max 2MB)</span>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-field-group">
+                  <div className="form-field">
+                    <label className="field-label">Brand Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={brandName}
+                      onChange={(e) => setBrandName(e.target.value)}
+                      placeholder="Enter brand name"
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label className="field-label">Brand Description</label>
+                    <textarea
+                      className="form-textarea"
+                      value={brandDescription}
+                      onChange={(e) => setBrandDescription(e.target.value)}
+                      placeholder="Enter brand description"
+                      rows={4}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="activate-section">
+                <label className="activate-label">
+                  <input
+                    type="checkbox"
+                    checked={activateBrand}
+                    onChange={(e) => setActivateBrand(e.target.checked)}
+                  />
+                  <span>Activate Brand</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="form-section-footer">
+              <button className="cancel-btn" onClick={handleCloseForm}>
+                Cancel
+              </button>
+              <button 
+                className="save-btn" 
+                onClick={handleSaveForm}
+                disabled={savingBrand}
+              >
+                {savingBrand ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div style={{padding: '20px', textAlign: 'center'}}>Loading brands...</div>
@@ -221,7 +442,7 @@ const BrandsListPage: React.FC = () => {
                       </td>
                       <td data-label="Actions: ">
                         <div className="action-buttons">
-                          <button className="action-btn edit-btn" onClick={() => navigate(`/edit-brand/${brand.id}`)}>
+                          <button className="action-btn edit-btn" onClick={() => handleEditBrand(brand)}>
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565"/>
                             </svg>

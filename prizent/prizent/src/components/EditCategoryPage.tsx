@@ -140,6 +140,7 @@ const EditCategoryPage: React.FC = () => {
     <div className="add-category-page">
       {/* Main Content */}
       <main className="main-content">
+        <div className="scroll-area">
         {/* Header */}
         <header className="header">
           <div className="header-left">
@@ -173,8 +174,7 @@ const EditCategoryPage: React.FC = () => {
           </div>
         </header>
 
-        {/* Category Details Section */}
-        <div className="content-wrapper">
+          <div className="content-wrapper">
           <h2 className="section-title">Category Details</h2>
           {(validationError || error) && (
             <div style={{ color: '#c0392b', padding: '8px 12px', marginBottom: '12px', background: '#ffeaea', borderRadius: '4px', fontSize: '13px' }}>
@@ -259,13 +259,16 @@ const EditCategoryPage: React.FC = () => {
               <label htmlFor="enableCategory">Activate category</label>
             </div>
           </div>
-          <div className="form-actions">
+          </div>{/* end content-wrapper */}
+        </div>{/* end scroll-area */}
+
+        {/* Action Buttons - always visible at bottom */}
+        <div className="actions-footer">
             <button className="cancel-btn" onClick={handleCancel} disabled={saving}>Cancel</button>
             <button className="save-btn" onClick={handleSave} disabled={saving || !categoryName.trim()}>
               {saving ? 'UPDATING...' : 'UPDATE'}
             </button>
           </div>
-        </div>
       </main>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AddMarketplacePage.css";
 import marketplaceService, { CreateMarketplaceRequest, CreateMarketplaceCostRequest } from '../../services/marketplaceService';
@@ -28,9 +28,9 @@ const AddMarketplacePage: React.FC = () => {
   });
   
   // Cost slabs state
-  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
-  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
-  const [shippingSlabs, setShippingSlabs] = useState([{ from: '', to: '', value: '', valueType: 'A' as 'P' | 'A' }]);
+  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
+  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
+  const [shippingSlabs, setShippingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -110,8 +110,8 @@ const AddMarketplacePage: React.FC = () => {
     fetchCustomFields();
   }, []);
 
-  // ── Brand mapping handlers ──────────────────────────────────────────────────
-  const emptySlabs = (vt: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '', to: '', value: '', valueType: vt }];
+  // ÔöÇÔöÇ Brand mapping handlers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  const emptySlabs = (vt: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '0', to: '0', value: '0', valueType: vt }];
 
   const addBrandMapping = () => {
     setBrandMappings(prev => [...prev, {
@@ -145,7 +145,7 @@ const AddMarketplacePage: React.FC = () => {
     const slabKey = `${category}Slabs` as keyof BrandMapping;
     setBrandMappings(prev => prev.map(m => {
       if (m.localId !== localId) return m;
-      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '', to: '', value: '', valueType: m[typeKey] as 'P' | 'A' }] };
+      return { ...m, [slabKey]: [...(m[slabKey] as BrandSlab[]), { from: '0', to: '0', value: '0', valueType: m[typeKey] as 'P' | 'A' }] };
     }));
   };
 
@@ -167,14 +167,14 @@ const AddMarketplacePage: React.FC = () => {
       return { ...m, [slabKey]: (m[slabKey] as BrandSlab[]).map((s, i) => i === index ? { ...s, [field]: validated } : s) };
     }));
   };
-  // ────────────────────────────────────────────────────────────────────────────
+  // ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const addProductCostSlab = () => {
-    setProductCostSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: productCostValueType }]);
+    setProductCostSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: productCostValueType }]);
   };
 
   const removeProductCostSlab = (index: number) => {
@@ -191,7 +191,7 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addMarketingSlab = () => {
-    setMarketingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: marketingValueType }]);
+    setMarketingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: marketingValueType }]);
   };
 
   const removeMarketingSlab = (index: number) => {
@@ -208,7 +208,7 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addShippingSlab = () => {
-    setShippingSlabs(prev => [...prev, { from: '', to: '', value: '', valueType: shippingValueType }]);
+    setShippingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: shippingValueType }]);
   };
 
   const removeShippingSlab = (index: number) => {
@@ -335,7 +335,7 @@ const AddMarketplacePage: React.FC = () => {
       const response = await marketplaceService.createMarketplace(request);
       
       if (response.success) {
-        console.log('✓ Marketplace created successfully!');
+        console.log('Ô£ô Marketplace created successfully!');
 
         // Save custom field values
         if (Object.keys(customFieldValues).length > 0 && response.marketplace) {
@@ -516,7 +516,7 @@ const AddMarketplacePage: React.FC = () => {
             <div key={mapping.localId} className="brand-mapping-card">
               <div className="brand-mapping-card-header">
                 <span className="brand-label">BRAND</span>
-                <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">✕</button>
+                <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">Ô£ò</button>
               </div>
 
               <div className="form-field">
@@ -558,7 +558,7 @@ const AddMarketplacePage: React.FC = () => {
                       <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'to', e.target.value)} />
                       <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'value', e.target.value)} />
                       {mapping.commissionSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>Ô£ò</button>
                       )}
                     </div>
                   ))}
@@ -589,7 +589,7 @@ const AddMarketplacePage: React.FC = () => {
                       <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'to', e.target.value)} />
                       <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'value', e.target.value)} />
                       {mapping.marketingSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>Ô£ò</button>
                       )}
                     </div>
                   ))}
@@ -620,7 +620,7 @@ const AddMarketplacePage: React.FC = () => {
                       <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'to', e.target.value)} />
                       <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'value', e.target.value)} />
                       {mapping.shippingSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>Ô£ò</button>
                       )}
                     </div>
                   ))}

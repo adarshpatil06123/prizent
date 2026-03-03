@@ -1,4 +1,4 @@
-/* Edit Product Page Styles */
+﻿/* Edit Product Page Styles */
 .edit-product-bg {
   box-sizing: border-box;
   position: relative;
@@ -106,14 +106,9 @@
   gap: 32px;
 }
 
-.categories-details-section {
-  position: relative;
-}
-
+.categories-details-section,
 .pricing-attributes-section {
   position: relative;
-  grid-column: 2;
-  grid-row: 1 / span 2;
 }
 
 .section-title {
@@ -409,9 +404,4 @@
     grid-template-columns: 1fr;
     gap: 24px;
   }
-}
-
-/* Marketplace Details Section */
-.marketplace-config-section {
-  grid-column: 1;
 }
