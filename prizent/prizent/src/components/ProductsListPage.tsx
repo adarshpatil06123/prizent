@@ -6,6 +6,7 @@ import productService, { Product, PagedResponse } from '../services/productServi
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 import categoryService, { Category } from '../services/categoryService';
 import brandService, { Brand } from '../services/brandService';
+import marketplaceService, { Marketplace } from '../services/marketplaceService';
 
 const ProductsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,9 +27,12 @@ const ProductsListPage: React.FC = () => {
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productName, setProductName] = useState('');
+  const [productNumber, setProductNumber] = useState('');
+  const [styleCode, setStyleCode] = useState('');
   const [productBrandId, setProductBrandId] = useState<number>(0);
   const [productSkuCode, setProductSkuCode] = useState('');
   const [productCategoryId, setProductCategoryId] = useState<number>(0);
+  const [marketplaceId, setMarketplaceId] = useState<number>(0);
   const [productMrp, setProductMrp] = useState<number>(0);
   const [productCost, setProductCost] = useState<number>(0);
   const [productPriceSales, setProductPriceSales] = useState<number>(0);
@@ -38,6 +42,7 @@ const ProductsListPage: React.FC = () => {
   const [savingProduct, setSavingProduct] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
 
   // Fetch categories on mount
   useEffect(() => {
@@ -81,6 +86,21 @@ const ProductsListPage: React.FC = () => {
     fetchBrands();
   }, []);
 
+  // Fetch marketplaces on mount
+  useEffect(() => {
+    const fetchMarketplaces = async () => {
+      try {
+        const response = await marketplaceService.getAllMarketplaces(0, 100);
+        if (response.marketplaces && response.marketplaces.content) {
+          setMarketplaces(response.marketplaces.content.filter((m: Marketplace) => m.enabled));
+        }
+      } catch (err) {
+        console.error('Failed to fetch marketplaces:', err);
+      }
+    };
+    fetchMarketplaces();
+  }, []);
+
   // Handle toggle product status
   const handleToggleStatus = async (productId: number, currentEnabled: boolean) => {
     try {
@@ -100,9 +120,12 @@ const ProductsListPage: React.FC = () => {
     setFormMode('add');
     setEditingProduct(null);
     setProductName('');
+    setProductNumber('');
+    setStyleCode('');
     setProductBrandId(0);
     setProductSkuCode('');
     setProductCategoryId(0);
+    setMarketplaceId(0);
     setProductMrp(0);
     setProductCost(0);
     setProductPriceSales(0);
@@ -133,9 +156,12 @@ const ProductsListPage: React.FC = () => {
     setShowFormSection(false);
     setEditingProduct(null);
     setProductName('');
+    setProductNumber('');
+    setStyleCode('');
     setProductBrandId(0);
     setProductSkuCode('');
     setProductCategoryId(0);
+    setMarketplaceId(0);
     setProductMrp(0);
     setProductCost(0);
     setProductPriceSales(0);
@@ -331,7 +357,7 @@ const ProductsListPage: React.FC = () => {
             <div className="form-section-body">
               <div className="form-row">
                 <div className="form-field">
-                  <label className="field-label">Product Name</label>
+                  <label className="field-label">Name</label>
                   <input
                     type="text"
                     className="form-input"
@@ -341,6 +367,41 @@ const ProductsListPage: React.FC = () => {
                   />
                 </div>
 
+                <div className="form-field">
+                  <label className="field-label">Product Number</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={productNumber}
+                    onChange={(e) => setProductNumber(e.target.value)}
+                    placeholder="Enter product number"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Style Code</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={styleCode}
+                    onChange={(e) => setStyleCode(e.target.value)}
+                    placeholder="Enter style code"
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">SKU Code</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={productSkuCode}
+                    onChange={(e) => setProductSkuCode(e.target.value)}
+                    placeholder="Enter SKU code"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
                 <div className="form-field">
                   <label className="field-label">Brand</label>
                   <select
@@ -356,18 +417,7 @@ const ProductsListPage: React.FC = () => {
                 </div>
 
                 <div className="form-field">
-                  <label className="field-label">SKU Code</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={productSkuCode}
-                    onChange={(e) => setProductSkuCode(e.target.value)}
-                    placeholder="Enter SKU code"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label className="field-label">Category</label>
+                  <label className="field-label">Categories</label>
                   <select
                     className="form-input"
                     value={productCategoryId}
@@ -379,9 +429,21 @@ const ProductsListPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Marketplace</label>
+                  <select
+                    className="form-input"
+                    value={marketplaceId}
+                    onChange={(e) => setMarketplaceId(Number(e.target.value))}
+                  >
+                    <option value={0}>Select Marketplace</option>
+                    {marketplaces.map((marketplace) => (
+                      <option key={marketplace.id} value={marketplace.id}>{marketplace.name}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="form-field">
                   <label className="field-label">MRP</label>
                   <input
@@ -394,7 +456,9 @@ const ProductsListPage: React.FC = () => {
                     step="0.01"
                   />
                 </div>
+              </div>
 
+              <div className="form-row">
                 <div className="form-field">
                   <label className="field-label">Product Cost</label>
                   <input
@@ -409,55 +473,29 @@ const ProductsListPage: React.FC = () => {
                 </div>
 
                 <div className="form-field">
-                  <label className="field-label">Price (Sales)</label>
+                  <label className="field-label">ASP (Sales)</label>
                   <input
                     type="number"
                     className="form-input"
                     value={productPriceSales}
                     onChange={(e) => setProductPriceSales(Number(e.target.value))}
-                    placeholder="Enter sales price"
+                    placeholder="Enter ASP sales"
                     min="0"
                     step="0.01"
                   />
                 </div>
 
                 <div className="form-field">
-                  <label className="field-label">Price (Non-Sales)</label>
+                  <label className="field-label">ASP (Non-Sales)</label>
                   <input
                     type="number"
                     className="form-input"
                     value={productPriceNonSales}
                     onChange={(e) => setProductPriceNonSales(Number(e.target.value))}
-                    placeholder="Enter non-sales price"
+                    placeholder="Enter ASP non-sales"
                     min="0"
                     step="0.01"
                   />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-field">
-                  <label className="field-label">Product Type</label>
-                  <select
-                    className="form-input"
-                    value={productCurrentType}
-                    onChange={(e) => setProductCurrentType(e.target.value as 'T' | 'A' | 'N')}
-                  >
-                    <option value="N">Normal</option>
-                    <option value="T">Top Seller</option>
-                    <option value="A">Average</option>
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label className="activate-label">
-                    <input
-                      type="checkbox"
-                      checked={productEnabled}
-                      onChange={(e) => setProductEnabled(e.target.checked)}
-                    />
-                    <span>Activate Product</span>
-                  </label>
                 </div>
               </div>
             </div>

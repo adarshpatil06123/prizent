@@ -8,6 +8,7 @@ import EditBrandPage from './components/EditBrandPage';
 import CategoriesListPage from './components/CategoriesListPage';
 import AddCategoryPage from './components/AddCategoryPage';
 import EditCategoryPage from './components/EditCategoryPage';
+import ImportCategoriesPage from './components/ImportCategoriesPage';
 import SuperAdminUsersPage from './components/SuperAdminUsersPage';
 import AddUserPage from './components/AddUserPage';
 import EditUserPage from './components/EditUserPage';
@@ -47,6 +48,7 @@ const App: React.FC = () => {
           <Route path="/categories" element={<CategoriesListPage />} />
           <Route path="/add-category" element={<AddCategoryPage />} />
           <Route path="/edit-category/:id" element={<EditCategoryPage />} />
+          <Route path="/import-categories" element={<ImportCategoriesPage />} />
           <Route path="/products" element={<ProductsListPage />} />
           <Route path="/products/add" element={<AddProductPage />} />
           <Route path="/add-product" element={<AddProductPage />} />
