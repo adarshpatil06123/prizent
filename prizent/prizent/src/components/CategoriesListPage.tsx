@@ -311,7 +311,7 @@ const CategoriesListPage: React.FC = () => {
                     value={parentCategoryId || ''}
                     onChange={(e) => setParentCategoryId(e.target.value ? Number(e.target.value) : null)}
                   >
-                    <option value="">None (Root Category)</option>
+                    <option value="">Parent Category</option>
                     {categories.filter(c => c.enabled && c.id !== editingCategoryId).map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}

@@ -38,6 +38,7 @@ const ProductsListPage: React.FC = () => {
   const [productPriceSales, setProductPriceSales] = useState<string>('');
   const [productPriceNonSales, setProductPriceNonSales] = useState<string>('');
   const [productEnabled, setProductEnabled] = useState(true);
+  const [categoryPath, setCategoryPath] = useState<number[]>([]);
   const [savingProduct, setSavingProduct] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -124,6 +125,7 @@ const ProductsListPage: React.FC = () => {
     setProductBrandId(0);
     setProductSkuCode('');
     setProductCategoryId(0);
+    setCategoryPath([]);
     setMarketplaceId(0);
     setProductMrp('');
     setProductCost('');
@@ -131,6 +133,19 @@ const ProductsListPage: React.FC = () => {
     setProductPriceNonSales('');
     setProductEnabled(true);
     setShowFormSection(true);
+  };
+
+  const buildCategoryPathFromId = (leafId: number): number[] => {
+    const catMap = new Map(categories.map(c => [c.id, c]));
+    const path: number[] = [];
+    let id: number | null = leafId;
+    while (id !== null && id !== undefined) {
+      const cat = catMap.get(id);
+      if (!cat) break;
+      path.unshift(cat.id);
+      id = cat.parentCategoryId ?? null;
+    }
+    return path;
   };
 
   const handleEditProduct = (product: Product) => {
@@ -142,6 +157,7 @@ const ProductsListPage: React.FC = () => {
     setProductBrandId(product.brandId);
     setProductSkuCode(product.skuCode);
     setProductCategoryId(product.categoryId);
+    setCategoryPath(buildCategoryPathFromId(product.categoryId));
     setProductMrp(product.mrp != null ? String(product.mrp) : '');
     setProductCost(product.productCost != null ? String(product.productCost) : '');
     setProductPriceSales(product.proposedSellingPriceSales != null ? String(product.proposedSellingPriceSales) : '');
@@ -160,6 +176,7 @@ const ProductsListPage: React.FC = () => {
     setProductBrandId(0);
     setProductSkuCode('');
     setProductCategoryId(0);
+    setCategoryPath([]);
     setMarketplaceId(0);
     setProductMrp('');
     setProductCost('');
@@ -432,19 +449,45 @@ const ProductsListPage: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="form-field">
-                  <label className="field-label">Categories</label>
-                  <select
-                    className="form-input"
-                    value={productCategoryId}
-                    onChange={(e) => setProductCategoryId(Number(e.target.value))}
-                  >
-                    <option value={0}>Select Category</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {(() => {
+                  const levels: React.ReactElement[] = [];
+                  const levelsToRender = categoryPath.length + 1;
+                  for (let i = 0; i < levelsToRender; i++) {
+                    const parentId = i === 0 ? null : (categoryPath[i - 1] ?? null);
+                    if (i > 0 && !categoryPath[i - 1]) break;
+                    const children = categories.filter(c => c.enabled && (c.parentCategoryId ?? null) === parentId);
+                    if (children.length === 0) break;
+                    const currentVal = categoryPath[i] ?? 0;
+                    const levelIndex = i;
+                    levels.push(
+                      <div key={i} className="form-field">
+                        <label className="field-label">{i === 0 ? 'Category' : 'Sub-category'}</label>
+                        <select
+                          className="form-input"
+                          value={currentVal}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            if (val === 0) {
+                              const newPath = categoryPath.slice(0, levelIndex);
+                              setCategoryPath(newPath);
+                              setProductCategoryId(newPath[newPath.length - 1] ?? 0);
+                            } else {
+                              const newPath = [...categoryPath.slice(0, levelIndex), val];
+                              setCategoryPath(newPath);
+                              setProductCategoryId(val);
+                            }
+                          }}
+                        >
+                          <option value={0}>{i === 0 ? 'Select Category' : 'Select Sub-category'}</option>
+                          {children.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+                  return levels;
+                })()}
 
                 <div className="form-field">
                   <label className="field-label">Marketplace</label>
