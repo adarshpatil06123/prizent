@@ -17,6 +17,7 @@ export interface UpdateCustomFieldRequest {
   name: string;
   fieldType: 'text' | 'numeric' | 'dropdown' | 'date' | 'file';
   required: boolean;
+  enabled?: boolean;
   dropdownOptions?: string;
 }
 

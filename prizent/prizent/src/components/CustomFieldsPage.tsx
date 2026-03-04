@@ -161,7 +161,8 @@ const CustomFieldsPage: React.FC = () => {
       await updateCustomField(editingField.id, {
         name: fieldName,
         fieldType: fieldType as any,
-        required: fieldRequired
+        required: fieldRequired,
+        enabled: enableField
       });
 
       setSuccessMessage(`Custom field "${fieldName}" updated successfully`);
