@@ -15,13 +15,24 @@ interface CategoryDisplay {
 
 const CategoriesListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { categories, loading, error, fetchCategories, toggleCategoryStatus, deleteCategory } = useCategories();
+  const { categories, loading, error, fetchCategories, toggleCategoryStatus, deleteCategory, createCategory, updateCategory } = useCategories();
   
   const [displayCategories, setDisplayCategories] = useState<CategoryDisplay[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
   const [categoryCustomFields, setCategoryCustomFields] = useState<CustomFieldResponse[]>([]);
   const [categoryFieldValues, setCategoryFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
+
+  // Form section state
+  const [showFormSection, setShowFormSection] = useState(false);
+  const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
+  
+  // Form fields
+  const [categoryName, setCategoryName] = useState('');
+  const [parentCategoryId, setParentCategoryId] = useState<number | null>(null);
+  const [categoryEnabled, setCategoryEnabled] = useState(true);
 
   
   useEffect(() => {
@@ -115,6 +126,67 @@ const CategoriesListPage: React.FC = () => {
       }
     }
   };
+
+  // Form handlers
+  const handleAddNewCategory = () => {
+    setFormMode('add');
+    setEditingCategoryId(null);
+    setCategoryName('');
+    setParentCategoryId(null);
+    setCategoryEnabled(true);
+    setShowFormSection(true);
+  };
+
+  const handleEditCategory = (categoryId: number) => {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return;
+    
+    setFormMode('edit');
+    setEditingCategoryId(categoryId);
+    setCategoryName(category.name || '');
+    setParentCategoryId(category.parentCategoryId || null);
+    setCategoryEnabled(category.enabled || false);
+    setShowFormSection(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCloseForm = () => {
+    setShowFormSection(false);
+    setEditingCategoryId(null);
+    setCategoryName('');
+    setParentCategoryId(null);
+    setCategoryEnabled(true);
+  };
+
+  const handleSaveForm = async () => {
+    // Validation
+    if (!categoryName.trim()) {
+      alert('Category name is required');
+      return;
+    }
+
+    setSavingCategory(true);
+    try {
+      if (formMode === 'add') {
+        await createCategory(categoryName.trim(), parentCategoryId, categoryEnabled);
+      } else if (editingCategoryId) {
+        await updateCategory(editingCategoryId, {
+          name: categoryName.trim(),
+          parentCategoryId: parentCategoryId,
+          enabled: categoryEnabled
+        });
+      }
+
+      // Refresh categories list
+      await fetchCategories();
+      handleCloseForm();
+    } catch (err: any) {
+      console.error('Error saving category:', err);
+      alert(err.response?.data?.message || 'Failed to save category');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
   
   // Pagination logic
   const totalPages = Math.ceil(displayCategories.length / itemsPerPage);
@@ -189,13 +261,77 @@ const CategoriesListPage: React.FC = () => {
             <p className="categories-count">{displayCategories.length} Total number of items</p>
           </div>
           
-          <button className="add-category-btn" onClick={() => navigate('/add-category')}>
+          <button className="add-category-btn" onClick={handleAddNewCategory}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M5 0V10M0 5H10" stroke="#FFFFFF" strokeWidth="2"/>
             </svg>
             ADD CATEGORY
           </button>
         </div>
+
+        {/* Inline Form Section */}
+        {showFormSection && (
+          <div className="form-section">
+            <div className="form-section-header">
+              <h3 className="form-section-title">
+                {formMode === 'add' ? 'Add New Category' : 'Edit Category'}
+              </h3>
+              <button className="close-btn" onClick={handleCloseForm}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M1 1L13 13M1 13L13 1" stroke="#656565" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="form-section-body">
+              {/* Category Details Row */}
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Category Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter category name"
+                    className="form-input"
+                    value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Parent Category</label>
+                  <select
+                    className="form-input"
+                    value={parentCategoryId || ''}
+                    onChange={(e) => setParentCategoryId(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">None (Root Category)</option>
+                    {categories.filter(c => c.enabled && c.id !== editingCategoryId).map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label className="checkbox-label-field">
+                    <input
+                      type="checkbox"
+                      checked={categoryEnabled}
+                      onChange={(e) => setCategoryEnabled(e.target.checked)}
+                    />
+                    <span>Enable category</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="form-actions">
+                <button className="cancel-btn" onClick={handleCloseForm} disabled={savingCategory}>
+                  Cancel
+                </button>
+                <button className="save-btn" onClick={handleSaveForm} disabled={savingCategory}>
+                  {savingCategory ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Categories Table */}
           <div className="categories-table-container">
@@ -235,7 +371,7 @@ const CategoriesListPage: React.FC = () => {
                     <div className="action-buttons">
                       <button 
                         className="action-btn edit-btn"
-                        onClick={() => navigate(`/edit-category/${category.id}`)}
+                        onClick={() => handleEditCategory(category.id)}
                         title="Edit Category"
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

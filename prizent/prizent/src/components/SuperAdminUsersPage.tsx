@@ -12,6 +12,22 @@ const SuperAdminUsersPage: React.FC = () => {
   const [error, setError] = useState('');
   const usersPerPage = 8;
 
+  // Form section state
+  const [showFormSection, setShowFormSection] = useState(false);
+  const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [savingUser, setSavingUser] = useState(false);
+  
+  // Form fields
+  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState('USER');
+  const [userDesignation, setUserDesignation] = useState('');
+  const [userPhone, setUserPhone] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [enableUser, setEnableUser] = useState(true);
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -36,6 +52,109 @@ const SuperAdminUsersPage: React.FC = () => {
       setError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Form handlers
+  const handleAddNewUser = () => {
+    setFormMode('add');
+    setEditingUser(null);
+    setUserName('');
+    setUserRole('USER');
+    setUserDesignation('');
+    setUserPhone('');
+    setUserEmail('');
+    setLoginUsername('');
+    setUserPassword('');
+    setEnableUser(true);
+    setShowFormSection(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    setFormMode('edit');
+    setEditingUser(user);
+    setUserName(user.name || '');
+    setUserRole(user.role || 'USER');
+    setUserDesignation(user.employeeDesignation || '');
+    setUserPhone(user.phoneNumber || '');
+    setUserEmail(user.emailId || '');
+    setLoginUsername(user.username || '');
+    setUserPassword(''); // Don't populate password
+    setEnableUser(user.enabled || false);
+    setShowFormSection(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCloseForm = () => {
+    setShowFormSection(false);
+    setEditingUser(null);
+    setUserName('');
+    setUserRole('USER');
+    setUserDesignation('');
+    setUserPhone('');
+    setUserEmail('');
+    setLoginUsername('');
+    setUserPassword('');
+    setEnableUser(true);
+  };
+
+  const handleSaveForm = async () => {
+    // Validation
+    if (!userName.trim()) {
+      alert('User name is required');
+      return;
+    }
+    if (!userRole) {
+      alert('Role is required');
+      return;
+    }
+    if (!userEmail.trim()) {
+      alert('Email is required');
+      return;
+    }
+    if (!loginUsername.trim()) {
+      alert('Login username is required');
+      return;
+    }
+    if (formMode === 'add' && !userPassword.trim()) {
+      alert('Password is required');
+      return;
+    }
+
+    setSavingUser(true);
+    try {
+      const currentUser = authService.getCurrentUser();
+      const clientId = currentUser?.clientId || 1;
+
+      const userData: any = {
+        name: userName,
+        username: loginUsername,
+        emailId: userEmail,
+        role: userRole,
+        phoneNumber: userPhone,
+        employeeDesignation: userDesignation,
+        enabled: enableUser
+      };
+
+      if (formMode === 'add') {
+        userData.password = userPassword;
+        await userService.createUser(userData, clientId);
+      } else if (editingUser) {
+        // Only include password if it's not empty
+        if (userPassword && userPassword.trim().length > 0) {
+          userData.password = userPassword;
+        }
+        await userService.updateUser(editingUser.id, userData);
+      }
+
+      // Refresh users list
+      await fetchUsers();
+      handleCloseForm();
+    } catch (err: any) {
+      console.error('Error saving user:', err);
+      alert(err.response?.data?.message || 'Failed to save user');
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -175,13 +294,131 @@ const SuperAdminUsersPage: React.FC = () => {
               {loading ? 'Loading...' : `${users.length} Total number of items`}
             </p>
           </div>
-          <button className="add-btn" onClick={() => navigate('/superadmin/add-user')}>
+          <button className="add-btn" onClick={handleAddNewUser}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M5 0V10M0 5H10" stroke="#FFFFFF" strokeWidth="2"/>
             </svg>
             Add New User
           </button>
         </div>
+
+        {/* Inline Form Section */}
+        {showFormSection && (
+          <div className="form-section">
+            <div className="form-section-header">
+              <h3 className="form-section-title">
+                {formMode === 'add' ? 'Add New User' : 'Edit User'}
+              </h3>
+              <button className="close-btn" onClick={handleCloseForm}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M1 1L13 13M1 13L13 1" stroke="#656565" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="form-section-body">
+              {/* User Details Row */}
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">User Name</label>
+                  <input
+                    type="text"
+                    placeholder="enter user name"
+                    className="form-input"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Role</label>
+                  <select
+                    className="form-input"
+                    value={userRole}
+                    onChange={(e) => setUserRole(e.target.value)}
+                  >
+                    <option value="USER">User</option>
+                    <option value="ADMIN">Admin</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="SUPER_ADMIN">Super Admin</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Designation</label>
+                  <input
+                    type="text"
+                    placeholder="designation"
+                    className="form-input"
+                    value={userDesignation}
+                    onChange={(e) => setUserDesignation(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="user phone no."
+                    className="form-input"
+                    value={userPhone}
+                    onChange={(e) => setUserPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Credentials Row */}
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="field-label">Email</label>
+                  <input
+                    type="email"
+                    placeholder="user email"
+                    className="form-input"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Login Username</label>
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    className="form-input"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="field-label">Password{formMode === 'edit' ? ' (leave empty to keep current)' : ''}</label>
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    className="form-input"
+                    value={userPassword}
+                    onChange={(e) => setUserPassword(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="checkbox-label-field">
+                    <input
+                      type="checkbox"
+                      checked={enableUser}
+                      onChange={(e) => setEnableUser(e.target.checked)}
+                    />
+                    <span>Enable user</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="form-actions">
+                <button className="cancel-btn" onClick={handleCloseForm} disabled={savingUser}>
+                  Cancel
+                </button>
+                <button className="save-btn" onClick={handleSaveForm} disabled={savingUser}>
+                  {savingUser ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
@@ -240,7 +477,7 @@ const SuperAdminUsersPage: React.FC = () => {
                         <div className="action-buttons">
                           <button 
                             className="action-btn edit-btn" 
-                            onClick={() => navigate(`/superadmin/edit-user/${user.id}`)}
+                            onClick={() => handleEditUser(user)}
                           >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                               <path d="M12.9143 0C12.1418 0 11.3694 0.292612 10.7809 0.880547L1.48058 10.1845C1.44913 10.2159 1.42726 10.2556 1.41632 10.2986L0.00812566 15.6873C-0.0144334 15.7734 0.01086 15.8643 0.0730658 15.9265C0.135273 15.9894 0.22619 16.014 0.312324 15.9922L5.70245 14.5838C5.74484 14.5729 5.7838 14.5503 5.81525 14.5196L15.1182 5.21773C16.2939 4.04182 16.2939 2.12692 15.1182 0.950983L15.0478 0.880567C14.4599 0.292613 13.6867 0.000701771 12.9143 0.000701771L12.9143 0ZM12.9143 0.496332C13.5575 0.496332 14.2022 0.742441 14.6951 1.2347L14.7634 1.30306C15.7485 2.28822 15.7485 3.87844 14.7634 4.86361L13.1549 6.47159L9.52723 2.84348L11.135 1.23482C11.6272 0.742585 12.2705 0.496458 12.9144 0.496458L12.9143 0.496332ZM9.17369 3.19685L12.8014 6.82496L5.50887 14.119L0.598061 15.4015L1.88252 10.4902L9.17369 3.19685Z" fill="#656565"/>
