@@ -68,22 +68,29 @@ public class ProductImportValidator {
             }
         }
 
-        // ── Required: Brand ID ────────────────────────────────────────────────
+        // ── Required: Brand Name (resolved to ID before validation) ────────────────
         if (row.getBrandId() == null) {
-            errors.add(new ImportRowError(rowNum, "Brand ID",
-                    "Brand ID is required"));
+            // Only show if no parse/resolution error was already added by resolveNames()
+            if (row.getBrandName() == null || row.getBrandName().isBlank()) {
+                errors.add(new ImportRowError(rowNum, "Brand Name",
+                        "Brand Name is required"));
+            }
+            // If brandName was provided but not resolved, the error was added in resolveNames()
         } else if (row.getBrandId() <= 0) {
-            errors.add(new ImportRowError(rowNum, "Brand ID",
-                    "Brand ID must be a positive number"));
+            errors.add(new ImportRowError(rowNum, "Brand Name",
+                    "Brand could not be resolved to a valid ID"));
         }
 
-        // ── Required: Category ID ─────────────────────────────────────────────
+        // ── Required: Category Name (resolved to ID before validation) ──────────────
         if (row.getCategoryId() == null) {
-            errors.add(new ImportRowError(rowNum, "Category ID",
-                    "Category ID is required"));
+            if (row.getCategoryName() == null || row.getCategoryName().isBlank()) {
+                errors.add(new ImportRowError(rowNum, "Category Name",
+                        "Category Name is required"));
+            }
+            // If categoryName was provided but not resolved, the error was added in resolveNames()
         } else if (row.getCategoryId() <= 0) {
-            errors.add(new ImportRowError(rowNum, "Category ID",
-                    "Category ID must be a positive number"));
+            errors.add(new ImportRowError(rowNum, "Category Name",
+                    "Category could not be resolved to a valid ID"));
         }
 
         // ── Numeric constraints ───────────────────────────────────────────────

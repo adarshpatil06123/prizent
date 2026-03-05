@@ -69,7 +69,6 @@ const ProductsListPage: React.FC = () => {
     const fetchBrands = async () => {
       try {
         const response = await brandService.getAllBrands();
-        console.log('Brands API response:', response);
         if (response.brands) {
           setBrands(response.brands);
           const map = new Map<number, string>();
@@ -77,7 +76,6 @@ const ProductsListPage: React.FC = () => {
             map.set(brand.id, brand.name);
           });
           setBrandMap(map);
-          console.log('Brand map created:', Array.from(map.entries()));
         }
       } catch (err) {
         console.error('Failed to fetch brands:', err);
@@ -148,7 +146,7 @@ const ProductsListPage: React.FC = () => {
     return path;
   };
 
-  const handleEditProduct = (product: Product) => {
+  const handleEditProduct = async (product: Product) => {
     setFormMode('edit');
     setEditingProduct(product);
     setProductName(product.name);
@@ -163,6 +161,16 @@ const ProductsListPage: React.FC = () => {
     setProductPriceSales(product.proposedSellingPriceSales != null ? String(product.proposedSellingPriceSales) : '');
     setProductPriceNonSales(product.proposedSellingPriceNonSales != null ? String(product.proposedSellingPriceNonSales) : '');
     setProductEnabled(product.enabled);
+    setMarketplaceId(0);
+    // Load existing marketplace mapping for this product
+    try {
+      const mappings = await productService.getMarketplaceMappings(product.id);
+      if (mappings && mappings.length > 0) {
+        setMarketplaceId(mappings[0].marketplaceId);
+      }
+    } catch (err) {
+      console.error('Failed to load marketplace mappings:', err);
+    }
     setShowFormSection(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -262,7 +270,6 @@ const ProductsListPage: React.FC = () => {
         const fields = await getCustomFields('p'); // 'p' for products
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded product custom fields:', enabledFields);
       } catch (err) {
         console.error('Failed to fetch custom fields:', err);
       }
@@ -627,8 +634,6 @@ const ProductsListPage: React.FC = () => {
                   const value = fieldValues.find(v => v.customFieldId === fieldId);
                   return value ? value.value : '-';
                 };
-                console.log(`Product ${product.name} - brandId: ${product.brandId}, brand lookup: ${brandMap.get(product.brandId)}`);
-                
                 return (
                 <div className="products-table-row" key={product.id}>
                   <div className="product-cell">

@@ -41,7 +41,6 @@ const CategoriesListPage: React.FC = () => {
     const loadCustomFields = async () => {
       try {
         const fields = await getCustomFields('c');
-        console.log('DEBUG: Category custom fields fetched:', fields);
         setCategoryCustomFields(fields);
       } catch (err) {
         console.error('Failed to fetch category custom fields:', err);
@@ -60,7 +59,6 @@ const CategoriesListPage: React.FC = () => {
           categories.map(async (cat) => {
             try {
               const values = await getCustomFieldValues('c', cat.id);
-              console.log(`DEBUG: Custom field values for category ${cat.id} (${cat.name}):`, values);
               if (values && values.length > 0) {
                 valuesMap.set(cat.id, values);
               }
@@ -69,7 +67,6 @@ const CategoriesListPage: React.FC = () => {
             }
           })
         );
-        console.log('DEBUG: All field values map:', valuesMap);
         setCategoryFieldValues(valuesMap);
       } catch (err) {
         console.error('Failed to fetch category field values:', err);
@@ -81,8 +78,6 @@ const CategoriesListPage: React.FC = () => {
   useEffect(() => {
     // Show all categories including parent categories in the table
     // Filter out test categories but include both root and non-root categories
-    
-    console.log('CategoriesListPage: All categories from context:', categories);
     
     // Show all categories without any name-based filtering
     const transformedCategories: CategoryDisplay[] = categories.map((category) => {
@@ -100,7 +95,6 @@ const CategoriesListPage: React.FC = () => {
     // Sort newest first (highest ID = most recently created)
     transformedCategories.sort((a, b) => b.id - a.id);
     
-    console.log('CategoriesListPage: Final display categories:', transformedCategories);
     setDisplayCategories(transformedCategories);
   }, [categories]);
   

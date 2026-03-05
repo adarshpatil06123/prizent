@@ -25,7 +25,6 @@ const EditCategoryPage: React.FC = () => {
         const fields = await getCustomFields('c');
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded category custom fields:', enabledFields);
       } catch (error) {
         console.error('Failed to fetch custom fields:', error);
       }
@@ -54,7 +53,6 @@ const EditCategoryPage: React.FC = () => {
               valuesMap[fv.customFieldId] = fv.value;
             });
             setCustomFieldValues(valuesMap);
-            console.log('Loaded custom field values:', valuesMap);
           } catch (error) {
             console.error('Failed to load custom field values:', error);
           }
@@ -106,12 +104,10 @@ const EditCategoryPage: React.FC = () => {
             }
           })
         );
-        console.log('Custom field values saved');
-      } catch (fieldError) {
-        console.error('Error saving custom field values:', fieldError);
-        // Continue with success message even if custom fields fail
-      }
-      
+        } catch (fieldError) {
+          console.error('Error saving custom field values:', fieldError);
+          // Continue with success message even if custom fields fail
+        }
       // Navigate back on success
       navigate('/categories');
     } catch (err: any) {

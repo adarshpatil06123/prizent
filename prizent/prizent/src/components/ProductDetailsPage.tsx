@@ -56,7 +56,6 @@ const ProductDetailsPage: React.FC = () => {
 
   const handleEdit = () => {
     // Handle edit functionality
-    console.log('Edit clicked');
   };
 
   return (

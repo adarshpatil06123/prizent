@@ -5,8 +5,8 @@ import './LoginPage.css';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('admin@test.com');
-  const [password, setPassword] = useState('password');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -15,29 +15,19 @@ const LoginPage: React.FC = () => {
     setError('');
     setLoading(true);
 
-    console.log('=== LOGIN PAGE SUBMIT ===');
-    console.log('Username:', username);
-    console.log('Password length:', password.length);
-
     try {
       const response = await authService.login(username, password);
-      console.log('Login response received:', response);
       
       if (response.success && response.token) {
-        console.log('✓ Login successful, checking user roles...');
         // Check user role and navigate accordingly
         const user = authService.getCurrentUser();
-        console.log('Current user:', user);
         
         if (user?.roles?.includes('SUPERADMIN')) {
-          console.log('Navigating to superadmin...');
           navigate('/superadmin');
         } else {
-          console.log('Navigating to categories...');
           navigate('/categories');
         }
       } else {
-        console.log('❌ Login failed:', response.message);
         setError(response.message || 'Login failed. Please try again.');
       }
     } catch (err: any) {

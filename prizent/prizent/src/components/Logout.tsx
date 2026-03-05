@@ -10,7 +10,6 @@ const Logout: React.FC = () => {
       try {
         // Call logout service
         await authService.logout();
-        console.log('✓ Logout successful');
       } catch (error) {
         console.error('Logout error:', error);
       } finally {

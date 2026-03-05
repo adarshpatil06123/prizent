@@ -33,11 +33,9 @@ export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) 
     setLoading(true);
     setError(null);
     try {
-      console.log('CategoryContext: Fetching categories...');
       const response = await categoryService.getAllCategories();
       if (response.success && response.categories) {
         setCategories(response.categories);
-        console.log('CategoryContext: Categories updated:', response.categories.length, 'categories');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch categories');
@@ -67,10 +65,8 @@ export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) 
     setLoading(true);
     setError(null);
     try {
-      console.log('CategoryContext: Creating category:', name, 'parent:', parentCategoryId, 'enabled:', enabled);
       const response = await categoryService.createCategory({ name, parentCategoryId, enabled });
       if (response.success) {
-        console.log('CategoryContext: Category created successfully, refreshing...');
         await fetchCategories(); // Refresh the shared state
         await fetchCategoryTree(); // Also refresh tree
         return response;

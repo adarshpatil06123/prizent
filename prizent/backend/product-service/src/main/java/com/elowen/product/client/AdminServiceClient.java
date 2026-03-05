@@ -209,6 +209,112 @@ public class AdminServiceClient {
         return response;
     }
 
+    // ── Name-lookup helpers for import ────────────────────────────────────────
+
+    /**
+     * Fetch all brands for the current client (used for name → ID resolution during import).
+     * Returns list of maps with at least "id" (Long) and "name" (String).
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getBrandsForImport(String authToken) {
+        try {
+            String url = adminServiceUrl + "/brands";
+            HttpHeaders headers = buildHeaders(authToken);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Object brands = response.getBody().get("brands");
+                if (brands instanceof List) return (List<Map<String, Object>>) brands;
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch brands from admin-service for import: {}", e.getMessage());
+        }
+        return new ArrayList<>();
+    }
+
+    /**
+     * Fetch all categories for the current client (used for name → ID resolution during import).
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getCategoriesForImport(String authToken) {
+        try {
+            String url = adminServiceUrl + "/categories";
+            HttpHeaders headers = buildHeaders(authToken);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Object categories = response.getBody().get("categories");
+                if (categories instanceof List) return (List<Map<String, Object>>) categories;
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch categories from admin-service for import: {}", e.getMessage());
+        }
+        return new ArrayList<>();
+    }
+
+    /**
+     * Fetch all marketplaces (used for name → ID resolution during import).
+     * Requests a large page size to get all records in one call.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getMarketplacesForImport(String authToken) {
+        try {
+            String url = adminServiceUrl + "/marketplaces?page=0&size=1000";
+            log.debug("Fetching marketplaces from: {}", url);
+            HttpHeaders headers = buildHeaders(authToken);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            
+            log.debug("Marketplace response status: {}", response.getStatusCode());
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+                log.debug("Marketplace response body keys: {}", body.keySet());
+                
+                Object mp = body.get("marketplaces");
+                log.debug("Marketplace object type: {}, value: {}", mp != null ? mp.getClass().getSimpleName() : "null", mp);
+                
+                if (mp instanceof Map) {
+                    // PagedResponse wraps list under "content"
+                    Map<String, Object> mpMap = (Map<String, Object>) mp;
+                    log.debug("Marketplace map keys: {}", mpMap.keySet());
+                    
+                    Object content = mpMap.get("content");
+                    log.debug("Marketplace content type: {}, size: {}", 
+                            content != null ? content.getClass().getSimpleName() : "null",
+                            content instanceof List ? ((List<?>) content).size() : "N/A");
+                    
+                    if (content instanceof List) {
+                        List<Map<String, Object>> result = (List<Map<String, Object>>) content;
+                        log.info("Successfully fetched {} marketplaces from admin-service", result.size());
+                        return result;
+                    }
+                } else if (mp instanceof List) {
+                    // Direct list response (fallback)
+                    List<Map<String, Object>> result = (List<Map<String, Object>>) mp;
+                    log.info("Successfully fetched {} marketplaces (direct list) from admin-service", result.size());
+                    return result;
+                }
+                log.warn("Unexpected marketplace response structure: {}", mp);
+            } else {
+                log.warn("Marketplace fetch returned non-success status: {}", response.getStatusCode());
+            }
+        } catch (Exception e) {
+            log.error("Could not fetch marketplaces from admin-service for import: {}", e.getMessage(), e);
+        }
+        log.warn("Returning empty marketplace list");
+        return new ArrayList<>();
+    }
+
+    /** Build an HttpHeaders object with the Authorization header set. */
+    private HttpHeaders buildHeaders(String authToken) {
+        HttpHeaders headers = new HttpHeaders();
+        if (authToken != null && !authToken.isEmpty()) {
+            headers.set("Authorization", authToken);
+        }
+        return headers;
+    }
+
     // ── Custom Field Definitions ──────────────────────────────────────────────
 
     /**

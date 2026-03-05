@@ -68,7 +68,6 @@ const AddProductPage: React.FC = () => {
         const fields = await getCustomFields('p');
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded product custom fields:', enabledFields);
       } catch (error) {
         console.error('Failed to fetch custom fields:', error);
       }
@@ -106,12 +105,9 @@ const AddProductPage: React.FC = () => {
       return;
     }
 
-    console.log('Creating product with data:', formData);
-
     try {
       setLoading(true);
       const response = await productService.createProduct(formData);
-      console.log('Product created:', response);
 
       // Save custom field values
       if (response.id) {
@@ -145,7 +141,6 @@ const AddProductPage: React.FC = () => {
         // If user unchecked Active product, disable it (backend defaults to enabled)
         if (!enabled) {
           await productService.toggleProductStatus(response.id, false);
-          console.log('Product disabled after creation');
         }
       }
 

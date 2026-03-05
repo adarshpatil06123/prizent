@@ -159,26 +159,13 @@ const SuperAdminUsersPage: React.FC = () => {
   };
 
   const handleToggleStatus = async (userId: number, currentEnabled: boolean) => {
-    console.log(`=== TOGGLE STATUS START ===`);
-    console.log(`User ID: ${userId}`);
-    console.log(`Current Enabled: ${currentEnabled}`);
-    console.log(`Action: ${currentEnabled ? 'DISABLE' : 'ENABLE'}`);
-    
     try {
       if (currentEnabled) {
-        console.log('Calling disableUser...');
-        const result = await userService.disableUser(userId);
-        console.log('Disable result:', result);
+        await userService.disableUser(userId);
       } else {
-        console.log('Calling enableUser...');
-        const result = await userService.enableUser(userId);
-        console.log('Enable result:', result);
+        await userService.enableUser(userId);
       }
-      console.log('Status toggled successfully!');
-      console.log('Fetching updated user list...');
       await fetchUsers();
-      console.log('User list refreshed!');
-      console.log(`=== TOGGLE STATUS END ===`);
     } catch (err: any) {
       console.error('=== ERROR TOGGLING STATUS ===');
       console.error('Error object:', err);

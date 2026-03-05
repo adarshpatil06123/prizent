@@ -125,7 +125,6 @@ const EditUserPage: React.FC = () => {
   };
 
   const handleResetPassword = () => {
-    console.log('Reset password for user:', userId);
     // Add password reset logic here
     alert('Password reset link sent to user email');
   };

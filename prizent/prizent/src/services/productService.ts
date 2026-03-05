@@ -115,12 +115,8 @@ export const getProductStatusDisplay = (currentType: 'T' | 'A' | 'N'): string =>
 const productService = {
   // Get all products with pagination
   getAllProducts: async (page: number = 0, size: number = 20): Promise<PagedResponse<Product>> => {
-    console.log('=== PRODUCT SERVICE GET ALL PRODUCTS ===');
-    console.log(`Page: ${page}, Size: ${size}`);
-    
     try {
       const response = await apiClient.get(`products?page=${page}&size=${size}`);
-      console.log('✓ Products retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching products:', error);
@@ -130,11 +126,8 @@ const productService = {
 
   // Get all products including disabled
   getAllProductsIncludingDisabled: async (page: number = 0, size: number = 20): Promise<PagedResponse<Product>> => {
-    console.log('=== PRODUCT SERVICE GET ALL PRODUCTS (INCLUDING DISABLED) ===');
-    
     try {
       const response = await apiClient.get(`products/all?page=${page}&size=${size}`);
-      console.log('✓ Products retrieved (including disabled):', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching products:', error);
@@ -144,12 +137,8 @@ const productService = {
 
   // Get product by ID
   getProductById: async (id: number): Promise<Product> => {
-    console.log('=== PRODUCT SERVICE GET PRODUCT BY ID ===');
-    console.log(`Product ID: ${id}`);
-    
     try {
       const response = await apiClient.get(`products/${id}`);
-      console.log('✓ Product retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching product:', error);
@@ -159,12 +148,8 @@ const productService = {
 
   // Get product by ID with custom fields
   getProductByIdFull: async (id: number): Promise<Product> => {
-    console.log('=== PRODUCT SERVICE GET PRODUCT BY ID (FULL) ===');
-    console.log(`Product ID: ${id}`);
-    
     try {
       const response = await apiClient.get(`products/${id}/full`);
-      console.log('✓ Product with custom fields retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching product with custom fields:', error);
@@ -174,12 +159,8 @@ const productService = {
 
   // Create new product
   createProduct: async (productData: CreateProductRequest): Promise<Product> => {
-    console.log('=== PRODUCT SERVICE CREATE PRODUCT ===');
-    console.log('Product data:', productData);
-    
     try {
       const response = await apiClient.post('products', productData);
-      console.log('✓ Product created:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error creating product:', error);
@@ -189,13 +170,8 @@ const productService = {
 
   // Update product
   updateProduct: async (id: number, productData: UpdateProductRequest): Promise<Product> => {
-    console.log('=== PRODUCT SERVICE UPDATE PRODUCT ===');
-    console.log(`Product ID: ${id}`);
-    console.log('Updated data:', productData);
-    
     try {
       const response = await apiClient.put(`products/${id}`, productData);
-      console.log('✓ Product updated:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error updating product:', error);
@@ -205,12 +181,8 @@ const productService = {
 
   // Update product flag/currentType
   updateProductFlag: async (id: number, currentType: 'T' | 'A' | 'N'): Promise<Product> => {
-    console.log('=== PRODUCT SERVICE UPDATE PRODUCT FLAG ===');
-    console.log(`Product ID: ${id}, Flag: ${currentType}`);
-    
     try {
       const response = await apiClient.patch(`products/${id}/flag?currentType=${currentType}`);
-      console.log('✓ Product flag updated:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error updating product flag:', error);
@@ -220,12 +192,8 @@ const productService = {
 
   // Enable or disable product
   toggleProductStatus: async (id: number, enabled: boolean): Promise<Product> => {
-    console.log('=== PRODUCT SERVICE TOGGLE PRODUCT STATUS ===');
-    console.log(`Product ID: ${id}, Enabled: ${enabled}`);
-    
     try {
       const response = await apiClient.patch(`products/${id}/enable?enabled=${enabled}`);
-      console.log('✓ Product status updated:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error toggling product status:', error);
@@ -235,12 +203,8 @@ const productService = {
 
   // Delete product permanently
   deleteProduct: async (id: number): Promise<void> => {
-    console.log('=== PRODUCT SERVICE DELETE PRODUCT ===');
-    console.log(`Product ID: ${id}`);
-    
     try {
       await apiClient.delete(`products/${id}`);
-      console.log('✓ Product deleted successfully');
     } catch (error: any) {
       console.error('Error deleting product:', error);
       throw error;
@@ -249,11 +213,8 @@ const productService = {
 
   // Get product statistics
   getProductStats: async (): Promise<ProductStats> => {
-    console.log('=== PRODUCT SERVICE GET STATS ===');
-    
     try {
       const response = await apiClient.get('products/stats');
-      console.log('✓ Product stats retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching product stats:', error);
@@ -274,9 +235,6 @@ const productService = {
       direction?: 'asc' | 'desc';
     }
   ): Promise<PagedResponse<Product>> => {
-    console.log('=== PRODUCT SERVICE FILTER PRODUCTS ===');
-    console.log('Filters:', filters);
-    
     try {
       const params = new URLSearchParams();
       
@@ -290,7 +248,6 @@ const productService = {
       params.append('direction', filters.direction || 'desc');
       
       const response = await apiClient.get(`products/filter?${params.toString()}`);
-      console.log('✓ Filtered products retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error filtering products:', error);

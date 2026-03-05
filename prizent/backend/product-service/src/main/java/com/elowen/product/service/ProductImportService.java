@@ -77,12 +77,19 @@ public class ProductImportService {
         List<Map<String, Object>> cfDefs =
                 adminServiceClient.getCustomFieldDefinitions("p", authToken);
 
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet productsSheet = workbook.createSheet("Products");
-            Sheet infoSheet     = workbook.createSheet("Instructions");
+        // Fetch brands / categories / marketplaces for the Valid Options sheet
+        List<Map<String, Object>> brands       = adminServiceClient.getBrandsForImport(authToken);
+        List<Map<String, Object>> categories   = adminServiceClient.getCategoriesForImport(authToken);
+        List<Map<String, Object>> marketplaces = adminServiceClient.getMarketplacesForImport(authToken);
 
-            buildProductsSheet(workbook, productsSheet, cfDefs);
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet productsSheet    = workbook.createSheet("Products");
+            Sheet infoSheet        = workbook.createSheet("Instructions");
+            Sheet validOptionsSheet = workbook.createSheet("Valid Options (Reference)");
+
+            buildProductsSheet(workbook, productsSheet, cfDefs, brands, categories, marketplaces);
             buildInstructionsSheet(infoSheet, cfDefs);
+            buildValidOptionsSheet(validOptionsSheet, brands, categories, marketplaces);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
@@ -91,7 +98,10 @@ public class ProductImportService {
     }
 
     private void buildProductsSheet(XSSFWorkbook wb, Sheet sheet,
-                                    List<Map<String, Object>> cfDefs) {
+                                    List<Map<String, Object>> cfDefs,
+                                    List<Map<String, Object>> brands,
+                                    List<Map<String, Object>> categories,
+                                    List<Map<String, Object>> marketplaces) {
 
         // ── Header style (dark background, white bold text) ───────────────────
         CellStyle headerStyle = wb.createCellStyle();
@@ -120,21 +130,26 @@ public class ProductImportService {
         exampleFont.setColor(IndexedColors.BLACK.getIndex());
         exampleStyle.setFont(exampleFont);
 
+        // Pick example names from real data (or fallback placeholders)
+        String exampleBrand       = brands.isEmpty()       ? "YourBrandName"       : (String) brands.get(0).get("name");
+        String exampleCategory    = categories.isEmpty()   ? "YourCategoryName"    : (String) categories.get(0).get("name");
+        String exampleMarketplace = marketplaces.isEmpty() ? "YourMarketplaceName" : (String) marketplaces.get(0).get("name");
+
         // ── Build column list ─────────────────────────────────────────────────
         List<String> headers  = new ArrayList<>(ExcelParserUtil.STANDARD_HEADERS);
         List<Object> examples = new ArrayList<>(Arrays.asList(
-                "My Product",       // Product Name*
-                "PN-001",           // Product Number
-                "SC-001",           // Style Code
-                "SKU-001",          // SKU Code*
-                1L,                 // Brand ID*
-                1L,                 // Category ID*
-                999.00,             // MRP
-                750.00,             // Product Cost
-                899.00,             // Proposed Selling Price (Sales)
-                950.00,             // Proposed Selling Price (Non-Sales)
-                "true",             // Enabled (true/false)
-                "1,2"               // Marketplace IDs (comma-sep)
+                "My Product",         // Product Name*
+                "PN-001",             // Product Number
+                "SC-001",             // Style Code
+                "SKU-001",            // SKU Code*
+                exampleBrand,         // Brand Name*
+                exampleCategory,      // Category Name*
+                999.00,               // MRP
+                750.00,               // Product Cost
+                899.00,               // Proposed Selling Price (Sales)
+                950.00,               // Proposed Selling Price (Non-Sales)
+                "true",              // Enabled (true/false)
+                exampleMarketplace    // Marketplace Names (comma-sep)
         ));
 
         // Add dynamic custom-field columns
@@ -153,8 +168,8 @@ public class ProductImportService {
         Set<String> requiredCols = Set.of(
                 ExcelParserUtil.COL_PRODUCT_NAME,
                 ExcelParserUtil.COL_SKU_CODE,
-                ExcelParserUtil.COL_BRAND_ID,
-                ExcelParserUtil.COL_CATEGORY_ID
+                ExcelParserUtil.COL_BRAND_NAME,
+                ExcelParserUtil.COL_CATEGORY_NAME
         );
 
         for (int i = 0; i < headers.size(); i++) {
@@ -186,21 +201,25 @@ public class ProductImportService {
         int ri = 0;
         addInfoRow(sheet, ri++, "=== Product Import Instructions ===");
         addInfoRow(sheet, ri++, "Fill product data in the 'Products' sheet starting from row 3.");
-        addInfoRow(sheet, ri++, "Row 2 (orange headers) = required fields.  Row 2 (blue) = optional.");
+        addInfoRow(sheet, ri++, "Orange headers = required fields.  Blue headers = optional.");
         addInfoRow(sheet, ri++, "");
         addInfoRow(sheet, ri++, "COLUMN GUIDE:");
-        addInfoRow(sheet, ri++, "  Product Name*        : Full product name (max 255 chars)");
-        addInfoRow(sheet, ri++, "  Product Number       : Optional product number");
-        addInfoRow(sheet, ri++, "  Style Code           : Optional style code");
-        addInfoRow(sheet, ri++, "  SKU Code*            : Unique stock-keeping unit code");
-        addInfoRow(sheet, ri++, "  Brand ID*            : Numeric ID of the brand (from Brands page)");
-        addInfoRow(sheet, ri++, "  Category ID*         : Numeric ID of the category (from Categories page)");
-        addInfoRow(sheet, ri++, "  MRP                  : Maximum Retail Price (>= 0)");
-        addInfoRow(sheet, ri++, "  Product Cost         : Cost price (>= 0)");
-        addInfoRow(sheet, ri++, "  Proposed SP (Sales)  : Proposed Selling Price for sales period");
-        addInfoRow(sheet, ri++, "  Proposed SP (Non-S.) : Proposed Selling Price outside sales");
-        addInfoRow(sheet, ri++, "  Enabled              : true / false  (default: true)");
-        addInfoRow(sheet, ri++, "  Marketplace IDs      : Comma-separated marketplace IDs e.g. 1,2,3");
+        addInfoRow(sheet, ri++, "  Product Name*              : Full product name (max 255 chars)");
+        addInfoRow(sheet, ri++, "  Product Number             : Optional product number");
+        addInfoRow(sheet, ri++, "  Style Code                 : Optional style code");
+        addInfoRow(sheet, ri++, "  SKU Code*                  : Unique stock-keeping unit code");
+        addInfoRow(sheet, ri++, "  Brand Name*                : Exact brand name (see 'Valid Options (Reference)' sheet)");
+        addInfoRow(sheet, ri++, "  Category Name*             : Exact category name (see 'Valid Options (Reference)' sheet)");
+        addInfoRow(sheet, ri++, "  MRP                        : Maximum Retail Price (>= 0)");
+        addInfoRow(sheet, ri++, "  Product Cost               : Cost price (>= 0)");
+        addInfoRow(sheet, ri++, "  Proposed SP (Sales)        : Proposed Selling Price for sales period");
+        addInfoRow(sheet, ri++, "  Proposed SP (Non-S.)       : Proposed Selling Price outside sales");
+        addInfoRow(sheet, ri++, "  Enabled                    : true / false  (default: true)");
+        addInfoRow(sheet, ri++, "  Marketplace Names          : Comma-separated marketplace names e.g. Amazon,Ebay");
+        addInfoRow(sheet, ri++, "                               (see 'Valid Options (Reference)' sheet for allowed names)");
+        addInfoRow(sheet, ri++, "");
+        addInfoRow(sheet, ri++, "TIP: Open the 'Valid Options (Reference)' sheet to see all allowed Brand,");
+        addInfoRow(sheet, ri++, "     Category, and Marketplace names. Copy-paste to avoid typos.");
 
         if (!cfDefs.isEmpty()) {
             addInfoRow(sheet, ri++, "");
@@ -213,7 +232,41 @@ public class ProductImportService {
             }
         }
 
-        sheet.setColumnWidth(0, 20000);
+        sheet.setColumnWidth(0, 25000);
+    }
+
+    private void buildValidOptionsSheet(Sheet sheet,
+                                         List<Map<String, Object>> brands,
+                                         List<Map<String, Object>> categories,
+                                         List<Map<String, Object>> marketplaces) {
+        int ri = 0;
+        // Header row
+        Row headerRow = sheet.createRow(ri++);
+        headerRow.createCell(0).setCellValue("Valid Brand Names");
+        headerRow.createCell(1).setCellValue("Valid Category Names");
+        headerRow.createCell(2).setCellValue("Valid Marketplace Names");
+
+        // Data rows
+        int maxRows = Math.max(brands.size(), Math.max(categories.size(), marketplaces.size()));
+        for (int i = 0; i < maxRows; i++) {
+            Row row = sheet.createRow(ri++);
+            if (i < brands.size()) {
+                Object name = brands.get(i).get("name");
+                row.createCell(0).setCellValue(name != null ? name.toString() : "");
+            }
+            if (i < categories.size()) {
+                Object name = categories.get(i).get("name");
+                row.createCell(1).setCellValue(name != null ? name.toString() : "");
+            }
+            if (i < marketplaces.size()) {
+                Object name = marketplaces.get(i).get("name");
+                row.createCell(2).setCellValue(name != null ? name.toString() : "");
+            }
+        }
+
+        sheet.setColumnWidth(0, 8000);
+        sheet.setColumnWidth(1, 8000);
+        sheet.setColumnWidth(2, 8000);
     }
 
     private void addInfoRow(Sheet sheet, int rowIndex, String text) {
@@ -254,12 +307,38 @@ public class ProductImportService {
 
         log.info("Parsed {} rows, {} parse errors", rows.size(), allErrors.size());
 
-        // ── 4. Row-level validation ────────────────────────────────────────────
+        // ── 4. Fetch lookup data for name → ID resolution ─────────────────────
+        Map<String, Long> brandNameToId       = buildNameIdMap(adminServiceClient.getBrandsForImport(authToken));
+        Map<String, Long> categoryNameToId    = buildNameIdMap(adminServiceClient.getCategoriesForImport(authToken));
+        Map<String, Long> marketplaceNameToId = buildNameIdMap(adminServiceClient.getMarketplacesForImport(authToken));
+
+        log.info("Loaded {} brands, {} categories, {} marketplaces for import name resolution",
+                brandNameToId.size(), categoryNameToId.size(), marketplaceNameToId.size());
+        if (!marketplaceNameToId.isEmpty()) {
+            log.debug("Available marketplace names: {}", marketplaceNameToId.keySet());
+        } else {
+            log.warn("WARNING: No marketplaces loaded from admin-service. Products will not be mapped to marketplaces.");
+        }
+
+        // ── 5. Resolve names → IDs. Track rows with resolution errors ──────────
+        Set<Integer> resolutionErrorRows = new HashSet<>();
+        for (ImportRowDTO row : rows) {
+            int errorsBefore = allErrors.size();
+            resolveNames(row, brandNameToId, categoryNameToId, marketplaceNameToId, allErrors);
+            if (allErrors.size() > errorsBefore) {
+                resolutionErrorRows.add(row.getRowNumber());
+            }
+        }
+
+        // ── 6. Row-level validation ────────────────────────────────────────────
         ProductImportValidator validator = new ProductImportValidator(productRepository, clientId);
         Set<String>            seenSkus  = new HashSet<>();
         List<ImportRowDTO>     validRows = new ArrayList<>();
 
         for (ImportRowDTO row : rows) {
+            // Skip rows that already failed name resolution (errors already recorded)
+            if (resolutionErrorRows.contains(row.getRowNumber())) continue;
+
             List<ImportRowError> rowErrors = validator.validate(row, seenSkus);
             if (rowErrors.isEmpty()) {
                 seenSkus.add(normalise(row.getSkuCode()));
@@ -272,7 +351,7 @@ public class ProductImportService {
         log.info("{} valid rows after validation, {} rows failed", validRows.size(),
                 rows.size() - validRows.size());
 
-        // ── 5. Batch insert ────────────────────────────────────────────────────
+        // ── 8. Batch insert ────────────────────────────────────────────────────
         int successCount = 0;
         List<List<ImportRowDTO>> batches = partition(validRows, BATCH_SIZE);
 
@@ -304,19 +383,30 @@ public class ProductImportService {
                              String authToken,
                              List<ImportRowError> allErrors) {
 
+        log.debug("Saving batch of {} rows", batch.size());
+
         // Build Product entities
         List<Product> entities = new ArrayList<>();
         for (ImportRowDTO row : batch) {
+            log.debug("Row {}: Building product entity: name={}, sku={}, brandId={}, categoryId={}, marketplaceIds={}",
+                    row.getRowNumber(), row.getName(), row.getSkuCode(), row.getBrandId(), row.getCategoryId(), row.getMarketplaceIds());
             entities.add(buildProduct(row, clientId, userId));
         }
 
         // Batch-insert all products in this chunk
         List<Product> saved = productRepository.saveAll(entities);
+        log.info("Batch: Saved {} products to database", saved.size());
 
         int savedCount = 0;
         for (int i = 0; i < batch.size(); i++) {
             ImportRowDTO row     = batch.get(i);
             Product      product = saved.get(i);
+            
+            log.debug("Row {}: Processing post-save for product {}: customFields={}, marketplaces={}",
+                    row.getRowNumber(), product.getId(), 
+                    row.getCustomFieldValues() != null ? row.getCustomFieldValues().size() : 0,
+                    row.getMarketplaceIds() != null ? row.getMarketplaceIds().size() : 0);
+            
             savedCount++;
 
             // Save custom field values
@@ -325,6 +415,7 @@ public class ProductImportService {
             // Save marketplace mappings
             saveMarketplaceMappings(row, product, clientId, userId, row.getRowNumber(), allErrors);
         }
+        log.info("Batch: Completed processing {} rows", savedCount);
         return savedCount;
     }
 
@@ -359,7 +450,13 @@ public class ProductImportService {
     private void saveMarketplaceMappings(ImportRowDTO row, Product product,
                                           Integer clientId, Long userId,
                                           int rowNum, List<ImportRowError> allErrors) {
-        if (row.getMarketplaceIds() == null || row.getMarketplaceIds().isEmpty()) return;
+        if (row.getMarketplaceIds() == null || row.getMarketplaceIds().isEmpty()) {
+            log.trace("Row {}: No marketplace IDs to save for product {}", rowNum, product.getName());
+            return;
+        }
+
+        log.debug("Row {}: Saving {} marketplace mappings for product {} (ID: {})", 
+                rowNum, row.getMarketplaceIds().size(), product.getName(), product.getId());
 
         for (Long marketplaceId : row.getMarketplaceIds()) {
             try {
@@ -373,13 +470,16 @@ public class ProductImportService {
                         userId
                 );
                 mappingRepository.save(mapping);
+                log.debug("Row {}: Saved marketplace mapping: product={}, marketplace={}", 
+                        rowNum, product.getId(), marketplaceId);
             } catch (Exception e) {
-                log.warn("Row {}: Failed to save marketplace mapping {}: {}",
-                        rowNum, marketplaceId, e.getMessage());
+                log.error("Row {}: Failed to save marketplace mapping marketplaceId={}: {}",
+                        rowNum, marketplaceId, e.getMessage(), e);
                 allErrors.add(new ImportRowError(rowNum, "Marketplace IDs",
                         "Marketplace mapping " + marketplaceId + " could not be saved: " + e.getMessage()));
             }
         }
+        log.info("Row {}: Completed marketplace mapping saves for product {}", rowNum, product.getName());
     }
 
     // ── Entity builder ────────────────────────────────────────────────────────
@@ -423,6 +523,81 @@ public class ProductImportService {
             }
         }
         return map;
+    }
+
+    /**
+     * Build a case-insensitive name → ID map from a list of entity maps
+     * (each map must have "id" and "name" keys as returned by admin-service).
+     */
+    private Map<String, Long> buildNameIdMap(List<Map<String, Object>> entities) {
+        Map<String, Long> map = new HashMap<>();
+        for (Map<String, Object> entity : entities) {
+            Object nameObj = entity.get("name");
+            Object idObj   = entity.get("id");
+            if (nameObj != null && idObj != null) {
+                map.put(nameObj.toString().trim().toLowerCase(), ((Number) idObj).longValue());
+            }
+        }
+        return map;
+    }
+
+    /**
+     * Resolve brandName, categoryName, and marketplaceNames in a parsed row to their
+     * corresponding IDs. Unresolvable names are recorded as row errors.
+     */
+    private void resolveNames(ImportRowDTO row,
+                               Map<String, Long> brandNameToId,
+                               Map<String, Long> categoryNameToId,
+                               Map<String, Long> marketplaceNameToId,
+                               List<ImportRowError> allErrors) {
+        int rowNum = row.getRowNumber();
+
+        // Brand Name → Brand ID
+        String brandName = row.getBrandName();
+        if (brandName != null && !brandName.isBlank()) {
+            Long brandId = brandNameToId.get(brandName.trim().toLowerCase());
+            if (brandId != null) {
+                row.setBrandId(brandId);
+                log.debug("Row {}: Resolved brand '{}' to ID {}", rowNum, brandName, brandId);
+            } else {
+                log.warn("Row {}: Brand not found: '{}'", rowNum, brandName);
+                allErrors.add(new ImportRowError(rowNum, "Brand Name",
+                        "Brand not found: '" + brandName.trim() + "'. Check the Valid Options sheet for allowed names."));
+            }
+        }
+
+        // Category Name → Category ID
+        String categoryName = row.getCategoryName();
+        if (categoryName != null && !categoryName.isBlank()) {
+            Long categoryId = categoryNameToId.get(categoryName.trim().toLowerCase());
+            if (categoryId != null) {
+                row.setCategoryId(categoryId);
+                log.debug("Row {}: Resolved category '{}' to ID {}", rowNum, categoryName, categoryId);
+            } else {
+                log.warn("Row {}: Category not found: '{}'", rowNum, categoryName);
+                allErrors.add(new ImportRowError(rowNum, "Category Name",
+                        "Category not found: '" + categoryName.trim() + "'. Check the Valid Options sheet for allowed names."));
+            }
+        }
+
+        // Marketplace Names → Marketplace IDs
+        if (row.getMarketplaceNames() != null && !row.getMarketplaceNames().isEmpty()) {
+            log.debug("Row {}: Resolving {} marketplace names to IDs", rowNum, row.getMarketplaceNames().size());
+            List<Long> resolvedIds = new ArrayList<>();
+            for (String mpName : row.getMarketplaceNames()) {
+                Long mpId = marketplaceNameToId.get(mpName.trim().toLowerCase());
+                if (mpId != null) {
+                    resolvedIds.add(mpId);
+                    log.debug("Row {}: Resolved marketplace '{}' to ID {}", rowNum, mpName, mpId);
+                } else {
+                    log.warn("Row {}: Marketplace not found: '{}' (available keys: {})", rowNum, mpName, marketplaceNameToId.keySet());
+                    allErrors.add(new ImportRowError(rowNum, "Marketplace Names",
+                            "Marketplace not found: '" + mpName.trim() + "'. Check the Valid Options sheet for allowed names."));
+                }
+            }
+            row.setMarketplaceIds(resolvedIds);
+            log.debug("Row {}: Resolved {} marketplace names to {} IDs", rowNum, row.getMarketplaceNames().size(), resolvedIds.size());
+        }
     }
 
     private <T> List<List<T>> partition(List<T> list, int size) {

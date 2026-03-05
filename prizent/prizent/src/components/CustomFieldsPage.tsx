@@ -52,13 +52,8 @@ const CustomFieldsPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching custom fields...');
       const fields = await getCustomFields();
-      console.log('Custom fields fetched:', fields);
       setExistingFields(fields);
-      if (fields.length === 0) {
-        console.log('No custom fields found');
-      }
     } catch (err: any) {
       console.error('Error fetching custom fields:', err);
       console.error('Error response:', err.response?.data);

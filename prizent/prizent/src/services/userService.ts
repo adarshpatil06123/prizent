@@ -43,14 +43,9 @@ export interface UsersResponse {
 }
 
 const userService = {
-  // Get all users for a client
   getAllUsers: async (clientId: number): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE GET ALL USERS ===');
-    console.log('Client ID:', clientId);
-    
     try {
       const response = await apiClient.get(`admin/users?clientId=${clientId}`);
-      console.log('✓ Users retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching users:', error);
@@ -60,12 +55,8 @@ const userService = {
 
   // Get user by ID
   getUserById: async (userId: number): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE GET USER BY ID ===');
-    console.log('User ID:', userId);
-    
     try {
       const response = await apiClient.get(`admin/users/${userId}`);
-      console.log('✓ User retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching user:', error);
@@ -75,13 +66,8 @@ const userService = {
 
   // Create new user
   createUser: async (request: CreateUserRequest, clientId: number): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE CREATE USER ===');
-    console.log('Request:', request);
-    console.log('Client ID:', clientId);
-    
     try {
       const response = await apiClient.post(`admin/users?clientId=${clientId}`, request);
-      console.log('✓ User created:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -91,13 +77,8 @@ const userService = {
 
   // Update user
   updateUser: async (userId: number, request: UpdateUserRequest): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE UPDATE USER ===');
-    console.log('User ID:', userId);
-    console.log('Request:', request);
-    
     try {
       const response = await apiClient.put(`admin/users/${userId}`, request);
-      console.log('✓ User updated:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error updating user:', error);
@@ -107,12 +88,8 @@ const userService = {
 
   // Enable user
   enableUser: async (userId: number): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE ENABLE USER ===');
-    console.log('User ID:', userId);
-    
     try {
       const response = await apiClient.patch(`admin/users/${userId}/enable`);
-      console.log('✓ User enabled:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error enabling user:', error);
@@ -122,12 +99,8 @@ const userService = {
 
   // Disable user
   disableUser: async (userId: number): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE DISABLE USER ===');
-    console.log('User ID:', userId);
-    
     try {
       const response = await apiClient.patch(`admin/users/${userId}/disable`);
-      console.log('✓ User disabled:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error disabling user:', error);
@@ -137,12 +110,8 @@ const userService = {
 
   // Delete user
   deleteUser: async (userId: number): Promise<UsersResponse> => {
-    console.log('=== USER SERVICE DELETE USER ===');
-    console.log('User ID:', userId);
-    
     try {
       const response = await apiClient.delete(`admin/users/${userId}`);
-      console.log('✓ User deleted:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error deleting user:', error);

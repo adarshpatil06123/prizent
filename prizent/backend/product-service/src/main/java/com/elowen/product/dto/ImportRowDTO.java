@@ -21,6 +21,14 @@ public class ImportRowDTO {
     private String productNumber;
     private String styleCode;
     private String skuCode;
+
+    /** Name-based fields (from the new name-based import template) */
+    private String brandName;
+    private String categoryName;
+    /** Comma-separated marketplace names → resolved to IDs during import */
+    private List<String> marketplaceNames = new ArrayList<>();
+
+    /** Resolved numeric IDs – populated during name-lookup phase, not from Excel */
     private Long brandId;
     private Long categoryId;
     private BigDecimal mrp            = BigDecimal.ZERO;
@@ -63,6 +71,15 @@ public class ImportRowDTO {
 
     public String getSkuCode() { return skuCode; }
     public void setSkuCode(String skuCode) { this.skuCode = skuCode; }
+
+    public String getBrandName() { return brandName; }
+    public void setBrandName(String brandName) { this.brandName = brandName; }
+
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
+
+    public List<String> getMarketplaceNames() { return marketplaceNames; }
+    public void setMarketplaceNames(List<String> marketplaceNames) { this.marketplaceNames = marketplaceNames; }
 
     public Long getBrandId() { return brandId; }
     public void setBrandId(Long brandId) { this.brandId = brandId; }

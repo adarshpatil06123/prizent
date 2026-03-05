@@ -173,12 +173,8 @@ export const getSlabsForCategory = (costs: MarketplaceCost[], category: 'COMMISS
 const marketplaceService = {
   // Get all marketplaces with pagination
   getAllMarketplaces: async (page: number = 0, size: number = 10): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE GET ALL ===');
-    console.log('Page:', page, 'Size:', size);
-    
     try {
       const response = await apiClient.get(`admin/marketplaces?page=${page}&size=${size}`);
-      console.log('✓ Marketplaces retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching marketplaces:', error);
@@ -188,12 +184,8 @@ const marketplaceService = {
 
   // Get marketplace by ID
   getMarketplaceById: async (id: number): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE GET BY ID ===');
-    console.log('Marketplace ID:', id);
-    
     try {
       const response = await apiClient.get(`admin/marketplaces/${id}`);
-      console.log('✓ Marketplace retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching marketplace:', error);
@@ -203,12 +195,8 @@ const marketplaceService = {
 
   // Create new marketplace
   createMarketplace: async (request: CreateMarketplaceRequest): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE CREATE ===');
-    console.log('Request:', request);
-    
     try {
       const response = await apiClient.post('admin/marketplaces', request);
-      console.log('✓ Marketplace created:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error creating marketplace:', error);
@@ -218,13 +206,8 @@ const marketplaceService = {
 
   // Update marketplace
   updateMarketplace: async (id: number, request: UpdateMarketplaceRequest): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE UPDATE ===');
-    console.log('Marketplace ID:', id);
-    console.log('Request:', request);
-    
     try {
       const response = await apiClient.put(`admin/marketplaces/${id}`, request);
-      console.log('✓ Marketplace updated:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error updating marketplace:', error);
@@ -234,12 +217,8 @@ const marketplaceService = {
 
   // Enable/Disable marketplace
   toggleMarketplace: async (id: number, enabled: boolean): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE TOGGLE ===');
-    console.log('Marketplace ID:', id, 'Enabled:', enabled);
-    
     try {
       const response = await apiClient.patch(`admin/marketplaces/${id}/enable?enabled=${enabled}`);
-      console.log('✓ Marketplace toggled:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error toggling marketplace:', error);
@@ -249,12 +228,8 @@ const marketplaceService = {
 
   // Get marketplace costs
   getMarketplaceCosts: async (id: number): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE GET COSTS ===');
-    console.log('Marketplace ID:', id);
-    
     try {
       const response = await apiClient.get(`admin/marketplaces/${id}/costs`);
-      console.log('✓ Marketplace costs retrieved:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching marketplace costs:', error);
@@ -264,12 +239,8 @@ const marketplaceService = {
 
   // Delete marketplace
   deleteMarketplace: async (id: number): Promise<MarketplaceResponse> => {
-    console.log('=== MARKETPLACE SERVICE DELETE ===');
-    console.log('Marketplace ID:', id);
-    
     try {
       const response = await apiClient.delete(`admin/marketplaces/${id}`);
-      console.log('✓ Marketplace deleted:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Error deleting marketplace:', error);

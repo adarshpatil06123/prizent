@@ -24,7 +24,6 @@ const MarketplacesListPage: React.FC = () => {
         const fields = await getCustomFields('m'); // 'm' for marketplaces
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded marketplace custom fields:', enabledFields);
       } catch (err) {
         console.error('Failed to fetch custom fields:', err);
       }

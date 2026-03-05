@@ -20,52 +20,21 @@ export interface LoginResponse {
 const authService = {
   // Login
   login: async (username: string, password: string): Promise<LoginResponse> => {
-    console.log('=== AUTH SERVICE LOGIN START ===');
-    console.log('authService.login called with username:', username);
-    if (typeof password === 'string') {
-      console.log('Password length:', password.length);
-    } else {
-      console.log('Password is not a string:', password);
-    }
-    console.log('Request URL will be: /api/auth/login');
-
-    const requestBody = {
-      username,
-      password
-    };
-    console.log('Request body:', requestBody);
+    const requestBody = { username, password };
 
     try {
-      console.log('Making POST request to auth/login...');
       const response = await apiClient.post('auth/login', requestBody);
-
-      console.log('✓ Response received!');
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-      console.log('Response data:', response.data);
-      console.log('Response data type:', typeof response.data);
 
       // Store token in localStorage if login successful
       if (response.data.success && response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        console.log('✓ Token and user stored in localStorage');
       }
 
-      console.log('=== AUTH SERVICE LOGIN END (SUCCESS) ===');
       return response.data;
     } catch (error: any) {
-      console.error('=== AUTH SERVICE LOGIN ERROR ===');
-      console.error('Error object:', error);
-      console.error('Error message:', error.message);
-      console.error('Error response status:', error.response?.status);
-      console.error('Error response data:', error.response?.data);
-      console.error('Error response headers:', error.response?.headers);
-      console.error('Error request:', error.request);
-      console.error('Error config:', error.config);
-      console.error('=== AUTH SERVICE LOGIN END (ERROR) ===');
+      console.error('Login error:', error.response?.data || error.message);
 
-      // Return a proper error response instead of throwing
       const errorMessage = error.response?.data?.message || error.message || 'Network error occurred';
       return {
         success: false,
@@ -76,29 +45,19 @@ const authService = {
 
   // Logout
   logout: async () => {
-    console.log('=== AUTH SERVICE LOGOUT START ===');
     try {
       const token = localStorage.getItem('token');
-      console.log('Token exists:', !!token);
       if (token) {
-        console.log('Token preview:', token.substring(0, 20) + '...');
-        console.log('Making POST request to auth/logout...');
         // Call backend logout endpoint - Authorization header will be added by interceptor
-        const response = await apiClient.post('auth/logout', {});
-        console.log('✓ Backend logout successful');
-        console.log('Response:', response.data);
-      } else {
-        console.log('No token found in localStorage');
+        await apiClient.post('auth/logout', {});
       }
     } catch (error) {
-      console.error('❌ Error calling backend logout:', error);
+      console.error('Error calling backend logout:', error);
       // Continue with local logout even if backend call fails
     } finally {
       // Always clear local storage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      console.log('✓ Local storage cleared');
-      console.log('=== AUTH SERVICE LOGOUT END ===');
     }
   },
 

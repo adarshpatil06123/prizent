@@ -89,7 +89,6 @@ const EditProductPage: React.FC = () => {
         const fields = await getCustomFields('p');
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded product custom fields:', enabledFields);
       } catch (error) {
         console.error('Failed to fetch custom fields:', error);
       }
@@ -128,7 +127,6 @@ const EditProductPage: React.FC = () => {
         });
         setEnabled(product.enabled || false);
         setOriginalEnabled(product.enabled || false);
-        console.log('Loaded product brandId:', product.brandId);
 
         // Derive parent category from loaded categoryId
         if (product.categoryId) {
@@ -146,7 +144,6 @@ const EditProductPage: React.FC = () => {
             valuesMap[fv.customFieldId] = fv.value;
           });
           setCustomFieldValues(valuesMap);
-          console.log('Loaded custom field values:', valuesMap);
         } catch (error) {
           console.error('Failed to load custom field values:', error);
         }
@@ -197,17 +194,13 @@ const EditProductPage: React.FC = () => {
       return;
     }
 
-    console.log('Updating product with data:', formData);
-    
     try {
       setLoading(true);
       const response = await productService.updateProduct(Number(id), formData);
-      console.log('Product updated response:', response);
 
       // If enabled status changed, update it separately
       if (enabled !== originalEnabled) {
         await productService.toggleProductStatus(Number(id), enabled);
-        console.log('Product enabled status updated to:', enabled);
       }
 
       // Save custom field values
@@ -225,7 +218,6 @@ const EditProductPage: React.FC = () => {
             }
           })
         );
-        console.log('Custom field values saved');
       } catch (fieldError) {
         console.error('Error saving custom field values:', fieldError);
         // Continue with success message even if custom fields fail
@@ -239,7 +231,6 @@ const EditProductPage: React.FC = () => {
           productMarketplaceName: productMarketplaceNames[mid] || ''
         }));
         await productService.saveMarketplaceMappings(Number(id), mappings);
-        console.log('Marketplace mappings saved');
       } catch (mappingError) {
         console.error('Error saving marketplace mappings:', mappingError);
       }

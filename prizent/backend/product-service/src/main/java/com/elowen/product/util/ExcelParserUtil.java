@@ -39,24 +39,24 @@ public class ExcelParserUtil {
 
     // ── Standard header constants ─────────────────────────────────────────────
 
-    public static final String COL_PRODUCT_NAME   = "Product Name*";
-    public static final String COL_PRODUCT_NUMBER  = "Product Number";
-    public static final String COL_STYLE_CODE      = "Style Code";
-    public static final String COL_SKU_CODE        = "SKU Code*";
-    public static final String COL_BRAND_ID        = "Brand ID*";
-    public static final String COL_CATEGORY_ID     = "Category ID*";
-    public static final String COL_MRP             = "MRP";
-    public static final String COL_PRODUCT_COST    = "Product Cost";
-    public static final String COL_PSP_SALES       = "Proposed Selling Price (Sales)";
-    public static final String COL_PSP_NON_SALES   = "Proposed Selling Price (Non-Sales)";
-    public static final String COL_ENABLED         = "Enabled (true/false)";
-    public static final String COL_MARKETPLACE_IDS = "Marketplace IDs (comma-sep)";
+    public static final String COL_PRODUCT_NAME      = "Product Name*";
+    public static final String COL_PRODUCT_NUMBER     = "Product Number";
+    public static final String COL_STYLE_CODE         = "Style Code";
+    public static final String COL_SKU_CODE           = "SKU Code*";
+    public static final String COL_BRAND_NAME         = "Brand Name*";
+    public static final String COL_CATEGORY_NAME      = "Category Name*";
+    public static final String COL_MRP                = "MRP";
+    public static final String COL_PRODUCT_COST       = "Product Cost";
+    public static final String COL_PSP_SALES          = "Proposed Selling Price (Sales)";
+    public static final String COL_PSP_NON_SALES      = "Proposed Selling Price (Non-Sales)";
+    public static final String COL_ENABLED            = "Enabled (true/false)";
+    public static final String COL_MARKETPLACE_NAMES  = "Marketplace Names (comma-sep)";
 
     public static final List<String> STANDARD_HEADERS = List.of(
             COL_PRODUCT_NAME, COL_PRODUCT_NUMBER, COL_STYLE_CODE,
-            COL_SKU_CODE, COL_BRAND_ID, COL_CATEGORY_ID,
+            COL_SKU_CODE, COL_BRAND_NAME, COL_CATEGORY_NAME,
             COL_MRP, COL_PRODUCT_COST, COL_PSP_SALES, COL_PSP_NON_SALES,
-            COL_ENABLED, COL_MARKETPLACE_IDS
+            COL_ENABLED, COL_MARKETPLACE_NAMES
     );
 
     public static final String CF_PREFIX = "CF:";
@@ -132,8 +132,8 @@ public class ExcelParserUtil {
 
         // Validate required standard headers are present
         Set<String> presentCols = new HashSet<>(colIndexToName.values());
-        for (String required : List.of(COL_PRODUCT_NAME, COL_SKU_CODE, COL_BRAND_ID,
-                COL_CATEGORY_ID)) {
+        for (String required : List.of(COL_PRODUCT_NAME, COL_SKU_CODE, COL_BRAND_NAME,
+                COL_CATEGORY_NAME)) {
             if (!presentCols.contains(required)) {
                 result.addError(new ImportRowError(1, "Header",
                         "Required column missing: '" + required + "'"));
@@ -225,13 +225,11 @@ public class ExcelParserUtil {
         dto.setStyleCode(cells.getOrDefault(COL_STYLE_CODE, "").trim());
         dto.setSkuCode(cells.getOrDefault(COL_SKU_CODE, "").trim());
 
-        // Brand ID
-        dto.setBrandId(parseLong(rowNum, COL_BRAND_ID,
-                cells.getOrDefault(COL_BRAND_ID, ""), parseErrors));
+        // Brand Name (resolved to ID later in ProductImportService)
+        dto.setBrandName(cells.getOrDefault(COL_BRAND_NAME, "").trim());
 
-        // Category ID
-        dto.setCategoryId(parseLong(rowNum, COL_CATEGORY_ID,
-                cells.getOrDefault(COL_CATEGORY_ID, ""), parseErrors));
+        // Category Name (resolved to ID later in ProductImportService)
+        dto.setCategoryName(cells.getOrDefault(COL_CATEGORY_NAME, "").trim());
 
         // Prices
         dto.setMrp(parseBigDecimal(rowNum, COL_MRP,
@@ -247,22 +245,17 @@ public class ExcelParserUtil {
         String enabledStr = cells.getOrDefault(COL_ENABLED, "true").trim().toLowerCase();
         dto.setEnabled(!"false".equals(enabledStr));
 
-        // Marketplace IDs (comma-separated)
-        String mpStr = cells.getOrDefault(COL_MARKETPLACE_IDS, "").trim();
+        // Marketplace Names (comma-separated) — resolved to IDs later
+        String mpStr = cells.getOrDefault(COL_MARKETPLACE_NAMES, "").trim();
         if (!mpStr.isEmpty()) {
-            List<Long> mpIds = new ArrayList<>();
+            List<String> mpNames = new ArrayList<>();
             for (String part : mpStr.split(",")) {
                 String trimmed = part.trim();
                 if (!trimmed.isEmpty()) {
-                    try {
-                        mpIds.add(Long.parseLong(trimmed));
-                    } catch (NumberFormatException e) {
-                        parseErrors.add(new ImportRowError(rowNum, COL_MARKETPLACE_IDS,
-                                "Invalid marketplace ID: '" + trimmed + "'"));
-                    }
+                    mpNames.add(trimmed);
                 }
             }
-            dto.setMarketplaceIds(mpIds);
+            dto.setMarketplaceNames(mpNames);
         }
 
         // Dynamic custom fields: any column starting with "CF:"

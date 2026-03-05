@@ -45,36 +45,18 @@ const AddMarketplacePage: React.FC = () => {
 
   // Update all existing slabs when value type toggle changes
   const handleProductCostValueTypeChange = (newType: 'P' | 'A') => {
-    console.log('=== COMMISSION VALUE TYPE CHANGE ===');
-    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
     setProductCostValueType(newType);
-    setProductCostSlabs(prev => {
-      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
-      console.log('Updated commission slabs:', updated);
-      return updated;
-    });
+    setProductCostSlabs(prev => prev.map(slab => ({ ...slab, valueType: newType })));
   };
 
   const handleMarketingValueTypeChange = (newType: 'P' | 'A') => {
-    console.log('=== MARKETING VALUE TYPE CHANGE ===');
-    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
     setMarketingValueType(newType);
-    setMarketingSlabs(prev => {
-      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
-      console.log('Updated marketing slabs:', updated);
-      return updated;
-    });
+    setMarketingSlabs(prev => prev.map(slab => ({ ...slab, valueType: newType })));
   };
 
   const handleShippingValueTypeChange = (newType: 'P' | 'A') => {
-    console.log('=== SHIPPING VALUE TYPE CHANGE ===');
-    console.log('New type:', newType, newType === 'P' ? '(Percentage)' : '(Amount)');
     setShippingValueType(newType);
-    setShippingSlabs(prev => {
-      const updated = prev.map(slab => ({ ...slab, valueType: newType }));
-      console.log('Updated shipping slabs:', updated);
-      return updated;
-    });
+    setShippingSlabs(prev => prev.map(slab => ({ ...slab, valueType: newType })));
   };
 
   // Validate numeric input - only allow numbers and decimal point
@@ -102,7 +84,6 @@ const AddMarketplacePage: React.FC = () => {
         const fields = await getCustomFields('m');
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
-        console.log('Loaded marketplace custom fields:', enabledFields);
       } catch (error) {
         console.error('Failed to fetch custom fields:', error);
       }
@@ -280,15 +261,9 @@ const AddMarketplacePage: React.FC = () => {
       // Prepare cost data
       const costs: CreateMarketplaceCostRequest[] = [];
       
-      console.log('=== PREPARING COSTS FOR SAVE ===');
-      console.log('Current productCostSlabs:', productCostSlabs);
-      console.log('Current marketingSlabs:', marketingSlabs);
-      console.log('Current shippingSlabs:', shippingSlabs);
-      
       // Add product cost slabs
       productCostSlabs.forEach((slab) => {
         if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
-          console.log('Adding COMMISSION cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'COMMISSION',
             costValueType: slab.valueType,
@@ -301,7 +276,6 @@ const AddMarketplacePage: React.FC = () => {
       // Add marketing slabs
       marketingSlabs.forEach((slab) => {
         if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
-          console.log('Adding MARKETING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'MARKETING',
             costValueType: slab.valueType,
@@ -314,7 +288,6 @@ const AddMarketplacePage: React.FC = () => {
       // Add shipping slabs
       shippingSlabs.forEach((slab) => {
         if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
-          console.log('Adding SHIPPING cost:', { valueType: slab.valueType, value: slab.value, range: `${slab.from}-${slab.to}` });
           costs.push({
             costCategory: 'SHIPPING',
             costValueType: slab.valueType,
@@ -331,12 +304,9 @@ const AddMarketplacePage: React.FC = () => {
         costs
       };
       
-      console.log('Creating marketplace with data:', request);
       const response = await marketplaceService.createMarketplace(request);
       
       if (response.success) {
-        console.log('Ô£ô Marketplace created successfully!');
-
         // Save custom field values
         if (Object.keys(customFieldValues).length > 0 && response.marketplace) {
           try {
@@ -353,10 +323,8 @@ const AddMarketplacePage: React.FC = () => {
                 }
               })
             );
-            console.log('Custom field values saved');
           } catch (fieldError) {
             console.error('Error saving custom field values:', fieldError);
-            // Continue with navigation even if custom fields fail
           }
         }
 
@@ -373,7 +341,6 @@ const AddMarketplacePage: React.FC = () => {
                 return { brandId: Number(m.brandId), costs };
               });
             await marketplaceService.saveBrandMappings(response.marketplace.id, mappingRequests);
-            console.log('Brand mappings saved');
           } catch (brandError: any) {
             const msg = brandError?.response?.data?.message || brandError?.message || 'Failed to save brand mappings';
             console.error('Error saving brand mappings:', msg, brandError);
