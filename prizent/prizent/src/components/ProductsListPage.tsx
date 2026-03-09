@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './ProductsListPage.css';
 import productThumb from '../assets/brand_logo.png';
 import productService, { Product, PagedResponse } from '../services/productService';
-import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
+import { getCustomFields, getCustomFieldValues, saveCustomFieldValue, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 import categoryService, { Category } from '../services/categoryService';
 import brandService, { Brand } from '../services/brandService';
 import marketplaceService, { Marketplace } from '../services/marketplaceService';
@@ -43,6 +43,7 @@ const ProductsListPage: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
+  const [formCustomFieldValues, setFormCustomFieldValues] = useState<Map<number, string>>(new Map());
 
   // Fetch categories on mount
   useEffect(() => {
@@ -130,6 +131,7 @@ const ProductsListPage: React.FC = () => {
     setProductPriceSales('');
     setProductPriceNonSales('');
     setProductEnabled(true);
+    setFormCustomFieldValues(new Map());
     setShowFormSection(true);
   };
 
@@ -162,6 +164,7 @@ const ProductsListPage: React.FC = () => {
     setProductPriceNonSales(product.proposedSellingPriceNonSales != null ? String(product.proposedSellingPriceNonSales) : '');
     setProductEnabled(product.enabled);
     setMarketplaceId(0);
+    
     // Load existing marketplace mapping for this product
     try {
       const mappings = await productService.getMarketplaceMappings(product.id);
@@ -171,6 +174,20 @@ const ProductsListPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to load marketplace mappings:', err);
     }
+    
+    // Load existing custom field values for this product
+    try {
+      const fieldValues = await getCustomFieldValues('p', product.id);
+      const valueMap = new Map<number, string>();
+      fieldValues.forEach((fv) => {
+        valueMap.set(fv.customFieldId, fv.value);
+      });
+      setFormCustomFieldValues(valueMap);
+    } catch (err) {
+      console.error('Failed to load custom field values:', err);
+      setFormCustomFieldValues(new Map());
+    }
+    
     setShowFormSection(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -191,6 +208,7 @@ const ProductsListPage: React.FC = () => {
     setProductPriceSales('');
     setProductPriceNonSales('');
     setProductEnabled(true);
+    setFormCustomFieldValues(new Map());
   };
 
   const handleSaveForm = async () => {
@@ -234,6 +252,19 @@ const ProductsListPage: React.FC = () => {
             productMarketplaceName: ''
           }]);
         }
+        
+        // Save custom field values
+        for (const [fieldId, value] of Array.from(formCustomFieldValues.entries())) {
+          if (value) {
+            await saveCustomFieldValue({
+              customFieldId: fieldId,
+              module: 'p',
+              moduleId: editingProduct.id,
+              value: value
+            });
+          }
+        }
+        
         alert('Product updated successfully!');
       } else {
         const created = await productService.createProduct(productData);
@@ -245,6 +276,21 @@ const ProductsListPage: React.FC = () => {
             productMarketplaceName: ''
           }]);
         }
+        
+        // Save custom field values
+        if (created?.id) {
+          for (const [fieldId, value] of Array.from(formCustomFieldValues.entries())) {
+            if (value) {
+              await saveCustomFieldValue({
+                customFieldId: fieldId,
+                module: 'p',
+                moduleId: created.id,
+                value: value
+              });
+            }
+          }
+        }
+        
         alert('Product created successfully!');
       }
       
@@ -455,7 +501,9 @@ const ProductsListPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="form-row categories-row">
                 {(() => {
                   const levels: React.ReactElement[] = [];
                   const levelsToRender = categoryPath.length + 1;
@@ -495,7 +543,9 @@ const ProductsListPage: React.FC = () => {
                   }
                   return levels;
                 })()}
+              </div>
 
+              <div className="form-row">
                 <div className="form-field">
                   <label className="field-label">Marketplace</label>
                   <select
@@ -564,6 +614,75 @@ const ProductsListPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Custom Fields Section */}
+              {customFields.length > 0 && (
+                <div className="form-row">
+                  {customFields.map((field) => (
+                    <div key={field.id} className="form-field">
+                      <label className="field-label">
+                        {field.name}
+                        {field.required && <span style={{ color: 'red' }}> *</span>}
+                      </label>
+                      {field.fieldType === 'dropdown' && field.dropdownOptions ? (
+                        <select
+                          className="form-input"
+                          value={formCustomFieldValues.get(field.id) || ''}
+                          onChange={(e) => {
+                            const newMap = new Map(formCustomFieldValues);
+                            newMap.set(field.id, e.target.value);
+                            setFormCustomFieldValues(newMap);
+                          }}
+                          required={field.required}
+                        >
+                          <option value="">Select {field.name}</option>
+                          {field.dropdownOptions.split(',').map((opt, idx) => (
+                            <option key={idx} value={opt.trim()}>{opt.trim()}</option>
+                          ))}
+                        </select>
+                      ) : field.fieldType === 'numeric' ? (
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={formCustomFieldValues.get(field.id) || ''}
+                          onChange={(e) => {
+                            const newMap = new Map(formCustomFieldValues);
+                            newMap.set(field.id, e.target.value);
+                            setFormCustomFieldValues(newMap);
+                          }}
+                          placeholder={`Enter ${field.name}`}
+                          required={field.required}
+                        />
+                      ) : field.fieldType === 'date' ? (
+                        <input
+                          type="date"
+                          className="form-input"
+                          value={formCustomFieldValues.get(field.id) || ''}
+                          onChange={(e) => {
+                            const newMap = new Map(formCustomFieldValues);
+                            newMap.set(field.id, e.target.value);
+                            setFormCustomFieldValues(newMap);
+                          }}
+                          required={field.required}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={formCustomFieldValues.get(field.id) || ''}
+                          onChange={(e) => {
+                            const newMap = new Map(formCustomFieldValues);
+                            newMap.set(field.id, e.target.value);
+                            setFormCustomFieldValues(newMap);
+                          }}
+                          placeholder={`Enter ${field.name}`}
+                          required={field.required}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="activate-section">
