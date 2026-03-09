@@ -69,9 +69,13 @@
   transition: all 0.2s;
 }
 
-.download-sample-btn:hover {
+.download-sample-btn:hover:not(:disabled) {
   background-color: #000000;
   color: #FFFFFF;
+}
+.download-sample-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .content-separator {
@@ -273,9 +277,61 @@
   border: 1px solid #A5D6A7;
 }
 
+/* Error Table */
+.error-table-wrap {
+  margin-top: 20px;
+}
+
+.error-table-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1E1E1E;
+  margin: 0 0 10px 0;
+}
+
+.error-table-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+}
+
+.error-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.error-table thead tr {
+  background: #F5F5F5;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.error-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.error-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #F0F0F0;
+  color: #333;
+  vertical-align: top;
+}
+
+.error-table tbody tr:last-child td { border-bottom: none; }
+.error-table tbody tr:hover { background: #FFFDE7; }
+
+.err-row   { font-weight: 600; color: #C62828; white-space: nowrap; }
+.err-field { color: #555; white-space: nowrap; }
+
 /* Upload Actions */
-.upload-actions {
-  display: flex;
+.upload-actions {  display: flex;
   gap: 12px;
   margin-top: 24px;
   justify-content: flex-end;

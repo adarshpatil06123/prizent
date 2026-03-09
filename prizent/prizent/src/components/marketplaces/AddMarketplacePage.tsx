@@ -483,7 +483,7 @@ const AddMarketplacePage: React.FC = () => {
             <div key={mapping.localId} className="brand-mapping-card">
               <div className="brand-mapping-card-header">
                 <span className="brand-label">BRAND</span>
-                <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">Ô£ò</button>
+                <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">✕</button>
               </div>
 
               <div className="form-field">
@@ -525,7 +525,7 @@ const AddMarketplacePage: React.FC = () => {
                       <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'to', e.target.value)} />
                       <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'value', e.target.value)} />
                       {mapping.commissionSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>Ô£ò</button>
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
                       )}
                     </div>
                   ))}
@@ -556,7 +556,7 @@ const AddMarketplacePage: React.FC = () => {
                       <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'to', e.target.value)} />
                       <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'value', e.target.value)} />
                       {mapping.marketingSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>Ô£ò</button>
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
                       )}
                     </div>
                   ))}
@@ -587,7 +587,7 @@ const AddMarketplacePage: React.FC = () => {
                       <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'to', e.target.value)} />
                       <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'value', e.target.value)} />
                       {mapping.shippingSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>Ô£ò</button>
+                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
                       )}
                     </div>
                   ))}

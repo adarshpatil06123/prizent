@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCategories } from '../contexts/CategoryContext';
-import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
+import { getCustomFields, getCustomFieldValues, saveCustomFieldValue, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 import './CategoriesListPage.css';
 
 interface CategoryDisplay {
@@ -33,6 +33,7 @@ const CategoriesListPage: React.FC = () => {
   const [categoryName, setCategoryName] = useState('');
   const [parentCategoryId, setParentCategoryId] = useState<number | null>(null);
   const [categoryEnabled, setCategoryEnabled] = useState(true);
+  const [formCustomFieldValues, setFormCustomFieldValues] = useState<Record<number, string>>({});
 
   
   useEffect(() => {
@@ -122,16 +123,22 @@ const CategoriesListPage: React.FC = () => {
   };
 
   // Form handlers
-  const handleAddNewCategory = () => {
+  const handleAddNewCategory = async () => {
     setFormMode('add');
     setEditingCategoryId(null);
     setCategoryName('');
     setParentCategoryId(null);
     setCategoryEnabled(true);
+    setFormCustomFieldValues({});
+    // Re-fetch so newly added custom fields appear immediately
+    try {
+      const fields = await getCustomFields('c');
+      setCategoryCustomFields(fields);
+    } catch {}
     setShowFormSection(true);
   };
 
-  const handleEditCategory = (categoryId: number) => {
+  const handleEditCategory = async (categoryId: number) => {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
     
@@ -140,6 +147,18 @@ const CategoriesListPage: React.FC = () => {
     setCategoryName(category.name || '');
     setParentCategoryId(category.parentCategoryId || null);
     setCategoryEnabled(category.enabled || false);
+    setFormCustomFieldValues({});
+    // Re-fetch fields and load existing values
+    try {
+      const [fields, values] = await Promise.all([
+        getCustomFields('c'),
+        getCustomFieldValues('c', categoryId),
+      ]);
+      setCategoryCustomFields(fields);
+      const valMap: Record<number, string> = {};
+      values.forEach(v => { valMap[v.customFieldId] = v.value; });
+      setFormCustomFieldValues(valMap);
+    } catch {}
     setShowFormSection(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -150,6 +169,7 @@ const CategoriesListPage: React.FC = () => {
     setCategoryName('');
     setParentCategoryId(null);
     setCategoryEnabled(true);
+    setFormCustomFieldValues({});
   };
 
   const handleSaveForm = async () => {
@@ -161,14 +181,40 @@ const CategoriesListPage: React.FC = () => {
 
     setSavingCategory(true);
     try {
+      let savedCategoryId: number | null = null;
+
       if (formMode === 'add') {
-        await createCategory(categoryName.trim(), parentCategoryId, categoryEnabled);
+        const response = await createCategory(categoryName.trim(), parentCategoryId, categoryEnabled);
+        savedCategoryId = response?.category?.id ?? null;
       } else if (editingCategoryId) {
         await updateCategory(editingCategoryId, {
           name: categoryName.trim(),
           parentCategoryId: parentCategoryId,
           enabled: categoryEnabled
         });
+        savedCategoryId = editingCategoryId;
+      }
+
+      // Save custom field values
+      if (savedCategoryId) {
+        const enabledFields = categoryCustomFields.filter(f => f.enabled);
+        await Promise.all(
+          enabledFields.map(async (field) => {
+            const value = formCustomFieldValues[field.id];
+            if (value !== undefined && value !== null && String(value).trim() !== '') {
+              try {
+                await saveCustomFieldValue({
+                  customFieldId: field.id,
+                  module: 'c',
+                  moduleId: savedCategoryId!,
+                  value: String(value).trim(),
+                });
+              } catch (err) {
+                console.error(`Failed to save custom field ${field.id}:`, err);
+              }
+            }
+          })
+        );
       }
 
       // Refresh categories list
@@ -322,6 +368,37 @@ const CategoriesListPage: React.FC = () => {
                   </label>
                 </div>
               </div>
+
+              {/* Custom Fields */}
+              {categoryCustomFields.filter(f => f.enabled).length > 0 && (
+                <div className="form-row" style={{ flexWrap: 'wrap' }}>
+                  {categoryCustomFields.filter(f => f.enabled).map(field => (
+                    <div className="form-field" key={field.id}>
+                      <label className="field-label">{field.name}{field.required ? ' *' : ''}</label>
+                      {field.fieldType === 'dropdown' && field.dropdownOptions ? (
+                        <select
+                          className="form-input"
+                          value={formCustomFieldValues[field.id] || ''}
+                          onChange={e => setFormCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                        >
+                          <option value="">Select {field.name}</option>
+                          {field.dropdownOptions.split(',').map((opt, idx) => (
+                            <option key={idx} value={opt.trim()}>{opt.trim()}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={field.fieldType === 'numeric' ? 'number' : field.fieldType === 'date' ? 'date' : 'text'}
+                          placeholder={field.name}
+                          className="form-input"
+                          value={formCustomFieldValues[field.id] || ''}
+                          onChange={e => setFormCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Form Actions */}
               <div className="form-actions">

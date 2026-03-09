@@ -123,41 +123,24 @@ public class ProductImportService {
         requiredStyle.cloneStyleFrom(headerStyle);
         requiredStyle.setFillForegroundColor(IndexedColors.ORANGE.getIndex());
 
-        // Example row style (normal black)
-        CellStyle exampleStyle = wb.createCellStyle();
-        Font exampleFont = wb.createFont();
-        exampleFont.setItalic(false);
-        exampleFont.setColor(IndexedColors.BLACK.getIndex());
-        exampleStyle.setFont(exampleFont);
-
-        // Pick example names from real data (or fallback placeholders)
-        String exampleBrand       = brands.isEmpty()       ? "YourBrandName"       : (String) brands.get(0).get("name");
-        String exampleCategory    = categories.isEmpty()   ? "YourCategoryName"    : (String) categories.get(0).get("name");
-        String exampleMarketplace = marketplaces.isEmpty() ? "YourMarketplaceName" : (String) marketplaces.get(0).get("name");
-
         // ── Build column list ─────────────────────────────────────────────────
-        List<String> headers  = new ArrayList<>(ExcelParserUtil.STANDARD_HEADERS);
-        List<Object> examples = new ArrayList<>(Arrays.asList(
-                "My Product",         // Product Name*
-                "PN-001",             // Product Number
-                "SC-001",             // Style Code
-                "SKU-001",            // SKU Code*
-                exampleBrand,         // Brand Name*
-                exampleCategory,      // Category Name*
-                999.00,               // MRP
-                750.00,               // Product Cost
-                899.00,               // Proposed Selling Price (Sales)
-                950.00,               // Proposed Selling Price (Non-Sales)
-                "true",              // Enabled (true/false)
-                exampleMarketplace    // Marketplace Names (comma-sep)
+        List<String> headers = new ArrayList<>(ExcelParserUtil.STANDARD_HEADERS);
+        Set<String> requiredCols = new HashSet<>(Set.of(
+                ExcelParserUtil.COL_PRODUCT_NAME,
+                ExcelParserUtil.COL_SKU_CODE,
+                ExcelParserUtil.COL_BRAND_NAME,
+                ExcelParserUtil.COL_CATEGORY_NAME
         ));
 
         // Add dynamic custom-field columns
         for (Map<String, Object> cf : cfDefs) {
             String name = (String) cf.get("name");
             if (name != null && !name.isBlank()) {
-                headers.add(ExcelParserUtil.CF_PREFIX + name);
-                examples.add("sample value");
+                String colHeader = ExcelParserUtil.CF_PREFIX + name;
+                headers.add(colHeader);
+                if (Boolean.TRUE.equals(cf.get("required"))) {
+                    requiredCols.add(colHeader);
+                }
             }
         }
 
@@ -165,31 +148,11 @@ public class ProductImportService {
         Row headerRow = sheet.createRow(0);
         headerRow.setHeightInPoints(20);
 
-        Set<String> requiredCols = Set.of(
-                ExcelParserUtil.COL_PRODUCT_NAME,
-                ExcelParserUtil.COL_SKU_CODE,
-                ExcelParserUtil.COL_BRAND_NAME,
-                ExcelParserUtil.COL_CATEGORY_NAME
-        );
-
         for (int i = 0; i < headers.size(); i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(headers.get(i));
             cell.setCellStyle(requiredCols.contains(headers.get(i)) ? requiredStyle : headerStyle);
             sheet.setColumnWidth(i, 7000);
-        }
-
-        // ── Row 1: Example data row ───────────────────────────────────────────
-        Row exampleRow = sheet.createRow(1);
-        for (int i = 0; i < examples.size(); i++) {
-            Cell cell = exampleRow.createCell(i);
-            Object val = examples.get(i);
-            if (val instanceof Number) {
-                cell.setCellValue(((Number) val).doubleValue());
-            } else {
-                cell.setCellValue(val != null ? val.toString() : "");
-            }
-            cell.setCellStyle(exampleStyle);
         }
 
         // Freeze the header row
