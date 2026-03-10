@@ -38,6 +38,7 @@ export interface CreateMarketplaceCostRequest {
   costValue: number;
   costProductRange: string;
   categoryId?: number;
+  brandId?: number;
 }
 
 export interface UpdateMarketplaceRequest {
@@ -55,6 +56,7 @@ export interface UpdateMarketplaceCostRequest {
   costValue: number;
   costProductRange: string;
   categoryId?: number;
+  brandId?: number;
 }
 
 export interface BrandMappingCostRequest {
@@ -167,12 +169,21 @@ export const formatCostSlabs = (costs: MarketplaceCost[]): string => {
 // Helper to get all formatted slabs for a specific category
 export const getSlabsForCategory = (costs: MarketplaceCost[], category: 'COMMISSION' | 'SHIPPING' | 'MARKETING'): string[] => {
   if (!costs || costs.length === 0) return ['-'];
-  const filtered = costs.filter(c => c.costCategory === category);
+  const shippingCategories = ['SHIPPING', 'WEIGHT_SHIPPING_LOCAL', 'WEIGHT_SHIPPING_ZONAL', 'WEIGHT_SHIPPING_NATIONAL', 'WEIGHT_SHIPPING', 'SHIPPING_PERCENTAGE_LOCAL', 'SHIPPING_PERCENTAGE_ZONAL', 'SHIPPING_PERCENTAGE_NATIONAL'];
+  const filtered = category === 'SHIPPING'
+    ? costs.filter(c => shippingCategories.includes(c.costCategory))
+    : costs.filter(c => c.costCategory === category);
   if (filtered.length === 0) return ['-'];
   return filtered.map(c => {
     const value = c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`;
     const range = c.costProductRange ? ` (${c.costProductRange})` : '';
-    return `${value}${range}`;
+    const label = c.costCategory === 'WEIGHT_SHIPPING_LOCAL' ? 'Local' :
+                  c.costCategory === 'WEIGHT_SHIPPING_ZONAL' ? 'Zonal' :
+                  c.costCategory === 'WEIGHT_SHIPPING_NATIONAL' ? 'National' :
+                  c.costCategory === 'SHIPPING_PERCENTAGE_LOCAL' ? 'Local%' :
+                  c.costCategory === 'SHIPPING_PERCENTAGE_ZONAL' ? 'Zonal%' :
+                  c.costCategory === 'SHIPPING_PERCENTAGE_NATIONAL' ? 'National%' : '';
+    return label ? `${label}: ${value}${range}` : `${value}${range}`;
   });
 };
 

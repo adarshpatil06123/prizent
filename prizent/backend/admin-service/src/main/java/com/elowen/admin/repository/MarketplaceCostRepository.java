@@ -13,8 +13,8 @@ import com.elowen.admin.entity.MarketplaceCost;
 @Repository
 public interface MarketplaceCostRepository extends JpaRepository<MarketplaceCost, Long> {
     
-    // Marketplace-level costs (brand_id IS NULL)
-    @Query("SELECT mc FROM MarketplaceCost mc WHERE mc.clientId = :clientId AND mc.marketplaceId = :marketplaceId AND mc.brandId IS NULL AND mc.enabled = true")
+    // All enabled costs for a marketplace
+    @Query("SELECT mc FROM MarketplaceCost mc WHERE mc.clientId = :clientId AND mc.marketplaceId = :marketplaceId AND mc.enabled = true")
     List<MarketplaceCost> findMarketplaceLevelCosts(@Param("clientId") Integer clientId, @Param("marketplaceId") Long marketplaceId);
     
     // Brand-specific costs for a marketplace

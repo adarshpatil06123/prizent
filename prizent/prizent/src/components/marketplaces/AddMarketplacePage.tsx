@@ -477,9 +477,7 @@ const AddMarketplacePage: React.FC = () => {
         productCostSlabs.forEach((slab) => {
           if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
             const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
-            const brandPart = slab.brandId ? `brand:${slab.brandId}` : '';
-            const range = brandPart ? `${slab.from}-${slab.to}|${brandPart}` : `${slab.from}-${slab.to}`;
-            costs.push({ costCategory: 'COMMISSION', costValueType: commissionSlabValueType, costValue: parseFloat(slab.value), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+            costs.push({ costCategory: 'COMMISSION', costValueType: commissionSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
           }
         });
       }
@@ -496,9 +494,7 @@ const AddMarketplacePage: React.FC = () => {
           marketingSlabs.forEach((slab) => {
             if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
               const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
-              const brandPart = slab.brandId ? `brand:${slab.brandId}` : '';
-              const range = brandPart ? `${slab.from}-${slab.to}|${brandPart}` : `${slab.from}-${slab.to}`;
-              costs.push({ costCategory: 'MARKETING', costValueType: marketingSlabValueType, costValue: parseFloat(slab.value), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+              costs.push({ costCategory: 'MARKETING', costValueType: marketingSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
             }
           });
         }
@@ -539,9 +535,7 @@ const AddMarketplacePage: React.FC = () => {
               : fixedFeeFilters.subCategoryId ? parseInt(fixedFeeFilters.subCategoryId)
               : fixedFeeFilters.categoryId ? parseInt(fixedFeeFilters.categoryId)
               : undefined;
-            const brandPart = fixedFeeFilters.brandId ? `brand:${fixedFeeFilters.brandId}` : '';
-            const range = brandPart ? `${slab.aspFrom}-${slab.aspTo}|${brandPart}` : `${slab.aspFrom}-${slab.aspTo}`;
-            costs.push({ costCategory: 'FIXED_FEE', costValueType: fixedFeeValueType, costValue: parseFloat(slab.fee), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+            costs.push({ costCategory: 'FIXED_FEE', costValueType: fixedFeeValueType, costValue: parseFloat(slab.fee), costProductRange: `${slab.aspFrom}-${slab.aspTo}`, ...(categoryId !== undefined && { categoryId }), ...(fixedFeeFilters.brandId && { brandId: parseInt(fixedFeeFilters.brandId) }) });
           }
         });
       }
@@ -582,9 +576,7 @@ const AddMarketplacePage: React.FC = () => {
         pickAndPackSlabs.forEach((slab) => {
           if (parseFloat(slab.pnpValue) > 0) {
             const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
-            const brandPart = slab.brand ? `brand:${slab.brand}` : '';
-            const range = brandPart ? `${slab.from}-${slab.to}|${brandPart}` : `${slab.from}-${slab.to}`;
-            costs.push({ costCategory: 'PICK_AND_PACK', costValueType: pickAndPackValueType, costValue: parseFloat(slab.pnpValue), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+            costs.push({ costCategory: 'PICK_AND_PACK', costValueType: pickAndPackValueType, costValue: parseFloat(slab.pnpValue), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brand && { brandId: parseInt(slab.brand) }) });
           }
         });
       }
@@ -618,28 +610,6 @@ const AddMarketplacePage: React.FC = () => {
             );
           } catch (fieldError) {
             console.error('Error saving custom field values:', fieldError);
-          }
-        }
-
-        // Save brand mappings
-        if (response.marketplace) {
-          try {
-            const mappingRequests = brandMappings
-              .filter(m => m.brandId)
-              .map(m => {
-                const costs: any[] = [];
-                m.commissionSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-                m.marketingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-                m.shippingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) costs.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-                return { brandId: Number(m.brandId), costs };
-              });
-            await marketplaceService.saveBrandMappings(response.marketplace.id, mappingRequests);
-          } catch (brandError: any) {
-            const msg = brandError?.response?.data?.message || brandError?.message || 'Failed to save brand mappings';
-            console.error('Error saving brand mappings:', msg, brandError);
-            setError(`Marketplace created but brand mappings failed: ${msg}`);
-            setLoading(false);
-            return;
           }
         }
 

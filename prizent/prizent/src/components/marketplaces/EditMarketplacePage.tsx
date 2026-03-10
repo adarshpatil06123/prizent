@@ -145,9 +145,9 @@ const EditMarketplacePage: React.FC = () => {
               setProductCostValueType('P');
               setCommissionSlabValueType(commCosts[0].costValueType);
               setProductCostSlabs(commCosts.map(c => {
-                const { from, to, brandId } = parseRange(c.costProductRange);
+                const { from, to } = parseRange(c.costProductRange);
                 const cat = resolveCategoryLevel(c.categoryId, allCats);
-                return { from, to, value: String(c.costValue), valueType: c.costValueType, brandId, ...cat };
+                return { from, to, value: String(c.costValue), valueType: c.costValueType, brandId: c.brandId ? String(c.brandId) : '', ...cat };
               }));
             }
           }
@@ -164,9 +164,9 @@ const EditMarketplacePage: React.FC = () => {
             setMarketingValueType('P');
             setMarketingSlabValueType(mktCosts[0].costValueType);
             setMarketingSlabs(mktCosts.map(c => {
-              const { from, to, brandId } = parseRange(c.costProductRange);
+              const { from, to } = parseRange(c.costProductRange);
               const cat = resolveCategoryLevel(c.categoryId, allCats);
-              return { from, to, value: String(c.costValue), valueType: c.costValueType, brandId, ...cat };
+              return { from, to, value: String(c.costValue), valueType: c.costValueType, brandId: c.brandId ? String(c.brandId) : '', ...cat };
             }));
           }
 
@@ -211,9 +211,8 @@ const EditMarketplacePage: React.FC = () => {
             } else {
               setFixedFeeType('gt');
               setFixedFeeValueType(ffCosts[0].costValueType);
-              const { brandId } = parseRange(ffCosts[0].costProductRange);
               const cat = resolveCategoryLevel(ffCosts[0].categoryId, allCats);
-              setFixedFeeFilters({ brandId, categoryId: cat.parentCategoryId, subCategoryId: cat.categoryId, subSubCategoryId: cat.subCategoryId });
+              setFixedFeeFilters({ brandId: ffCosts[0].brandId ? String(ffCosts[0].brandId) : '', categoryId: cat.parentCategoryId, subCategoryId: cat.categoryId, subSubCategoryId: cat.subCategoryId });
               setFixedFeeSlabs(ffCosts.map(c => { const { from, to } = parseRange(c.costProductRange); return { aspFrom: from, aspTo: to, fee: String(c.costValue) }; }));
             }
           }
@@ -272,9 +271,9 @@ const EditMarketplacePage: React.FC = () => {
             setPickAndPackType('slab');
             setPickAndPackValueType(pnpCosts[0].costValueType);
             setPickAndPackSlabs(pnpCosts.map(c => {
-              const { from, to, brandId } = parseRange(c.costProductRange);
+              const { from, to } = parseRange(c.costProductRange);
               const cat = resolveCategoryLevel(c.categoryId, allCats);
-              return { brand: brandId, parentCategoryId: cat.parentCategoryId, categoryId: cat.categoryId, subCategoryId: cat.subCategoryId, from, to, pnpValue: String(c.costValue) };
+              return { brand: c.brandId ? String(c.brandId) : '', parentCategoryId: cat.parentCategoryId, categoryId: cat.categoryId, subCategoryId: cat.subCategoryId, from, to, pnpValue: String(c.costValue) };
             }));
           }
 
@@ -419,9 +418,7 @@ const EditMarketplacePage: React.FC = () => {
         productCostSlabs.forEach(slab => {
           if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
             const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
-            const brandPart = slab.brandId ? `brand:${slab.brandId}` : '';
-            const range = brandPart ? `${slab.from}-${slab.to}|${brandPart}` : `${slab.from}-${slab.to}`;
-            costs.push({ costCategory: 'COMMISSION', costValueType: commissionSlabValueType, costValue: parseFloat(slab.value), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+            costs.push({ costCategory: 'COMMISSION', costValueType: commissionSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
           }
         });
       }
@@ -434,9 +431,7 @@ const EditMarketplacePage: React.FC = () => {
           marketingSlabs.forEach(slab => {
             if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
               const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
-              const brandPart = slab.brandId ? `brand:${slab.brandId}` : '';
-              const range = brandPart ? `${slab.from}-${slab.to}|${brandPart}` : `${slab.from}-${slab.to}`;
-              costs.push({ costCategory: 'MARKETING', costValueType: marketingSlabValueType, costValue: parseFloat(slab.value), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+              costs.push({ costCategory: 'MARKETING', costValueType: marketingSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
             }
           });
         }
@@ -468,9 +463,7 @@ const EditMarketplacePage: React.FC = () => {
         fixedFeeSlabs.forEach(slab => {
           if (parseFloat(slab.aspTo) > parseFloat(slab.aspFrom) && parseFloat(slab.fee) > 0) {
             const categoryId = fixedFeeFilters.subSubCategoryId ? parseInt(fixedFeeFilters.subSubCategoryId) : fixedFeeFilters.subCategoryId ? parseInt(fixedFeeFilters.subCategoryId) : fixedFeeFilters.categoryId ? parseInt(fixedFeeFilters.categoryId) : undefined;
-            const brandPart = fixedFeeFilters.brandId ? `brand:${fixedFeeFilters.brandId}` : '';
-            const range = brandPart ? `${slab.aspFrom}-${slab.aspTo}|${brandPart}` : `${slab.aspFrom}-${slab.aspTo}`;
-            costs.push({ costCategory: 'FIXED_FEE', costValueType: fixedFeeValueType, costValue: parseFloat(slab.fee), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+            costs.push({ costCategory: 'FIXED_FEE', costValueType: fixedFeeValueType, costValue: parseFloat(slab.fee), costProductRange: `${slab.aspFrom}-${slab.aspTo}`, ...(categoryId !== undefined && { categoryId }), ...(fixedFeeFilters.brandId && { brandId: parseInt(fixedFeeFilters.brandId) }) });
           }
         });
       }
@@ -507,9 +500,7 @@ const EditMarketplacePage: React.FC = () => {
         pickAndPackSlabs.forEach(slab => {
           if (parseFloat(slab.pnpValue) > 0) {
             const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
-            const brandPart = slab.brand ? `brand:${slab.brand}` : '';
-            const range = brandPart ? `${slab.from}-${slab.to}|${brandPart}` : `${slab.from}-${slab.to}`;
-            costs.push({ costCategory: 'PICK_AND_PACK', costValueType: pickAndPackValueType, costValue: parseFloat(slab.pnpValue), costProductRange: range, ...(categoryId !== undefined && { categoryId }) });
+            costs.push({ costCategory: 'PICK_AND_PACK', costValueType: pickAndPackValueType, costValue: parseFloat(slab.pnpValue), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brand && { brandId: parseInt(slab.brand) }) });
           }
         });
       }
@@ -525,21 +516,6 @@ const EditMarketplacePage: React.FC = () => {
           }));
         } catch (e) { console.error('Error saving custom field values:', e); }
 
-        const mappingRequests = brandMappings.filter(m => m.brandId).map(m => {
-          const mc: any[] = [];
-          m.commissionSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) mc.push({ costCategory: 'COMMISSION', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-          m.marketingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) mc.push({ costCategory: 'MARKETING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-          m.shippingSlabs.forEach(s => { if (parseFloat(s.to) > parseFloat(s.from) && parseFloat(s.value) > 0) mc.push({ costCategory: 'SHIPPING', costValueType: s.valueType, costValue: parseFloat(s.value), costProductRange: `${s.from}-${s.to}` }); });
-          return { brandId: Number(m.brandId), costs: mc };
-        });
-        if (mappingRequests.length > 0) {
-          try {
-            await marketplaceService.saveBrandMappings(Number(id), mappingRequests);
-          } catch (brandError: any) {
-            const msg = brandError?.response?.data?.message || brandError?.message || 'Failed to save brand mappings';
-            setError(`Marketplace saved but brand mappings failed: ${msg}`); setLoading(false); return;
-          }
-        }
         navigate('/marketplaces');
       } else { setError(response.message || 'Failed to update marketplace'); }
     } catch (err: any) {

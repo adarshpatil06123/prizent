@@ -240,6 +240,11 @@ public class MarketplaceService {
                 costRequest.getCostProductRange().trim()
             );
             cost.setCategoryId(costRequest.getCategoryId());
+            if (costRequest.getBrandId() != null) {
+                cost.setBrandId(costRequest.getBrandId());
+                brandRepository.findById(costRequest.getBrandId())
+                    .ifPresent(b -> cost.setBrandName(b.getName()));
+            }
             cost.setUpdatedBy(userId);
             costs.add(cost);
         }
@@ -260,6 +265,11 @@ public class MarketplaceService {
                 costRequest.getCostProductRange().trim()
             );
             cost.setCategoryId(costRequest.getCategoryId());
+            if (costRequest.getBrandId() != null) {
+                cost.setBrandId(costRequest.getBrandId());
+                brandRepository.findById(costRequest.getBrandId())
+                    .ifPresent(b -> cost.setBrandName(b.getName()));
+            }
             cost.setUpdatedBy(userId);
             costs.add(cost);
         }
@@ -298,25 +308,12 @@ public class MarketplaceService {
     private MarketplaceResponse toResponseWithCosts(Marketplace marketplace) {
         MarketplaceResponse response = new MarketplaceResponse(marketplace);
         
-        // Get only marketplace-level costs (brand_id IS NULL)
         List<MarketplaceCost> costs = marketplaceCostRepository
             .findMarketplaceLevelCosts(marketplace.getClientId(), marketplace.getId());
         
         response.setCosts(costs.stream()
             .map(MarketplaceResponse.CostResponse::new)
             .collect(Collectors.toList()));
-
-        // Flag whether brand-specific mappings exist (so UI can show "Brand-specific" instead of -)
-        List<MarketplaceCost> brandCosts = marketplaceCostRepository
-            .findBrandCostsByMarketplace(marketplace.getClientId(), marketplace.getId());
-        response.setHasBrandMappings(!brandCosts.isEmpty());
-
-        // Include brand costs summary so list page can show actual brand-specific values
-        if (!brandCosts.isEmpty()) {
-            response.setBrandCostsSummary(brandCosts.stream()
-                .map(MarketplaceResponse.CostResponse::new)
-                .collect(Collectors.toList()));
-        }
         
         return response;
     }
