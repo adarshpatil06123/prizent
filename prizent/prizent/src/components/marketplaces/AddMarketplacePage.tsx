@@ -26,6 +26,15 @@ interface CollectionFeeSlab {
   prepaid: string;
   postpaid: string;
 }
+interface PickAndPackSlab {
+  brand: string;
+  category: string;
+  subCategory: string;
+  gender: string;
+  from: string;
+  to: string;
+  pnpValue: string;
+}
 interface BrandMapping {
   localId: string;
   brandId: string;
@@ -44,6 +53,7 @@ const AddMarketplacePage: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    accNo: '',
     enabled: false
   });
   
@@ -62,6 +72,20 @@ const AddMarketplacePage: React.FC = () => {
   const [collectionFee, setCollectionFee] = useState({ prepaid: '0', postpaid: '0' });
   const [royalty, setRoyalty] = useState('0');
   const [pickAndPack, setPickAndPack] = useState('0');
+  
+  // Flat based values for Shipping, Marketing, Fixed Fee
+  const [shippingFlatValue, setShippingFlatValue] = useState('0');
+  const [marketingFlatValue, setMarketingFlatValue] = useState('0');
+  const [fixedFeeFlatValue, setFixedFeeFlatValue] = useState('0');
+  
+  // Value types for flat panels (% or Rs toggle)
+  const [shippingFlatValueType, setShippingFlatValueType] = useState<'P' | 'A'>('A');
+  const [marketingFlatValueType, setMarketingFlatValueType] = useState<'P' | 'A'>('A');
+  const [fixedFeeFlatValueType, setFixedFeeFlatValueType] = useState<'P' | 'A'>('A');
+  
+  // Value types for slab table toggles (% or Rs toggle)
+  const [marketingSlabValueType, setMarketingSlabValueType] = useState<'P' | 'A'>('A');
+  const [shippingSlabValueType, setShippingSlabValueType] = useState<'P' | 'A'>('A');
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -87,6 +111,8 @@ const AddMarketplacePage: React.FC = () => {
   const [reverseShippingValues, setReverseShippingValues] = useState({ grossUnitScale: '0', cr: '0', rto: '0', netUnitScale: '0' });
   const [reverseWeightSlabs, setReverseWeightSlabs] = useState<WeightSlab[]>([{ weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
   const [reverseWeightValueType, setReverseWeightValueType] = useState<'P' | 'A'>('A');
+  const [reverseShippingFlatValue, setReverseShippingFlatValue] = useState('0');
+  const [reverseShippingFlatValueType, setReverseShippingFlatValueType] = useState<'P' | 'A'>('A');
 
   // Collection Fee states
   const [collectionFeeType, setCollectionFeeType] = useState<'value' | 'none'>('value');
@@ -98,6 +124,13 @@ const AddMarketplacePage: React.FC = () => {
   const [royaltyType, setRoyaltyType] = useState<'flat' | 'none'>('flat');
   const [royaltyValue, setRoyaltyValue] = useState('0');
   const [royaltyValueType, setRoyaltyValueType] = useState<'P' | 'A'>('A');
+
+  // Pick and Pack states
+  const [pickAndPackType, setPickAndPackType] = useState<'slab' | 'none'>('slab');
+  const [pickAndPackSlabs, setPickAndPackSlabs] = useState<PickAndPackSlab[]>([
+    { brand: '', category: '', subCategory: '', gender: '', from: '0', to: '0', pnpValue: '0' }
+  ]);
+  const [pickAndPackValueType, setPickAndPackValueType] = useState<'P' | 'A'>('A');
 
   // Update all existing slabs when value type toggle changes
   const handleProductCostValueTypeChange = (newType: 'P' | 'A') => {
@@ -336,6 +369,30 @@ const AddMarketplacePage: React.FC = () => {
 
   const handlePostpaidValueTypeChange = (newType: 'P' | 'A') => {
     setPostpaidValueType(newType);
+  };
+
+  // ══════════ Pick and Pack Handlers ══════════
+  const addPickAndPackSlab = () => {
+    setPickAndPackSlabs(prev => [...prev, { brand: '', category: '', subCategory: '', gender: '', from: '0', to: '0', pnpValue: '0' }]);
+  };
+
+  const removePickAndPackSlab = (index: number) => {
+    if (pickAndPackSlabs.length > 1) {
+      setPickAndPackSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updatePickAndPackSlab = (index: number, field: keyof PickAndPackSlab, value: string) => {
+    const validatedValue = (field === 'from' || field === 'to' || field === 'pnpValue') 
+      ? validateNumericInput(value) 
+      : value;
+    setPickAndPackSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: validatedValue } : slab
+    ));
+  };
+
+  const handlePickAndPackValueTypeChange = (newType: 'P' | 'A') => {
+    setPickAndPackValueType(newType);
   };
 
   // ══════════ NEW: Fixed Fee Handlers ══════════
@@ -679,74 +736,91 @@ const AddMarketplacePage: React.FC = () => {
           </div>
         )}
 
-        <div className="details-card">
-          <div className="form-field">
-            <label className="field-label">Marketplace Name</label>
-            <input 
-              className="text-input" 
-              placeholder="enter marketplace name" 
-              value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-            />
-          </div>
-          <div className="form-field">
-            <label className="field-label">Description</label>
-            <input 
-              className="text-input" 
-              placeholder="description" 
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-            />
-          </div>
-          <label className="activate-row">
-            <input 
-              type="checkbox" 
-              checked={formData.enabled}
-              onChange={(e) => handleInputChange('enabled', e.target.checked)}
-            />
-            <span>Activate marketplace</span>
-          </label>
-        </div>
-
-        {/* Custom Fields Section */}
-        {customFields.length > 0 && (
-          <div className="panel" style={{ marginTop: '32px' }}>
-            <h3 className="panel-title">Custom Fields</h3>
-            <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-              {customFields.map((field) => (
-                <div key={field.id} className="form-field">
-                  <label className="field-label">{field.name}{field.required ? ' *' : ''}</label>
-                  {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
-                    <input
-                      type={field.fieldType === 'numeric' ? 'number' : 'text'}
-                      placeholder={field.name + (field.required ? ' *' : '')}
-                      className="form-input"
-                      value={customFieldValues[field.id] || ''}
-                      onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
-                      required={field.required}
-                      disabled={loading}
-                    />
-                  ) : field.fieldType === 'dropdown' && field.dropdownOptions ? (
-                    <select
-                      className="form-select"
-                      value={customFieldValues[field.id] || ''}
-                      onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
-                      required={field.required}
-                      disabled={loading}
-                    >
-                      <option value="">{field.name + (field.required ? ' *' : '')}</option>
-                      {field.dropdownOptions.split(',').map((option: string, idx: number) => (
-                        <option key={idx} value={option.trim()}>
-                          {option.trim()}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-                </div>
-              ))}
+        <div className="marketplace-details-container">
+          <div className="details-row-1">
+            <div className="form-field">
+              <label className="field-label">Marketplace Name</label>
+              <input 
+                className="text-input" 
+                placeholder="enter marketplace name" 
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label className="field-label">Acc.no</label>
+              <input 
+                className="text-input" 
+                placeholder="enter account number" 
+                value={formData.accNo}
+                onChange={(e) => handleInputChange('accNo', e.target.value)}
+              />
             </div>
           </div>
-        )}
+          
+          <div className="details-row-2">
+            <div className="form-field">
+              <label className="field-label">Description</label>
+              <textarea 
+                className="text-input description-textarea" 
+                placeholder="description" 
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          
+          {/* Custom Fields Row - Moved from separate section */}
+          {customFields.length > 0 && (
+            <div className="details-row-custom-fields">
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+                {customFields.map((field) => (
+                  <div key={field.id} className="form-field">
+                    <label className="field-label">{field.name}{field.required ? ' *' : ''}</label>
+                    {field.fieldType === 'text' || field.fieldType === 'numeric' ? (
+                      <input
+                        type={field.fieldType === 'numeric' ? 'number' : 'text'}
+                        placeholder={field.name + (field.required ? ' *' : '')}
+                        className="text-input"
+                        value={customFieldValues[field.id] || ''}
+                        onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                        required={field.required}
+                        disabled={loading}
+                      />
+                    ) : field.fieldType === 'dropdown' && field.dropdownOptions ? (
+                      <select
+                        className="select-input"
+                        value={customFieldValues[field.id] || ''}
+                        onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                        required={field.required}
+                        disabled={loading}
+                      >
+                        <option value="">{field.name + (field.required ? ' *' : '')}</option>
+                        {field.dropdownOptions.split(',').map((option: string, idx: number) => (
+                          <option key={idx} value={option.trim()}>
+                            {option.trim()}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="details-row-3">
+            <label className="activate-row">
+              <input 
+                type="checkbox" 
+                checked={formData.enabled}
+                onChange={(e) => handleInputChange('enabled', e.target.checked)}
+              />
+              <span>Activate marketplace</span>
+            </label>
+          </div>
+        </div>
 
         {/* ═══════════════════════ COMMISSION SECTION ═══════════════════════ */}
         <div className="commission-section">
@@ -882,7 +956,37 @@ const AddMarketplacePage: React.FC = () => {
             </label>
           </div>
 
+          {/* Flat Based Panel */}
+          {marketingValueType === 'A' && !marketingFilters.none && (
+            <div className="royalty-panel">
+              <div className="royalty-toggle-wrapper">
+                <span className="royalty-toggle-label">%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={marketingFlatValueType === 'A'}
+                    onChange={() => setMarketingFlatValueType(marketingFlatValueType === 'P' ? 'A' : 'P')}
+                  />
+                  <span className="slider"></span>
+                </label>
+                <span className="royalty-toggle-label">Rs</span>
+              </div>
+              <div className="royalty-content">
+                <label className="royalty-label">Value :</label>
+                <input 
+                  className="royalty-input" 
+                  type="text" 
+                  placeholder="0" 
+                  value={marketingFlatValue}
+                  onChange={e => setMarketingFlatValue(validateNumericInput(e.target.value))}
+                />
+                <span className="royalty-unit">Rs</span>
+              </div>
+            </div>
+          )}
+
           {/* Marketing Table */}
+          {marketingValueType === 'P' && !marketingFilters.none && (
           <div className="commission-panel">
             {/* Table Header */}
             <div className="commission-table-header">
@@ -898,8 +1002,8 @@ const AddMarketplacePage: React.FC = () => {
                 <label className="switch">
                   <input
                     type="checkbox"
-                    checked={marketingValueType === 'A'}
-                    onChange={e => handleMarketingValueTypeChange(e.target.checked ? 'A' : 'P')}
+                    checked={marketingSlabValueType === 'A'}
+                    onChange={e => setMarketingSlabValueType(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
@@ -942,6 +1046,7 @@ const AddMarketplacePage: React.FC = () => {
               <span>Add Slab</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* ═══════════════════════ SHIPPING SECTION ═══════════════════════ */}
@@ -988,7 +1093,37 @@ const AddMarketplacePage: React.FC = () => {
             </label>
           </div>
 
+          {/* Flat Based Panel */}
+          {shippingValueType === 'A' && (
+            <div className="royalty-panel">
+              <div className="royalty-toggle-wrapper">
+                <span className="royalty-toggle-label">%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={shippingFlatValueType === 'A'}
+                    onChange={() => setShippingFlatValueType(shippingFlatValueType === 'P' ? 'A' : 'P')}
+                  />
+                  <span className="slider"></span>
+                </label>
+                <span className="royalty-toggle-label">Rs</span>
+              </div>
+              <div className="royalty-content">
+                <label className="royalty-label">Value :</label>
+                <input 
+                  className="royalty-input" 
+                  type="text" 
+                  placeholder="0" 
+                  value={shippingFlatValue}
+                  onChange={e => setShippingFlatValue(validateNumericInput(e.target.value))}
+                />
+                <span className="royalty-unit">Rs</span>
+              </div>
+            </div>
+          )}
+
           {/* Shipping Table - Weight Based */}
+          {shippingValueType === 'P' && (
           <div className="commission-panel">
             {/* Table Header */}
             <div className="shipping-table-header">
@@ -1003,8 +1138,8 @@ const AddMarketplacePage: React.FC = () => {
                 <label className="switch">
                   <input
                     type="checkbox"
-                    checked={shippingValueType === 'A'}
-                    onChange={e => handleShippingValueTypeChange(e.target.checked ? 'A' : 'P')}
+                    checked={shippingSlabValueType === 'A'}
+                    onChange={e => setShippingSlabValueType(e.target.checked ? 'A' : 'P')}
                   />
                   <span className="slider" />
                 </label>
@@ -1033,6 +1168,7 @@ const AddMarketplacePage: React.FC = () => {
               <span>Add Weight Slab</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* ═══════════════════════ SHIPPING PERCENTAGE SECTION ═══════════════════════ */}
@@ -1116,7 +1252,37 @@ const AddMarketplacePage: React.FC = () => {
             </label>
           </div>
 
+          {/* Flat Based Panel */}
+          {fixedFeeType === 'flat' && (
+            <div className="royalty-panel">
+              <div className="royalty-toggle-wrapper">
+                <span className="royalty-toggle-label">%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={fixedFeeFlatValueType === 'A'}
+                    onChange={() => setFixedFeeFlatValueType(fixedFeeFlatValueType === 'P' ? 'A' : 'P')}
+                  />
+                  <span className="slider"></span>
+                </label>
+                <span className="royalty-toggle-label">Rs</span>
+              </div>
+              <div className="royalty-content">
+                <label className="royalty-label">Value :</label>
+                <input 
+                  className="royalty-input" 
+                  type="text" 
+                  placeholder="0" 
+                  value={fixedFeeFlatValue}
+                  onChange={e => setFixedFeeFlatValue(validateNumericInput(e.target.value))}
+                />
+                <span className="royalty-unit">Rs</span>
+              </div>
+            </div>
+          )}
+
           {/* Fixed Fee Table */}
+          {fixedFeeType === 'gt' && (
           <div className="commission-panel">
             {/* Table Header */}
             <div className="commission-table-header" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr' }}>
@@ -1177,11 +1343,12 @@ const AddMarketplacePage: React.FC = () => {
               <span>Add Slab</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* ══════════════════ Reverse Shipping Cost Section ══════════════════ */}
         <div className="commission-section">
-          <h3>Reverse Shipping Cost</h3>
+          <h3 className="section-title">Reverse Shipping Cost</h3>
           
           {/* Radio Toggle */}
           <div className="commission-toggle-container">
@@ -1211,44 +1378,31 @@ const AddMarketplacePage: React.FC = () => {
             </label>
           </div>
 
-          {/* Flat Based Panel - 4 Input Fields */}
+          {/* Flat Based Panel */}
           {reverseShippingType === 'flat' && (
-            <div className="reverse-shipping-flat-panel">
-              <div className="reverse-shipping-field">
-                <label>Gross Unit Scale:</label>
-                <input 
-                  type="text" 
-                  placeholder="5" 
-                  value={reverseShippingValues.grossUnitScale}
-                  onChange={e => setReverseShippingValues(prev => ({ ...prev, grossUnitScale: validateNumericInput(e.target.value) }))}
-                />
+            <div className="royalty-panel">
+              <div className="royalty-toggle-wrapper">
+                <span className="royalty-toggle-label">%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={reverseShippingFlatValueType === 'A'}
+                    onChange={() => setReverseShippingFlatValueType(reverseShippingFlatValueType === 'P' ? 'A' : 'P')}
+                  />
+                  <span className="slider"></span>
+                </label>
+                <span className="royalty-toggle-label">Rs</span>
               </div>
-              <div className="reverse-shipping-field">
-                <label>CR%:</label>
+              <div className="royalty-content">
+                <label className="royalty-label">Value :</label>
                 <input 
+                  className="royalty-input" 
                   type="text" 
-                  placeholder="5" 
-                  value={reverseShippingValues.cr}
-                  onChange={e => setReverseShippingValues(prev => ({ ...prev, cr: validateNumericInput(e.target.value) }))}
+                  placeholder="0" 
+                  value={reverseShippingFlatValue}
+                  onChange={e => setReverseShippingFlatValue(validateNumericInput(e.target.value))}
                 />
-              </div>
-              <div className="reverse-shipping-field">
-                <label>RTO%:</label>
-                <input 
-                  type="text" 
-                  placeholder="5" 
-                  value={reverseShippingValues.rto}
-                  onChange={e => setReverseShippingValues(prev => ({ ...prev, rto: validateNumericInput(e.target.value) }))}
-                />
-              </div>
-              <div className="reverse-shipping-field">
-                <label>NET Unit Scale:</label>
-                <input 
-                  type="text" 
-                  placeholder="5" 
-                  value={reverseShippingValues.netUnitScale}
-                  onChange={e => setReverseShippingValues(prev => ({ ...prev, netUnitScale: validateNumericInput(e.target.value) }))}
-                />
+                <span className="royalty-unit">Rs</span>
               </div>
             </div>
           )}
@@ -1297,7 +1451,7 @@ const AddMarketplacePage: React.FC = () => {
 
         {/* ══════════════════ Collection Fee Section ══════════════════ */}
         <div className="commission-section">
-          <h3>Collection Fee</h3>
+          <h3 className="section-title">Collection Fee</h3>
           
           {/* Radio Toggle */}
           <div className="commission-toggle-container">
@@ -1364,7 +1518,7 @@ const AddMarketplacePage: React.FC = () => {
 
         {/* ══════════════════ Royalty Section ══════════════════ */}
         <div className="commission-section">
-          <h3>Royalty</h3>
+          <h3 className="section-title">Royalty</h3>
           
           {/* Radio Toggle */}
           <div className="commission-toggle-container">
@@ -1390,21 +1544,157 @@ const AddMarketplacePage: React.FC = () => {
           {royaltyType === 'flat' && (
             <div className="royalty-panel">
               <div className="royalty-toggle-wrapper">
-                <div className="commission-value-toggle">
-                  <span className={royaltyValueType === 'P' ? 'active' : ''} onClick={() => setRoyaltyValueType('P')}>%</span>
-                  <div className="toggle-slider" style={{ left: royaltyValueType === 'A' ? '50%' : '0%' }}></div>
-                  <span className={royaltyValueType === 'A' ? 'active' : ''} onClick={() => setRoyaltyValueType('A')}>Rs</span>
-                </div>
+                <span className="royalty-toggle-label">%</span>
+                <label className="switch">
+                  <input 
+                    type="checkbox" 
+                    checked={royaltyValueType === 'A'}
+                    onChange={() => setRoyaltyValueType(royaltyValueType === 'P' ? 'A' : 'P')}
+                  />
+                  <span className="slider"></span>
+                </label>
+                <span className="royalty-toggle-label">Rs</span>
               </div>
-              <label className="royalty-label">Value :</label>
-              <input 
-                className="royalty-input" 
-                type="text" 
-                placeholder="5" 
-                value={royaltyValue}
-                onChange={e => setRoyaltyValue(validateNumericInput(e.target.value))}
+              <div className="royalty-content">
+                <label className="royalty-label">Value :</label>
+                <input 
+                  className="royalty-input" 
+                  type="text" 
+                  placeholder="5" 
+                  value={royaltyValue}
+                  onChange={e => setRoyaltyValue(validateNumericInput(e.target.value))}
+                />
+                <span className="royalty-unit">Rs</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════ Pick and Pack Section ══════════════════ */}
+        <div className="commission-section">
+          <h3 className="section-title">Pick and Pack</h3>
+          
+          {/* Radio Toggle */}
+          <div className="commission-toggle-container">
+            <label className={`commission-toggle-option ${pickAndPackType === 'slab' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={pickAndPackType === 'slab'}
+                onChange={() => setPickAndPackType('slab')}
               />
-              <span className="royalty-unit">Rs</span>
+              <span>Slab based Commission</span>
+            </label>
+            <label className={`commission-toggle-option ${pickAndPackType === 'none' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={pickAndPackType === 'none'}
+                onChange={() => setPickAndPackType('none')}
+              />
+              <span>None</span>
+            </label>
+          </div>
+
+          {/* Slab Based Table */}
+          {pickAndPackType === 'slab' && (
+            <div className="pick-and-pack-table-container">
+              <div className="pick-and-pack-table-header">
+                <span>Brand</span>
+                <span>Category</span>
+                <span>Sub Category</span>
+                <span>Gender</span>
+                <span>From</span>
+                <span>To</span>
+                <span>Pnp value</span>
+                <span className="pnp-toggle-header">
+                  <span className="pnp-toggle-label">%</span>
+                  <label className="switch">
+                    <input 
+                      type="checkbox" 
+                      checked={pickAndPackValueType === 'A'}
+                      onChange={() => handlePickAndPackValueTypeChange(pickAndPackValueType === 'P' ? 'A' : 'P')}
+                    />
+                    <span className="slider"></span>
+                  </label>
+                  <span className="pnp-toggle-label">Rs</span>
+                </span>
+                <span></span>
+              </div>
+
+              {pickAndPackSlabs.map((slab, index) => (
+                <div key={index} className="pick-and-pack-table-row">
+                  <select 
+                    value={slab.brand}
+                    onChange={e => updatePickAndPackSlab(index, 'brand', e.target.value)}
+                  >
+                    <option value="">Select Brand</option>
+                    {brands.map(brand => (
+                      <option key={brand.id} value={brand.name}>{brand.name}</option>
+                    ))}
+                  </select>
+
+                  <select 
+                    value={slab.category}
+                    onChange={e => updatePickAndPackSlab(index, 'category', e.target.value)}
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+
+                  <select 
+                    value={slab.subCategory}
+                    onChange={e => updatePickAndPackSlab(index, 'subCategory', e.target.value)}
+                  >
+                    <option value="">Select Sub Category</option>
+                    <option value="Jeans">Jeans</option>
+                    <option value="T-Shirt">T-Shirt</option>
+                    <option value="Shirt">Shirt</option>
+                  </select>
+
+                  <select 
+                    value={slab.gender}
+                    onChange={e => updatePickAndPackSlab(index, 'gender', e.target.value)}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Unisex">Unisex</option>
+                  </select>
+
+                  <input 
+                    type="text" 
+                    placeholder="0"
+                    value={slab.from}
+                    onChange={e => updatePickAndPackSlab(index, 'from', e.target.value)}
+                  />
+
+                  <input 
+                    type="text" 
+                    placeholder="0"
+                    value={slab.to}
+                    onChange={e => updatePickAndPackSlab(index, 'to', e.target.value)}
+                  />
+
+                  <input 
+                    type="text" 
+                    placeholder="0"
+                    value={slab.pnpValue}
+                    onChange={e => updatePickAndPackSlab(index, 'pnpValue', e.target.value)}
+                  />
+
+                  <button 
+                    className="delete-icon-btn"
+                    onClick={() => removePickAndPackSlab(index)}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+
+              <button className="add-slab-btn" onClick={addPickAndPackSlab}>
+                + Add Slab
+              </button>
             </div>
           )}
         </div>
