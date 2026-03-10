@@ -4,8 +4,28 @@ import "./AddMarketplacePage.css";
 import marketplaceService, { CreateMarketplaceRequest, CreateMarketplaceCostRequest } from '../../services/marketplaceService';
 import { getCustomFields, saveCustomFieldValue, CustomFieldResponse } from '../../services/customFieldService';
 import brandService, { Brand } from '../../services/brandService';
+import categoryService from '../../services/categoryService';
 
 interface BrandSlab { from: string; to: string; value: string; valueType: 'P' | 'A'; }
+interface WeightSlab { 
+  weightFrom: string; 
+  weightTo: string; 
+  local: string; 
+  zonal: string; 
+  national: string;
+  value: string;
+}
+interface FixedFeeSlab {
+  aspFrom: string;
+  aspTo: string;
+  fee: string;
+}
+interface CollectionFeeSlab {
+  orderValueFrom: string;
+  orderValueTo: string;
+  prepaid: string;
+  postpaid: string;
+}
 interface BrandMapping {
   localId: string;
   brandId: string;
@@ -32,6 +52,17 @@ const AddMarketplacePage: React.FC = () => {
   const [marketingSlabs, setMarketingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
   const [shippingSlabs, setShippingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A' }]);
   
+  // NEW: Weight-based shipping state
+  const [weightSlabs, setWeightSlabs] = useState<WeightSlab[]>([{ weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
+  
+  // NEW: Simple fee sections
+  const [shippingPercentage, setShippingPercentage] = useState({ local: '0', zonal: '0', national: '0' });
+  const [fixedFeeSlabs, setFixedFeeSlabs] = useState<FixedFeeSlab[]>([{ aspFrom: '0', aspTo: '0', fee: '0' }]);
+  const [reverseShippingCost, setReverseShippingCost] = useState('0');
+  const [collectionFee, setCollectionFee] = useState({ prepaid: '0', postpaid: '0' });
+  const [royalty, setRoyalty] = useState('0');
+  const [pickAndPack, setPickAndPack] = useState('0');
+  
   // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +72,32 @@ const AddMarketplacePage: React.FC = () => {
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: number]: string }>({});
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [brandMappings, setBrandMappings] = useState<BrandMapping[]>([]);
+
+  // NEW: Commission/Marketing filters
+  const [commissionFilters, setCommissionFilters] = useState({ brandId: '', categoryId: '', gender: '', none: false });
+  const [marketingFilters, setMarketingFilters] = useState({ brandId: '', categoryId: '', gender: '', none: false });
+  const [fixedFeeFilters, setFixedFeeFilters] = useState({ brandId: '', categoryId: '', subCategoryId: '', gender: '' });
+  const [fixedFeeValueType, setFixedFeeValueType] = useState<'P' | 'A'>('A');
+  const [fixedFeeType, setFixedFeeType] = useState<'flat' | 'gt' | 'none'>('gt');
+  
+  // Reverse Shipping Cost states
+  const [reverseShippingType, setReverseShippingType] = useState<'flat' | 'weight' | 'none'>('weight');
+  const [reverseShippingValues, setReverseShippingValues] = useState({ grossUnitScale: '0', cr: '0', rto: '0', netUnitScale: '0' });
+  const [reverseWeightSlabs, setReverseWeightSlabs] = useState<WeightSlab[]>([{ weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
+  const [reverseWeightValueType, setReverseWeightValueType] = useState<'P' | 'A'>('A');
+
+  // Collection Fee states
+  const [collectionFeeType, setCollectionFeeType] = useState<'value' | 'none'>('value');
+  const [collectionFeeSlabs, setCollectionFeeSlabs] = useState<CollectionFeeSlab[]>([{ orderValueFrom: '0', orderValueTo: '0', prepaid: '0', postpaid: '0' }]);
+  const [prepaidValueType, setPrepaidValueType] = useState<'P' | 'A'>('A');
+  const [postpaidValueType, setPostpaidValueType] = useState<'P' | 'A'>('A');
+
+  // Royalty states
+  const [royaltyType, setRoyaltyType] = useState<'flat' | 'none'>('flat');
+  const [royaltyValue, setRoyaltyValue] = useState('0');
+  const [royaltyValueType, setRoyaltyValueType] = useState<'P' | 'A'>('A');
 
   // Update all existing slabs when value type toggle changes
   const handleProductCostValueTypeChange = (newType: 'P' | 'A') => {
@@ -91,16 +147,27 @@ const AddMarketplacePage: React.FC = () => {
     fetchCustomFields();
   }, []);
 
-  // ÔöÇÔöÇ Brand mapping handlers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-  const emptySlabs = (vt: 'P' | 'A' = 'A'): BrandSlab[] => [{ from: '0', to: '0', value: '0', valueType: vt }];
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await categoryService.getAllCategories();
+        if (res.success && res.categories) setCategories(res.categories.filter((c: any) => c.enabled));
+      } catch (e) {
+        console.error('Failed to fetch categories:', e);
+      }
+    };
+    fetchCategories();
+  }, []);
 
+  // Brand mapping functions
   const addBrandMapping = () => {
     setBrandMappings(prev => [...prev, {
-      localId: Date.now().toString(),
+      localId: `temp-${Date.now()}`,
       brandId: '',
-      commissionSlabs: emptySlabs(),
-      marketingSlabs: emptySlabs(),
-      shippingSlabs: emptySlabs(),
+      commissionSlabs: [{ from: '0', to: '0', value: '0', valueType: 'A' }],
+      marketingSlabs: [{ from: '0', to: '0', value: '0', valueType: 'A' }],
+      shippingSlabs: [{ from: '0', to: '0', value: '0', valueType: 'A' }],
       commissionValueType: 'A',
       marketingValueType: 'A',
       shippingValueType: 'A',
@@ -205,6 +272,99 @@ const AddMarketplacePage: React.FC = () => {
     ));
   };
 
+  // ══════════ NEW: Weight-based Shipping Handlers ══════════
+  const addWeightSlab = () => {
+    setWeightSlabs(prev => [...prev, { weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
+  };
+
+  const removeWeightSlab = (index: number) => {
+    if (weightSlabs.length > 1) {
+      setWeightSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateWeightSlab = (index: number, field: keyof WeightSlab, value: string) => {
+    const validatedValue = validateNumericInput(value);
+    setWeightSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: validatedValue } : slab
+    ));
+  };
+
+  // ══════════ Reverse Weight-based Shipping Handlers ══════════
+  const addReverseWeightSlab = () => {
+    setReverseWeightSlabs(prev => [...prev, { weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
+  };
+
+  const removeReverseWeightSlab = (index: number) => {
+    if (reverseWeightSlabs.length > 1) {
+      setReverseWeightSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateReverseWeightSlab = (index: number, field: keyof WeightSlab, value: string) => {
+    const validatedValue = validateNumericInput(value);
+    setReverseWeightSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: validatedValue } : slab
+    ));
+  };
+
+  const handleReverseWeightValueTypeChange = (newType: 'P' | 'A') => {
+    setReverseWeightValueType(newType);
+  };
+
+  // ══════════ Collection Fee Handlers ══════════
+  const addCollectionFeeSlab = () => {
+    setCollectionFeeSlabs(prev => [...prev, { orderValueFrom: '0', orderValueTo: '0', prepaid: '0', postpaid: '0' }]);
+  };
+
+  const removeCollectionFeeSlab = (index: number) => {
+    if (collectionFeeSlabs.length > 1) {
+      setCollectionFeeSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateCollectionFeeSlab = (index: number, field: keyof CollectionFeeSlab, value: string) => {
+    const validatedValue = validateNumericInput(value);
+    setCollectionFeeSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: validatedValue } : slab
+    ));
+  };
+
+  const handlePrepaidValueTypeChange = (newType: 'P' | 'A') => {
+    setPrepaidValueType(newType);
+  };
+
+  const handlePostpaidValueTypeChange = (newType: 'P' | 'A') => {
+    setPostpaidValueType(newType);
+  };
+
+  // ══════════ NEW: Fixed Fee Handlers ══════════
+  const addFixedFeeSlab = () => {
+    setFixedFeeSlabs(prev => [...prev, { aspFrom: '0', aspTo: '0', fee: '0' }]);
+  };
+
+  const removeFixedFeeSlab = (index: number) => {
+    if (fixedFeeSlabs.length > 1) {
+      setFixedFeeSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateFixedFeeSlab = (index: number, field: keyof FixedFeeSlab, value: string) => {
+    const validatedValue = validateNumericInput(value);
+    setFixedFeeSlabs(prev => prev.map((slab, i) => 
+      i === index ? { ...slab, [field]: validatedValue } : slab
+    ));
+  };
+
+  // ══════════ NEW: Simple Input Handlers ══════════
+  const handleShippingPercentageChange = (field: 'local' | 'zonal' | 'national', value: string) => {
+    setShippingPercentage(prev => ({ ...prev, [field]: validateNumericInput(value) }));
+  };
+
+  const handleCollectionFeeChange = (field: 'prepaid' | 'postpaid', value: string) => {
+    setCollectionFee(prev => ({ ...prev, [field]: validateNumericInput(value) }));
+  };
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -296,6 +456,122 @@ const AddMarketplacePage: React.FC = () => {
           });
         }
       });
+      
+      // ══════════ NEW: Add weight-based shipping ══════════
+      weightSlabs.forEach((slab) => {
+        if (parseFloat(slab.weightTo) > parseFloat(slab.weightFrom)) {
+          if (parseFloat(slab.local) > 0) {
+            costs.push({
+              costCategory: 'WEIGHT_SHIPPING_LOCAL' as any,
+              costValueType: 'A',
+              costValue: parseFloat(slab.local),
+              costProductRange: `${slab.weightFrom}-${slab.weightTo}kg`
+            });
+          }
+          if (parseFloat(slab.zonal) > 0) {
+            costs.push({
+              costCategory: 'WEIGHT_SHIPPING_ZONAL' as any,
+              costValueType: 'A',
+              costValue: parseFloat(slab.zonal),
+              costProductRange: `${slab.weightFrom}-${slab.weightTo}kg`
+            });
+          }
+          if (parseFloat(slab.national) > 0) {
+            costs.push({
+              costCategory: 'WEIGHT_SHIPPING_NATIONAL' as any,
+              costValueType: 'A',
+              costValue: parseFloat(slab.national),
+              costProductRange: `${slab.weightFrom}-${slab.weightTo}kg`
+            });
+          }
+        }
+      });
+
+      // ══════════ NEW: Add shipping percentage ══════════
+      if (parseFloat(shippingPercentage.local) > 0) {
+        costs.push({
+          costCategory: 'SHIPPING_PERCENTAGE_LOCAL' as any,
+          costValueType: 'P',
+          costValue: parseFloat(shippingPercentage.local),
+          costProductRange: 'local'
+        });
+      }
+      if (parseFloat(shippingPercentage.zonal) > 0) {
+        costs.push({
+          costCategory: 'SHIPPING_PERCENTAGE_ZONAL' as any,
+          costValueType: 'P',
+          costValue: parseFloat(shippingPercentage.zonal),
+          costProductRange: 'zonal'
+        });
+      }
+      if (parseFloat(shippingPercentage.national) > 0) {
+        costs.push({
+          costCategory: 'SHIPPING_PERCENTAGE_NATIONAL' as any,
+          costValueType: 'P',
+          costValue: parseFloat(shippingPercentage.national),
+          costProductRange: 'national'
+        });
+      }
+
+      // ══════════ NEW: Add fixed fee slabs ══════════
+      fixedFeeSlabs.forEach((slab) => {
+        if (parseFloat(slab.aspTo) > parseFloat(slab.aspFrom) && parseFloat(slab.fee) > 0) {
+          costs.push({
+            costCategory: 'FIXED_FEE' as any,
+            costValueType: 'A',
+            costValue: parseFloat(slab.fee),
+            costProductRange: `${slab.aspFrom}-${slab.aspTo}`
+          });
+        }
+      });
+
+      // ══════════ NEW: Add reverse shipping cost ══════════
+      if (parseFloat(reverseShippingCost) > 0) {
+        costs.push({
+          costCategory: 'REVERSE_SHIPPING' as any,
+          costValueType: 'A',
+          costValue: parseFloat(reverseShippingCost),
+          costProductRange: 'flat'
+        });
+      }
+
+      // ══════════ NEW: Add collection fee ══════════
+      if (parseFloat(collectionFee.prepaid) > 0) {
+        costs.push({
+          costCategory: 'COLLECTION_FEE_PREPAID' as any,
+          costValueType: 'P',
+          costValue: parseFloat(collectionFee.prepaid),
+          costProductRange: 'prepaid'
+        });
+      }
+      if (parseFloat(collectionFee.postpaid) > 0) {
+        costs.push({
+          costCategory: 'COLLECTION_FEE_POSTPAID' as any,
+          costValueType: 'P',
+          costValue: parseFloat(collectionFee.postpaid),
+          costProductRange: 'postpaid'
+        });
+      }
+
+      // ══════════ NEW: Add royalty ══════════
+      if (parseFloat(royalty) > 0) {
+        costs.push({
+          costCategory: 'ROYALTY' as any,
+          costValueType: 'P',
+          costValue: parseFloat(royalty),
+          costProductRange: 'flat'
+        });
+      }
+
+      // ══════════ NEW: Add pick and pack ══════════
+      if (parseFloat(pickAndPack) > 0) {
+        costs.push({
+          costCategory: 'PICK_AND_PACK' as any,
+          costValueType: 'A',
+          costValue: parseFloat(pickAndPack),
+          costProductRange: 'flat'
+        });
+      }
       
       const request: CreateMarketplaceRequest = {
         name: formData.name.trim(),
@@ -472,130 +748,665 @@ const AddMarketplacePage: React.FC = () => {
           </div>
         )}
 
-        {/* Brand Mapping Section */}
-        <div className="brand-mapping-section">
-          <div className="brand-mapping-header">
-            <h3 className="section-title" style={{ margin: 0 }}>Brand Mapping</h3>
-            <button className="add-brand-btn" onClick={addBrandMapping} type="button">+ Add New Brand</button>
+        {/* ═══════════════════════ COMMISSION SECTION ═══════════════════════ */}
+        <div className="commission-section">
+          <h3 className="section-title">Commission</h3>
+          
+          {/* Radio Toggle: Flat based / Slab based */}
+          <div className="commission-toggle-container">
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="commissionType"
+                value="flat"
+                checked={productCostValueType === 'A'}
+                onChange={() => handleProductCostValueTypeChange('A')}
+              />
+              <span className="commission-radio-label">Flat based Commission</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="commissionType"
+                value="slab"
+                checked={productCostValueType === 'P'}
+                onChange={() => handleProductCostValueTypeChange('P')}
+              />
+              <span className="commission-radio-label">Slab based Commission</span>
+            </label>
           </div>
 
-          {brandMappings.map(mapping => (
-            <div key={mapping.localId} className="brand-mapping-card">
-              <div className="brand-mapping-card-header">
-                <span className="brand-label">BRAND</span>
-                <button className="remove-brand-btn" onClick={() => removeBrandMapping(mapping.localId)} type="button">✕</button>
-              </div>
-
-              <div className="form-field">
-                <label className="field-label">Brand</label>
-                <select
-                  className="brand-select"
-                  value={mapping.brandId}
-                  onChange={e => updateBrandMapping(mapping.localId, 'brandId', e.target.value)}
-                >
-                  <option value="">Select Brand</option>
-                  {brands.map(b => (
-                    <option key={b.id} value={String(b.id)}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid-3" style={{ marginTop: '16px' }}>
-                {/* Commission */}
-                <div className="panel">
-                  <div className="panel-header">
-                    <span>Commission</span>
-                    <div className="panel-units">
-                      <span>%</span>
-                      <label className="switch">
-                        <input type="checkbox" checked={mapping.commissionValueType === 'A'}
-                          onChange={e => updateBrandValueType(mapping.localId, 'commission', e.target.checked ? 'A' : 'P')} />
-                        <span className="slider" />
-                      </label>
-                      <span>Rs</span>
-                    </div>
-                  </div>
-                  <div className="panel-divider" />
-                  <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                    <span>From cost</span><span>To cost</span><span>Value</span><span></span>
-                  </div>
-                  {mapping.commissionSlabs.map((slab, i) => (
-                    <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'from', e.target.value)} />
-                      <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'to', e.target.value)} />
-                      <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'commission', i, 'value', e.target.value)} />
-                      {mapping.commissionSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'commission', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
-                      )}
-                    </div>
-                  ))}
-                  <button className="link-btn" onClick={() => addBrandSlab(mapping.localId, 'commission')} type="button">+ Add slab</button>
-                </div>
-
-                {/* Marketing */}
-                <div className="panel">
-                  <div className="panel-header">
-                    <span>Marketing</span>
-                    <div className="panel-units">
-                      <span>%</span>
-                      <label className="switch">
-                        <input type="checkbox" checked={mapping.marketingValueType === 'A'}
-                          onChange={e => updateBrandValueType(mapping.localId, 'marketing', e.target.checked ? 'A' : 'P')} />
-                        <span className="slider" />
-                      </label>
-                      <span>Rs</span>
-                    </div>
-                  </div>
-                  <div className="panel-divider" />
-                  <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                    <span>From cost</span><span>To cost</span><span>Value</span><span></span>
-                  </div>
-                  {mapping.marketingSlabs.map((slab, i) => (
-                    <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'from', e.target.value)} />
-                      <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'to', e.target.value)} />
-                      <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'marketing', i, 'value', e.target.value)} />
-                      {mapping.marketingSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'marketing', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
-                      )}
-                    </div>
-                  ))}
-                  <button className="link-btn" onClick={() => addBrandSlab(mapping.localId, 'marketing')} type="button">+ Add slab</button>
-                </div>
-
-                {/* Shipping */}
-                <div className="panel">
-                  <div className="panel-header">
-                    <span>Shipping</span>
-                    <div className="panel-units">
-                      <span>%</span>
-                      <label className="switch">
-                        <input type="checkbox" checked={mapping.shippingValueType === 'A'}
-                          onChange={e => updateBrandValueType(mapping.localId, 'shipping', e.target.checked ? 'A' : 'P')} />
-                        <span className="slider" />
-                      </label>
-                      <span>Rs</span>
-                    </div>
-                  </div>
-                  <div className="panel-divider" />
-                  <div className="panel-columns" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                    <span>From cost</span><span>To cost</span><span>Value</span><span></span>
-                  </div>
-                  {mapping.shippingSlabs.map((slab, i) => (
-                    <div key={i} className="panel-form-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
-                      <input className="small-input" placeholder="0" value={slab.from} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'from', e.target.value)} />
-                      <input className="small-input" placeholder="0" value={slab.to} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'to', e.target.value)} />
-                      <input className="small-input" placeholder="0" value={slab.value} onChange={e => updateBrandSlab(mapping.localId, 'shipping', i, 'value', e.target.value)} />
-                      {mapping.shippingSlabs.length > 1 && (
-                        <button className="delete-btn" onClick={() => removeBrandSlab(mapping.localId, 'shipping', i)} type="button" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#C23939', fontSize: '20px' }}>✕</button>
-                      )}
-                    </div>
-                  ))}
-                  <button className="link-btn" onClick={() => addBrandSlab(mapping.localId, 'shipping')} type="button">+ Add slab</button>
-                </div>
+          {/* Commission Table */}
+          <div className="commission-panel">
+            {/* Table Header */}
+            <div className="commission-table-header">
+              <span className="commission-header-label">Brand</span>
+              <span className="commission-header-label">Category</span>
+              <span className="commission-header-label">Sub Category</span>
+              <span className="commission-header-label">Gender</span>
+              <span className="commission-header-label">From</span>
+              <span className="commission-header-label">To</span>
+              <span className="commission-header-label">Value</span>
+              <div className="commission-value-toggle">
+                <span>%</span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={productCostValueType === 'A'}
+                    onChange={e => handleProductCostValueTypeChange(e.target.checked ? 'A' : 'P')}
+                  />
+                  <span className="slider" />
+                </label>
+                <span>Rs</span>
               </div>
             </div>
-          ))}
+
+            {/* Table Rows */}
+            {productCostSlabs.map((slab, i) => (
+              <div key={i} className="commission-table-row">
+                <select className="commission-dropdown" value={commissionFilters.brandId} onChange={e => setCommissionFilters(prev => ({ ...prev, brandId: e.target.value }))}>
+                  <option value="">Ivon</option>
+                  {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                </select>
+                <select className="commission-dropdown" value={commissionFilters.categoryId} onChange={e => setCommissionFilters(prev => ({ ...prev, categoryId: e.target.value }))}>
+                  <option value="">Bottom Wear</option>
+                  {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                </select>
+                <select className="commission-dropdown">
+                  <option value="">Jeans</option>
+                </select>
+                <select className="commission-dropdown" value={commissionFilters.gender} onChange={e => setCommissionFilters(prev => ({ ...prev, gender: e.target.value }))}>
+                  <option value="">Female</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="unisex">Unisex</option>
+                </select>
+                <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateProductCostSlab(i, 'from', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateProductCostSlab(i, 'to', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateProductCostSlab(i, 'value', e.target.value)} />
+                {productCostSlabs.length > 1 ? (
+                  <button className="commission-delete-btn" onClick={() => removeProductCostSlab(i)} type="button">🗑️</button>
+                ) : <div></div>}
+              </div>
+            ))}
+
+            {/* Add Slab Button */}
+            <button className="commission-add-slab" onClick={addProductCostSlab} type="button">
+              <span>+</span>
+              <span>Add Slab</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ═══════════════════════ MARKETING SECTION ═══════════════════════ */}
+        <div className="commission-section">
+          <h3 className="section-title">Marketing</h3>
+          
+          {/* Radio Toggle: Flat based / Slab based / None */}
+          <div className="commission-toggle-container">
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="marketingType"
+                value="flat"
+                checked={marketingValueType === 'A' && !marketingFilters.none}
+                onChange={() => {
+                  handleMarketingValueTypeChange('A');
+                  setMarketingFilters(prev => ({ ...prev, none: false }));
+                }}
+              />
+              <span className="commission-radio-label">Flat based Marketing</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="marketingType"
+                value="slab"
+                checked={marketingValueType === 'P' && !marketingFilters.none}
+                onChange={() => {
+                  handleMarketingValueTypeChange('P');
+                  setMarketingFilters(prev => ({ ...prev, none: false }));
+                }}
+              />
+              <span className="commission-radio-label">Slab based Marketing</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="marketingType"
+                value="none"
+                checked={marketingFilters.none}
+                onChange={() => setMarketingFilters(prev => ({ ...prev, none: true }))}
+              />
+              <span className="commission-radio-label">None</span>
+            </label>
+          </div>
+
+          {/* Marketing Table */}
+          <div className="commission-panel">
+            {/* Table Header */}
+            <div className="commission-table-header">
+              <span className="commission-header-label">Brand</span>
+              <span className="commission-header-label">Category</span>
+              <span className="commission-header-label">Sub Category</span>
+              <span className="commission-header-label">Gender</span>
+              <span className="commission-header-label">From</span>
+              <span className="commission-header-label">To</span>
+              <span className="commission-header-label">Contri</span>
+              <div className="commission-value-toggle">
+                <span>%</span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={marketingValueType === 'A'}
+                    onChange={e => handleMarketingValueTypeChange(e.target.checked ? 'A' : 'P')}
+                  />
+                  <span className="slider" />
+                </label>
+                <span>Rs</span>
+              </div>
+            </div>
+
+            {/* Table Rows */}
+            {marketingSlabs.map((slab, i) => (
+              <div key={i} className="commission-table-row">
+                <select className="commission-dropdown" value={marketingFilters.brandId} onChange={e => setMarketingFilters(prev => ({ ...prev, brandId: e.target.value }))}>
+                  <option value="">Ivon</option>
+                  {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                </select>
+                <select className="commission-dropdown" value={marketingFilters.categoryId} onChange={e => setMarketingFilters(prev => ({ ...prev, categoryId: e.target.value }))}>
+                  <option value="">Bottom Wear</option>
+                  {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                </select>
+                <select className="commission-dropdown">
+                  <option value="">Jeans</option>
+                </select>
+                <select className="commission-dropdown" value={marketingFilters.gender} onChange={e => setMarketingFilters(prev => ({ ...prev, gender: e.target.value }))}>
+                  <option value="">Female</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="unisex">Unisex</option>
+                </select>
+                <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateMarketingSlab(i, 'from', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateMarketingSlab(i, 'to', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateMarketingSlab(i, 'value', e.target.value)} />
+                {marketingSlabs.length > 1 ? (
+                  <button className="commission-delete-btn" onClick={() => removeMarketingSlab(i)} type="button">🗑️</button>
+                ) : <div></div>}
+              </div>
+            ))}
+
+            {/* Add Slab Button */}
+            <button className="commission-add-slab" onClick={addMarketingSlab} type="button">
+              <span>+</span>
+              <span>Add Slab</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ═══════════════════════ SHIPPING SECTION ═══════════════════════ */}
+        <div className="commission-section">
+          <h3 className="section-title">Shipping</h3>
+          
+          {/* Radio Toggle: Flat based / Weight based / GT based / None */}
+          <div className="commission-toggle-container" style={{ gap: '80px' }}>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="shippingType"
+                value="flat"
+                checked={shippingValueType === 'A'}
+                onChange={() => handleShippingValueTypeChange('A')}
+              />
+              <span className="commission-radio-label">Flat based Shipping</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="shippingType"
+                value="weight"
+                checked={shippingValueType === 'P'}
+                onChange={() => handleShippingValueTypeChange('P')}
+              />
+              <span className="commission-radio-label">Weight based Shipping</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="shippingType"
+                value="gt"
+              />
+              <span className="commission-radio-label">GT based</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="shippingType"
+                value="none"
+              />
+              <span className="commission-radio-label">None</span>
+            </label>
+          </div>
+
+          {/* Shipping Table - Weight Based */}
+          <div className="commission-panel">
+            {/* Table Header */}
+            <div className="shipping-table-header">
+              <span className="commission-header-label">Weight From(kg)</span>
+              <span className="commission-header-label">Weight To(kg)</span>
+              <span className="commission-header-label">Local(₹)</span>
+              <span className="commission-header-label">Zonal(₹)</span>
+              <span className="commission-header-label">National(₹)</span>
+              <span className="commission-header-label">Value</span>
+              <div className="commission-value-toggle">
+                <span>%</span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={shippingValueType === 'A'}
+                    onChange={e => handleShippingValueTypeChange(e.target.checked ? 'A' : 'P')}
+                  />
+                  <span className="slider" />
+                </label>
+                <span>Rs</span>
+              </div>
+            </div>
+
+            {/* Table Rows */}
+            {weightSlabs.map((slab, i) => (
+              <div key={i} className="shipping-table-row">
+                <input className="commission-input" placeholder="0" value={slab.weightFrom} onChange={e => updateWeightSlab(i, 'weightFrom', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.weightTo} onChange={e => updateWeightSlab(i, 'weightTo', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.local} onChange={e => updateWeightSlab(i, 'local', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.zonal} onChange={e => updateWeightSlab(i, 'zonal', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.national} onChange={e => updateWeightSlab(i, 'national', e.target.value)} />
+                <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateWeightSlab(i, 'value', e.target.value)} />
+                {weightSlabs.length > 1 ? (
+                  <button className="commission-delete-btn" onClick={() => removeWeightSlab(i)} type="button">🗑️</button>
+                ) : <div></div>}
+              </div>
+            ))}
+
+            {/* Add Weight Slab Button */}
+            <button className="commission-add-slab" onClick={addWeightSlab} type="button">
+              <span>+</span>
+              <span>Add Weight Slab</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ═══════════════════════ SHIPPING PERCENTAGE SECTION ═══════════════════════ */}
+        <div className="commission-section">
+          <h3 className="section-title">Shipping Percentage</h3>
+          
+          <div className="shipping-percentage-panel">
+            {/* Labels Row */}
+            <div className="shipping-percentage-labels">
+              <span className="shipping-percentage-label">Local(%)</span>
+              <span className="shipping-percentage-label">Zonal(%)</span>
+              <span className="shipping-percentage-label">National(%)</span>
+            </div>
+            
+            {/* Separator Line */}
+            <div className="shipping-percentage-divider"></div>
+            
+            {/* Inputs Row */}
+            <div className="shipping-percentage-inputs">
+              <input 
+                className="shipping-percentage-input" 
+                type="text" 
+                placeholder="50%" 
+                value={shippingPercentage.local} 
+                onChange={e => handleShippingPercentageChange('local', e.target.value)} 
+              />
+              <input 
+                className="shipping-percentage-input" 
+                type="text" 
+                placeholder="50%" 
+                value={shippingPercentage.zonal} 
+                onChange={e => handleShippingPercentageChange('zonal', e.target.value)} 
+              />
+              <input 
+                className="shipping-percentage-input" 
+                type="text" 
+                placeholder="50%" 
+                value={shippingPercentage.national} 
+                onChange={e => handleShippingPercentageChange('national', e.target.value)} 
+              />
+              <button className="commission-delete-btn" type="button">🗑️</button>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════ FIXED FEE SECTION ═══════════════════════ */}
+        <div className="commission-section">
+          <h3 className="section-title">Fixed Fee</h3>
+          
+          {/* Radio Toggle: Flat based / GT based on seller ASP / None */}
+          <div className="commission-toggle-container" style={{ gap: '80px' }}>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="fixedFeeType"
+                value="flat"
+                checked={fixedFeeType === 'flat'}
+                onChange={() => setFixedFeeType('flat')}
+              />
+              <span className="commission-radio-label">Flat based Shipping</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="fixedFeeType"
+                value="gt"
+                checked={fixedFeeType === 'gt'}
+                onChange={() => setFixedFeeType('gt')}
+              />
+              <span className="commission-radio-label">GT based on seller ASP</span>
+            </label>
+            <label className="commission-radio-option">
+              <input
+                type="radio"
+                name="fixedFeeType"
+                value="none"
+                checked={fixedFeeType === 'none'}
+                onChange={() => setFixedFeeType('none')}
+              />
+              <span className="commission-radio-label">None</span>
+            </label>
+          </div>
+
+          {/* Fixed Fee Table */}
+          <div className="commission-panel">
+            {/* Table Header */}
+            <div className="commission-table-header" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr' }}>
+              <span className="commission-header-label">Brand</span>
+              <span className="commission-header-label">Category</span>
+              <span className="commission-header-label">Sub Category</span>
+              <span className="commission-header-label">Gender</span>
+              <span className="commission-header-label">ASP From</span>
+              <span className="commission-header-label">ASP To</span>
+              <span className="commission-header-label">Fixed Fee</span>
+              <div className="commission-value-toggle">
+                <span>%</span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={fixedFeeValueType === 'A'}
+                    onChange={e => setFixedFeeValueType(e.target.checked ? 'A' : 'P')}
+                  />
+                  <span className="slider" />
+                </label>
+                <span>Rs</span>
+              </div>
+            </div>
+
+            {/* Table Rows */}
+            {fixedFeeSlabs.map((slab, i) => (
+              <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 0.9fr 0.9fr 0.9fr 1fr' }}>
+                <select className="commission-dropdown" value={fixedFeeFilters.brandId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, brandId: e.target.value }))}>
+                  <option value="">Ivon</option>
+                  {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                </select>
+                <select className="commission-dropdown" value={fixedFeeFilters.categoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, categoryId: e.target.value }))}>
+                  <option value="">Bottom Wear</option>
+                  {categories.filter(c => !c.parentId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                </select>
+                <select className="commission-dropdown" value={fixedFeeFilters.subCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subCategoryId: e.target.value }))}>
+                  <option value="">Jeans</option>
+                  {categories.filter(c => c.parentId && c.parentId === parseInt(fixedFeeFilters.categoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                </select>
+                <select className="commission-dropdown" value={fixedFeeFilters.gender} onChange={e => setFixedFeeFilters(prev => ({ ...prev, gender: e.target.value }))}>
+                  <option value="">Female</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="unisex">Unisex</option>
+                </select>
+                <input className="commission-input" placeholder="500" value={slab.aspFrom} onChange={e => updateFixedFeeSlab(i, 'aspFrom', e.target.value)} />
+                <input className="commission-input" placeholder="500" value={slab.aspTo} onChange={e => updateFixedFeeSlab(i, 'aspTo', e.target.value)} />
+                <input className="commission-input" placeholder="500" value={slab.fee} onChange={e => updateFixedFeeSlab(i, 'fee', e.target.value)} />
+                {fixedFeeSlabs.length > 1 ? (
+                  <button className="commission-delete-btn" onClick={() => removeFixedFeeSlab(i)} type="button">🗑️</button>
+                ) : <div></div>}
+              </div>
+            ))}
+
+            {/* Add Slab Button */}
+            <button className="commission-add-slab" onClick={addFixedFeeSlab} type="button">
+              <span>+</span>
+              <span>Add Slab</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ══════════════════ Reverse Shipping Cost Section ══════════════════ */}
+        <div className="commission-section">
+          <h3>Reverse Shipping Cost</h3>
+          
+          {/* Radio Toggle */}
+          <div className="commission-toggle-container">
+            <label className={`commission-toggle-option ${reverseShippingType === 'flat' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={reverseShippingType === 'flat'}
+                onChange={() => setReverseShippingType('flat')}
+              />
+              <span>Flat based Shipping</span>
+            </label>
+            <label className={`commission-toggle-option ${reverseShippingType === 'weight' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={reverseShippingType === 'weight'}
+                onChange={() => setReverseShippingType('weight')}
+              />
+              <span>Weight based Reverse Shipping</span>
+            </label>
+            <label className={`commission-toggle-option ${reverseShippingType === 'none' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={reverseShippingType === 'none'}
+                onChange={() => setReverseShippingType('none')}
+              />
+              <span>None</span>
+            </label>
+          </div>
+
+          {/* Flat Based Panel - 4 Input Fields */}
+          {reverseShippingType === 'flat' && (
+            <div className="reverse-shipping-flat-panel">
+              <div className="reverse-shipping-field">
+                <label>Gross Unit Scale:</label>
+                <input 
+                  type="text" 
+                  placeholder="5" 
+                  value={reverseShippingValues.grossUnitScale}
+                  onChange={e => setReverseShippingValues(prev => ({ ...prev, grossUnitScale: validateNumericInput(e.target.value) }))}
+                />
+              </div>
+              <div className="reverse-shipping-field">
+                <label>CR%:</label>
+                <input 
+                  type="text" 
+                  placeholder="5" 
+                  value={reverseShippingValues.cr}
+                  onChange={e => setReverseShippingValues(prev => ({ ...prev, cr: validateNumericInput(e.target.value) }))}
+                />
+              </div>
+              <div className="reverse-shipping-field">
+                <label>RTO%:</label>
+                <input 
+                  type="text" 
+                  placeholder="5" 
+                  value={reverseShippingValues.rto}
+                  onChange={e => setReverseShippingValues(prev => ({ ...prev, rto: validateNumericInput(e.target.value) }))}
+                />
+              </div>
+              <div className="reverse-shipping-field">
+                <label>NET Unit Scale:</label>
+                <input 
+                  type="text" 
+                  placeholder="5" 
+                  value={reverseShippingValues.netUnitScale}
+                  onChange={e => setReverseShippingValues(prev => ({ ...prev, netUnitScale: validateNumericInput(e.target.value) }))}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Weight Based Panel - Weight Table */}
+          {reverseShippingType === 'weight' && (
+            <div className="commission-panel">
+              {/* Table Header */}
+              <div className="shipping-table-header">
+                <span>Weight From(kg)</span>
+                <span>Weight To(kg)</span>
+                <span>Local(₹)</span>
+                <span>Zonal(₹)</span>
+                <span>National(₹)</span>
+                <span>Value</span>
+                <div className="commission-value-toggle">
+                  <span className={reverseWeightValueType === 'P' ? 'active' : ''} onClick={() => handleReverseWeightValueTypeChange('P')}>%</span>
+                  <div className="toggle-slider" style={{ left: reverseWeightValueType === 'A' ? '50%' : '0%' }}></div>
+                  <span className={reverseWeightValueType === 'A' ? 'active' : ''} onClick={() => handleReverseWeightValueTypeChange('A')}>Rs</span>
+                </div>
+              </div>
+
+              {/* Table Rows */}
+              {reverseWeightSlabs.map((slab, i) => (
+                <div className="shipping-table-row" key={i}>
+                  <input className="commission-input" placeholder="0" value={slab.weightFrom} onChange={e => updateReverseWeightSlab(i, 'weightFrom', e.target.value)} />
+                  <input className="commission-input" placeholder="0" value={slab.weightTo} onChange={e => updateReverseWeightSlab(i, 'weightTo', e.target.value)} />
+                  <input className="commission-input" placeholder="0" value={slab.local} onChange={e => updateReverseWeightSlab(i, 'local', e.target.value)} />
+                  <input className="commission-input" placeholder="0" value={slab.zonal} onChange={e => updateReverseWeightSlab(i, 'zonal', e.target.value)} />
+                  <input className="commission-input" placeholder="0" value={slab.national} onChange={e => updateReverseWeightSlab(i, 'national', e.target.value)} />
+                  <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateReverseWeightSlab(i, 'value', e.target.value)} />
+                  <div className="commission-delete-cell">
+                    <button className="commission-delete-btn" onClick={() => removeReverseWeightSlab(i)} type="button">🗑️</button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Add Weight Slab Button */}
+              <button className="commission-add-slab" onClick={addReverseWeightSlab} type="button">
+                <span>+</span>
+                <span>Add Weight Slab</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════ Collection Fee Section ══════════════════ */}
+        <div className="commission-section">
+          <h3>Collection Fee</h3>
+          
+          {/* Radio Toggle */}
+          <div className="commission-toggle-container">
+            <label className={`commission-toggle-option ${collectionFeeType === 'value' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={collectionFeeType === 'value'}
+                onChange={() => setCollectionFeeType('value')}
+              />
+              <span>Value based collection fee</span>
+            </label>
+            <label className={`commission-toggle-option ${collectionFeeType === 'none' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={collectionFeeType === 'none'}
+                onChange={() => setCollectionFeeType('none')}
+              />
+              <span>None</span>
+            </label>
+          </div>
+
+          {/* Value Based Panel */}
+          {collectionFeeType === 'value' && (
+            <div className="commission-panel">
+              {/* Table Header */}
+              <div className="collection-fee-table-header">
+                <span>Order Value From</span>
+                <span>Order Value To</span>
+                <span>Prepaid</span>
+                <div className="commission-value-toggle">
+                  <span className={prepaidValueType === 'P' ? 'active' : ''} onClick={() => handlePrepaidValueTypeChange('P')}>%</span>
+                  <div className="toggle-slider" style={{ left: prepaidValueType === 'A' ? '50%' : '0%' }}></div>
+                  <span className={prepaidValueType === 'A' ? 'active' : ''} onClick={() => handlePrepaidValueTypeChange('A')}>Rs</span>
+                </div>
+                <span>Postpaid</span>
+                <div className="commission-value-toggle">
+                  <span className={postpaidValueType === 'P' ? 'active' : ''} onClick={() => handlePostpaidValueTypeChange('P')}>%</span>
+                  <div className="toggle-slider" style={{ left: postpaidValueType === 'A' ? '50%' : '0%' }}></div>
+                  <span className={postpaidValueType === 'A' ? 'active' : ''} onClick={() => handlePostpaidValueTypeChange('A')}>Rs</span>
+                </div>
+              </div>
+
+              {/* Table Rows */}
+              {collectionFeeSlabs.map((slab, i) => (
+                <div className="collection-fee-table-row" key={i}>
+                  <input className="commission-input" placeholder="500" value={slab.orderValueFrom} onChange={e => updateCollectionFeeSlab(i, 'orderValueFrom', e.target.value)} />
+                  <input className="commission-input" placeholder="500" value={slab.orderValueTo} onChange={e => updateCollectionFeeSlab(i, 'orderValueTo', e.target.value)} />
+                  <input className="commission-input" placeholder="500" value={slab.prepaid} onChange={e => updateCollectionFeeSlab(i, 'prepaid', e.target.value)} />
+                  <input className="commission-input" placeholder="500" value={slab.postpaid} onChange={e => updateCollectionFeeSlab(i, 'postpaid', e.target.value)} />
+                  <div className="commission-delete-cell">
+                    <button className="commission-delete-btn" onClick={() => removeCollectionFeeSlab(i)} type="button">🗑️</button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Add Weight Slab Button */}
+              <button className="commission-add-slab" onClick={addCollectionFeeSlab} type="button">
+                <span>+</span>
+                <span>Add Weight Slab</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ══════════════════ Royalty Section ══════════════════ */}
+        <div className="commission-section">
+          <h3>Royalty</h3>
+          
+          {/* Radio Toggle */}
+          <div className="commission-toggle-container">
+            <label className={`commission-toggle-option ${royaltyType === 'flat' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={royaltyType === 'flat'}
+                onChange={() => setRoyaltyType('flat')}
+              />
+              <span>Flat based Royalty</span>
+            </label>
+            <label className={`commission-toggle-option ${royaltyType === 'none' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={royaltyType === 'none'}
+                onChange={() => setRoyaltyType('none')}
+              />
+              <span>None</span>
+            </label>
+          </div>
+
+          {/* Flat Based Panel */}
+          {royaltyType === 'flat' && (
+            <div className="royalty-panel">
+              <div className="royalty-toggle-wrapper">
+                <div className="commission-value-toggle">
+                  <span className={royaltyValueType === 'P' ? 'active' : ''} onClick={() => setRoyaltyValueType('P')}>%</span>
+                  <div className="toggle-slider" style={{ left: royaltyValueType === 'A' ? '50%' : '0%' }}></div>
+                  <span className={royaltyValueType === 'A' ? 'active' : ''} onClick={() => setRoyaltyValueType('A')}>Rs</span>
+                </div>
+              </div>
+              <label className="royalty-label">Value :</label>
+              <input 
+                className="royalty-input" 
+                type="text" 
+                placeholder="5" 
+                value={royaltyValue}
+                onChange={e => setRoyaltyValue(validateNumericInput(e.target.value))}
+              />
+              <span className="royalty-unit">Rs</span>
+            </div>
+          )}
         </div>
 
         <div className="footer-actions">
