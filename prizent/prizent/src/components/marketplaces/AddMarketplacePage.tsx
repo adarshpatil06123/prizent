@@ -804,7 +804,7 @@ const AddMarketplacePage: React.FC = () => {
                   value={commissionFlatValue}
                   onChange={e => setCommissionFlatValue(validateNumericInput(e.target.value))}
                 />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{commissionFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -820,8 +820,8 @@ const AddMarketplacePage: React.FC = () => {
               <span className="commission-header-label">Brand</span>
               <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                 <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                {commissionHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                {commissionHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
+                <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
+                <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
               </div>
               <span className="commission-header-label">From</span>
               <span className="commission-header-label">To</span>
@@ -837,45 +837,46 @@ const AddMarketplacePage: React.FC = () => {
                   <span className="slider" />
                 </label>
                 <span>Rs</span>
+
               </div>
             </div>
 
             {/* Table Rows */}
             {productCostSlabs.map((slab, i) => (
               <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
-                <select className="commission-dropdown" value={slab.brandId} onChange={e => updateProductCostSlab(i, 'brandId', e.target.value)}>
+                <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateProductCostSlab(i, 'brandId', e.target.value)}>
                   <option value="">All Brands</option>
                   {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                 </select>
                 <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
                     <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updateProductCostSlab(i, 'parentCategoryId', e.target.value)}>
                       <option value="">All Categories</option>
                       {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                     </select>
                   </div>
-                  {slab.parentCategoryId && (
-                    <div style={{ flex: 1 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateProductCostSlab(i, 'categoryId', e.target.value)}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {slab.categoryId && (
-                    <div style={{ flex: 1 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateProductCostSlab(i, 'subCategoryId', e.target.value)}>
-                        <option value="">All Sub Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateProductCostSlab(i, 'categoryId', e.target.value)} disabled={!slab.parentCategoryId}>
+                      <option value="">All Sub Categories</option>
+                      {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateProductCostSlab(i, 'subCategoryId', e.target.value)} disabled={!slab.categoryId}>
+                      <option value="">All Sub Sub Categories</option>
+                      {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateProductCostSlab(i, 'from', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateProductCostSlab(i, 'to', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateProductCostSlab(i, 'value', e.target.value)} />
                 {productCostSlabs.length > 1 ? (
-                  <button className="commission-delete-btn" onClick={() => removeProductCostSlab(i)} type="button">🗑️</button>
+                  <button className="commission-delete-btn" onClick={() => removeProductCostSlab(i)} type="button">
+                    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                    </svg>
+                  </button>
                 ) : <div></div>}
               </div>
             ))}
@@ -958,7 +959,7 @@ const AddMarketplacePage: React.FC = () => {
                   value={marketingFlatValue}
                   onChange={e => setMarketingFlatValue(validateNumericInput(e.target.value))}
                 />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{marketingFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -974,8 +975,8 @@ const AddMarketplacePage: React.FC = () => {
               <span className="commission-header-label">Brand</span>
               <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                 <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                {marketingHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                {marketingHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
+                <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
+                <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
               </div>
               <span className="commission-header-label">From</span>
               <span className="commission-header-label">To</span>
@@ -997,39 +998,39 @@ const AddMarketplacePage: React.FC = () => {
             {/* Table Rows */}
             {marketingSlabs.map((slab, i) => (
               <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
-                <select className="commission-dropdown" value={slab.brandId} onChange={e => updateMarketingSlab(i, 'brandId', e.target.value)}>
+                <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateMarketingSlab(i, 'brandId', e.target.value)}>
                   <option value="">All Brands</option>
                   {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                 </select>
                 <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
                     <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updateMarketingSlab(i, 'parentCategoryId', e.target.value)}>
                       <option value="">All Categories</option>
                       {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                     </select>
                   </div>
-                  {slab.parentCategoryId && (
-                    <div style={{ flex: 1 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateMarketingSlab(i, 'categoryId', e.target.value)}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {slab.categoryId && (
-                    <div style={{ flex: 1 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateMarketingSlab(i, 'subCategoryId', e.target.value)}>
-                        <option value="">All Sub Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateMarketingSlab(i, 'categoryId', e.target.value)} disabled={!slab.parentCategoryId}>
+                      <option value="">All Sub Categories</option>
+                      {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateMarketingSlab(i, 'subCategoryId', e.target.value)} disabled={!slab.categoryId}>
+                      <option value="">All Sub Sub Categories</option>
+                      {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateMarketingSlab(i, 'from', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateMarketingSlab(i, 'to', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateMarketingSlab(i, 'value', e.target.value)} />
                 {marketingSlabs.length > 1 ? (
-                  <button className="commission-delete-btn" onClick={() => removeMarketingSlab(i)} type="button">🗑️</button>
+                  <button className="commission-delete-btn" onClick={() => removeMarketingSlab(i)} type="button">
+                    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                    </svg>
+                  </button>
                 ) : <div></div>}
               </div>
             ))}
@@ -1116,7 +1117,7 @@ const AddMarketplacePage: React.FC = () => {
                   value={shippingFlatValue}
                   onChange={e => setShippingFlatValue(validateNumericInput(e.target.value))}
                 />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{shippingFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -1156,7 +1157,11 @@ const AddMarketplacePage: React.FC = () => {
                 <input className="commission-input" placeholder="0" value={slab.national} onChange={e => updateWeightSlab(i, 'national', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateWeightSlab(i, 'value', e.target.value)} />
                 {weightSlabs.length > 1 ? (
-                  <button className="commission-delete-btn" onClick={() => removeWeightSlab(i)} type="button">🗑️</button>
+                  <button className="commission-delete-btn" onClick={() => removeWeightSlab(i)} type="button">
+                    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                    </svg>
+                  </button>
                 ) : <div></div>}
               </div>
             ))}
@@ -1208,7 +1213,11 @@ const AddMarketplacePage: React.FC = () => {
                 value={shippingPercentage.national} 
                 onChange={e => handleShippingPercentageChange('national', e.target.value)} 
               />
-              <button className="commission-delete-btn" type="button" onClick={() => setShippingPercentage({ local: '0', zonal: '0', national: '0' })}>🗑️</button>
+              <button className="commission-delete-btn" type="button" onClick={() => setShippingPercentage({ local: '0', zonal: '0', national: '0' })}>
+                <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -1275,7 +1284,7 @@ const AddMarketplacePage: React.FC = () => {
                   value={fixedFeeFlatValue}
                   onChange={e => setFixedFeeFlatValue(validateNumericInput(e.target.value))}
                 />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{fixedFeeFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -1291,8 +1300,8 @@ const AddMarketplacePage: React.FC = () => {
               <span className="commission-header-label">Brand</span>
               <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                 <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                {fixedFeeHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                {fixedFeeHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
+                <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
+                <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
               </div>
               <span className="commission-header-label">ASP From</span>
               <span className="commission-header-label">ASP To</span>
@@ -1314,39 +1323,39 @@ const AddMarketplacePage: React.FC = () => {
             {/* Table Rows */}
             {fixedFeeSlabs.map((slab, i) => (
               <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.9fr 0.9fr 0.9fr 1fr' }}>
-                <select className="commission-dropdown" value={fixedFeeFilters.brandId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, brandId: e.target.value }))}>
+                <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.brandId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, brandId: e.target.value }))}>
                   <option value="">All Brands</option>
                   {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                 </select>
                 <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
                     <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.categoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, categoryId: e.target.value, subCategoryId: '', subSubCategoryId: '' }))}>
                       <option value="">All Categories</option>
                       {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                     </select>
                   </div>
-                  {fixedFeeFilters.categoryId && (
-                    <div style={{ flex: 1 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.subCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subCategoryId: e.target.value, subSubCategoryId: '' }))}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && c.parentCategoryId === parseInt(fixedFeeFilters.categoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {fixedFeeFilters.subCategoryId && (
-                    <div style={{ flex: 1 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.subSubCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subSubCategoryId: e.target.value }))}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && c.parentCategoryId === parseInt(fixedFeeFilters.subCategoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.subCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subCategoryId: e.target.value, subSubCategoryId: '' }))} disabled={!fixedFeeFilters.categoryId}>
+                      <option value="">All Sub Categories</option>
+                      {categories.filter(c => c.parentCategoryId !== null && c.parentCategoryId === parseInt(fixedFeeFilters.categoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.subSubCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subSubCategoryId: e.target.value }))} disabled={!fixedFeeFilters.subCategoryId}>
+                      <option value="">All Sub Categories</option>
+                      {categories.filter(c => c.parentCategoryId !== null && c.parentCategoryId === parseInt(fixedFeeFilters.subCategoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <input className="commission-input" placeholder="500" value={slab.aspFrom} onChange={e => updateFixedFeeSlab(i, 'aspFrom', e.target.value)} />
                 <input className="commission-input" placeholder="500" value={slab.aspTo} onChange={e => updateFixedFeeSlab(i, 'aspTo', e.target.value)} />
                 <input className="commission-input" placeholder="500" value={slab.fee} onChange={e => updateFixedFeeSlab(i, 'fee', e.target.value)} />
                 {fixedFeeSlabs.length > 1 ? (
-                  <button className="commission-delete-btn" onClick={() => removeFixedFeeSlab(i)} type="button">🗑️</button>
+                  <button className="commission-delete-btn" onClick={() => removeFixedFeeSlab(i)} type="button">
+                    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                    </svg>
+                  </button>
                 ) : <div></div>}
               </div>
             ))}
@@ -1417,7 +1426,7 @@ const AddMarketplacePage: React.FC = () => {
                   value={reverseShippingFlatValue}
                   onChange={e => setReverseShippingFlatValue(validateNumericInput(e.target.value))}
                 />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{reverseShippingFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -1450,7 +1459,11 @@ const AddMarketplacePage: React.FC = () => {
                   <input className="commission-input" placeholder="0" value={slab.national} onChange={e => updateReverseWeightSlab(i, 'national', e.target.value)} />
                   <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateReverseWeightSlab(i, 'value', e.target.value)} />
                   <div className="commission-delete-cell">
-                    <button className="commission-delete-btn" onClick={() => removeReverseWeightSlab(i)} type="button">🗑️</button>
+                    <button className="commission-delete-btn" onClick={() => removeReverseWeightSlab(i)} type="button">
+                      <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1517,7 +1530,11 @@ const AddMarketplacePage: React.FC = () => {
                   <input className="commission-input" placeholder="500" value={slab.prepaid} onChange={e => updateCollectionFeeSlab(i, 'prepaid', e.target.value)} />
                   <input className="commission-input" placeholder="500" value={slab.postpaid} onChange={e => updateCollectionFeeSlab(i, 'postpaid', e.target.value)} />
                   <div className="commission-delete-cell">
-                    <button className="commission-delete-btn" onClick={() => removeCollectionFeeSlab(i)} type="button">🗑️</button>
+                    <button className="commission-delete-btn" onClick={() => removeCollectionFeeSlab(i)} type="button">
+                      <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1579,7 +1596,7 @@ const AddMarketplacePage: React.FC = () => {
                   value={royaltyValue}
                   onChange={e => setRoyaltyValue(validateNumericInput(e.target.value))}
                 />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{royaltyValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -1620,8 +1637,8 @@ const AddMarketplacePage: React.FC = () => {
                   <span className="commission-header-label">Brand</span>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                     <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                    {pnpHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                    {pnpHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
+                    <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
+                    <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>
                   </div>
                   <span className="commission-header-label">From</span>
                   <span className="commission-header-label">To</span>
@@ -1643,39 +1660,39 @@ const AddMarketplacePage: React.FC = () => {
                 {/* Table Rows */}
                 {pickAndPackSlabs.map((slab, index) => (
                   <div key={index} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
-                    <select className="commission-dropdown" value={slab.brand} onChange={e => updatePickAndPackSlab(index, 'brand', e.target.value)}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brand} onChange={e => updatePickAndPackSlab(index, 'brand', e.target.value)}>
                       <option value="">All Brands</option>
                       {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                     </select>
                     <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
                         <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updatePickAndPackSlab(index, 'parentCategoryId', e.target.value)}>
                           <option value="">All Categories</option>
                           {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                         </select>
                       </div>
-                      {slab.parentCategoryId && (
-                        <div style={{ flex: 1 }}>
-                          <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updatePickAndPackSlab(index, 'categoryId', e.target.value)}>
-                            <option value="">All Sub Categories</option>
-                            {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                          </select>
-                        </div>
-                      )}
-                      {slab.categoryId && (
-                        <div style={{ flex: 1 }}>
-                          <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updatePickAndPackSlab(index, 'subCategoryId', e.target.value)}>
-                            <option value="">All Sub Categories</option>
-                            {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                          </select>
-                        </div>
-                      )}
+                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updatePickAndPackSlab(index, 'categoryId', e.target.value)} disabled={!slab.parentCategoryId}>
+                          <option value="">All Sub Categories</option>
+                          {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updatePickAndPackSlab(index, 'subCategoryId', e.target.value)} disabled={!slab.categoryId}>
+                          <option value="">All Sub Categories</option>
+                          {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updatePickAndPackSlab(index, 'from', e.target.value)} />
                     <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updatePickAndPackSlab(index, 'to', e.target.value)} />
                     <input className="commission-input" placeholder="0" value={slab.pnpValue} onChange={e => updatePickAndPackSlab(index, 'pnpValue', e.target.value)} />
                     {pickAndPackSlabs.length > 1 ? (
-                      <button className="commission-delete-btn" onClick={() => removePickAndPackSlab(index)} type="button">🗑️</button>
+                      <button className="commission-delete-btn" onClick={() => removePickAndPackSlab(index)} type="button">
+                        <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                        </svg>
+                      </button>
                     ) : <div></div>}
                   </div>
                 ))}

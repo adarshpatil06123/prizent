@@ -16,11 +16,169 @@ const MarketplacesListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomFieldResponse[]>([]);
   const [marketplaceFieldValues, setMarketplaceFieldValues] = useState<Map<number, CustomFieldValueResponse[]>>(new Map());
+  const [useDummyData] = useState(false); // Toggle this to test with dummy data
+
+  // Dummy marketplace data for testing
+  const dummyMarketplaces: Marketplace[] = [
+    {
+      id: 1,
+      name: "Amazon India",
+      accNo: "AMZ-IND-2024-001",
+      description: "Amazon marketplace India",
+      enabled: true,
+      createDateTime: "2024-01-15T10:30:00",
+      costs: [
+        { id: 1, costCategory: "COMMISSION", costValueType: "P", costValue: 15, costProductRange: "0-500" },
+        { id: 2, costCategory: "COMMISSION", costValueType: "P", costValue: 12, costProductRange: "501-2000" },
+        { id: 3, costCategory: "SHIPPING", costValueType: "A", costValue: 50, costProductRange: "0-1kg" },
+        { id: 4, costCategory: "MARKETING", costValueType: "P", costValue: 5, costProductRange: "All" },
+      ]
+    },
+    {
+      id: 2,
+      name: "Flipkart",
+      accNo: "FLP-2024-0042",
+      description: "Flipkart marketplace",
+      enabled: true,
+      createDateTime: "2024-02-10T14:20:00",
+      costs: [
+        { id: 5, costCategory: "COMMISSION", costValueType: "P", costValue: 18, costProductRange: "0-1000" },
+        { id: 6, costCategory: "SHIPPING", costValueType: "A", costValue: 45, costProductRange: "0-500g" },
+        { id: 7, costCategory: "MARKETING", costValueType: "P", costValue: 3, costProductRange: "All" },
+      ]
+    },
+    {
+      id: 3,
+      name: "Myntra Fashion",
+      accNo: "MYN-FASH-2024-15",
+      description: "Fashion marketplace",
+      enabled: false,
+      createDateTime: "2024-01-20T09:15:00",
+      costs: [
+        { id: 8, costCategory: "COMMISSION", costValueType: "P", costValue: 20, costProductRange: "All" },
+        { id: 9, costCategory: "SHIPPING", costValueType: "A", costValue: 60, costProductRange: "Standard" },
+      ]
+    },
+    {
+      id: 4,
+      name: "Meesho",
+      accNo: "MSH-2024-0089",
+      description: "Social commerce platform",
+      enabled: true,
+      createDateTime: "2024-03-01T11:30:00",
+      costs: [
+        { id: 10, costCategory: "COMMISSION", costValueType: "P", costValue: 10, costProductRange: "0-500" },
+        { id: 11, costCategory: "COMMISSION", costValueType: "P", costValue: 8, costProductRange: "501+" },
+        { id: 12, costCategory: "SHIPPING", costValueType: "A", costValue: 35, costProductRange: "All" },
+        { id: 13, costCategory: "MARKETING", costValueType: "P", costValue: 2, costProductRange: "All" },
+      ]
+    },
+    {
+      id: 5,
+      name: "Snapdeal",
+      accNo: "SNAP-2024-0156",
+      description: "Online marketplace",
+      enabled: true,
+      createDateTime: "2024-02-15T16:45:00",
+      costs: [
+        { id: 14, costCategory: "COMMISSION", costValueType: "P", costValue: 14, costProductRange: "All" },
+        { id: 15, costCategory: "SHIPPING", costValueType: "A", costValue: 40, costProductRange: "Standard" },
+      ]
+    },
+    {
+      id: 6,
+      name: "Ajio Fashion",
+      accNo: "AJO-2024-0234",
+      description: "Reliance fashion marketplace",
+      enabled: true,
+      createDateTime: "2024-01-25T13:20:00",
+      costs: [
+        { id: 16, costCategory: "COMMISSION", costValueType: "P", costValue: 22, costProductRange: "0-1500" },
+        { id: 17, costCategory: "COMMISSION", costValueType: "P", costValue: 18, costProductRange: "1501+" },
+        { id: 18, costCategory: "SHIPPING", costValueType: "A", costValue: 55, costProductRange: "All" },
+        { id: 19, costCategory: "MARKETING", costValueType: "P", costValue: 4, costProductRange: "All" },
+      ]
+    },
+    {
+      id: 7,
+      name: "Nykaa Beauty",
+      accNo: "NYK-BEAUTY-2024",
+      description: "Beauty & cosmetics marketplace",
+      enabled: false,
+      createDateTime: "2024-02-20T10:00:00",
+      costs: [
+        { id: 20, costCategory: "COMMISSION", costValueType: "P", costValue: 25, costProductRange: "All" },
+        { id: 21, costCategory: "SHIPPING", costValueType: "A", costValue: 50, costProductRange: "Standard" },
+      ]
+    },
+    {
+      id: 8,
+      name: "JioMart",
+      accNo: "JIO-MRT-2024-078",
+      description: "Reliance JioMart online",
+      enabled: true,
+      createDateTime: "2024-03-05T15:30:00",
+      costs: [
+        { id: 22, costCategory: "COMMISSION", costValueType: "P", costValue: 12, costProductRange: "0-1000" },
+        { id: 23, costCategory: "COMMISSION", costValueType: "P", costValue: 10, costProductRange: "1001+" },
+        { id: 24, costCategory: "SHIPPING", costValueType: "A", costValue: 30, costProductRange: "Express" },
+        { id: 25, costCategory: "MARKETING", costValueType: "P", costValue: 3, costProductRange: "All" },
+      ]
+    }
+  ];
+
+  // Dummy custom fields for testing
+  const dummyCustomFields: CustomFieldResponse[] = [
+    { id: 1, clientId: 1, name: "Region", fieldType: "TEXT", module: "m", required: false, enabled: true },
+    { id: 2, clientId: 1, name: "Payment Terms", fieldType: "TEXT", module: "m", required: false, enabled: true },
+  ];
+
+  // Dummy custom field values for marketplaces
+  const dummyCustomFieldValues = new Map<number, CustomFieldValueResponse[]>([
+    [1, [
+      { id: 1, customFieldId: 1, clientId: 1, module: "m", moduleId: 1, value: "North India" },
+      { id: 2, customFieldId: 2, clientId: 1, module: "m", moduleId: 1, value: "Net 30" }
+    ]],
+    [2, [
+      { id: 3, customFieldId: 1, clientId: 1, module: "m", moduleId: 2, value: "Pan India" },
+      { id: 4, customFieldId: 2, clientId: 1, module: "m", moduleId: 2, value: "Net 45" }
+    ]],
+    [3, [
+      { id: 5, customFieldId: 1, clientId: 1, module: "m", moduleId: 3, value: "Metro Cities" },
+      { id: 6, customFieldId: 2, clientId: 1, module: "m", moduleId: 3, value: "Net 15" }
+    ]],
+    [4, [
+      { id: 7, customFieldId: 1, clientId: 1, module: "m", moduleId: 4, value: "Tier 2/3 Cities" },
+      { id: 8, customFieldId: 2, clientId: 1, module: "m", moduleId: 4, value: "Net 60" }
+    ]],
+    [5, [
+      { id: 9, customFieldId: 1, clientId: 1, module: "m", moduleId: 5, value: "All India" },
+      { id: 10, customFieldId: 2, clientId: 1, module: "m", moduleId: 5, value: "Net 30" }
+    ]],
+    [6, [
+      { id: 11, customFieldId: 1, clientId: 1, module: "m", moduleId: 6, value: "Premium Zones" },
+      { id: 12, customFieldId: 2, clientId: 1, module: "m", moduleId: 6, value: "Net 20" }
+    ]],
+    [7, [
+      { id: 13, customFieldId: 1, clientId: 1, module: "m", moduleId: 7, value: "Urban Areas" },
+      { id: 14, customFieldId: 2, clientId: 1, module: "m", moduleId: 7, value: "Net 15" }
+    ]],
+    [8, [
+      { id: 15, customFieldId: 1, clientId: 1, module: "m", moduleId: 8, value: "National" },
+      { id: 16, customFieldId: 2, clientId: 1, module: "m", moduleId: 8, value: "Net 45" }
+    ]]
+  ]);
 
   // Fetch custom fields on component mount
   useEffect(() => {
     const fetchCustomFieldsData = async () => {
       try {
+        // Use dummy data if flag is enabled
+        if (useDummyData) {
+          setCustomFields(dummyCustomFields);
+          return;
+        }
+        
         const fields = await getCustomFields('m'); // 'm' for marketplaces
         const enabledFields = fields.filter(f => f.enabled);
         setCustomFields(enabledFields);
@@ -40,6 +198,19 @@ const MarketplacesListPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Use dummy data if flag is enabled
+      if (useDummyData) {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        setMarketplaces(dummyMarketplaces);
+        setTotalPages(1);
+        setTotalElements(dummyMarketplaces.length);
+        setMarketplaceFieldValues(dummyCustomFieldValues);
+        setLoading(false);
+        return;
+      }
       
       // Convert 1-based page to 0-based for API
       const apiPage = currentPage - 1;
@@ -208,10 +379,9 @@ const MarketplacesListPage: React.FC = () => {
           
           <div className="marketplaces-table">
             <div className="marketplaces-table-row marketplaces-table-header">
-              <div>Name</div>
-              <div>Commission</div>
-              <div>Shipping</div>
-              <div>Marketing</div>
+              <div>Marketplace</div>
+              <div>Account Number</div>
+              <div>Commission Details</div>
               {customFields.filter(f => f.enabled).map((field) => (
                 <div key={field.id}>{field.name}</div>
               ))}
@@ -238,49 +408,24 @@ const MarketplacesListPage: React.FC = () => {
                 return (
                 <div className="marketplaces-table-row" key={marketplace.id}>
                   <div>{marketplace.name}</div>
+                  <div>{marketplace.accNo || '-'}</div>
                   <div className="slab-cell">
-                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'COMMISSION').length === 0) ? (
-                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'COMMISSION').length > 0
-                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'COMMISSION').map((c, i) => (
+                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.length === 0) ? (
+                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.length > 0
+                        ? marketplace.brandCostsSummary.map((c, i) => (
                             <span key={i} className="slab-entry">
-                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
+                              {c.brandName ? `${c.brandName} - ` : ''}{c.costCategory}: {c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
                             </span>
                           ))
                         : <span className="slab-entry">-</span>
                     ) : (
-                      getSlabsForCategory(marketplace.costs || [], 'COMMISSION').map((slab, i) => (
-                        <span key={i} className="slab-entry">{slab}</span>
-                      ))
-                    )}
-                  </div>
-                  <div className="slab-cell">
-                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'SHIPPING').length === 0) ? (
-                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'SHIPPING').length > 0
-                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'SHIPPING').map((c, i) => (
-                            <span key={i} className="slab-entry">
-                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
-                            </span>
-                          ))
-                        : <span className="slab-entry">-</span>
-                    ) : (
-                      getSlabsForCategory(marketplace.costs || [], 'SHIPPING').map((slab, i) => (
-                        <span key={i} className="slab-entry">{slab}</span>
-                      ))
-                    )}
-                  </div>
-                  <div className="slab-cell">
-                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.filter(c => c.costCategory === 'MARKETING').length === 0) ? (
-                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.filter(c => c.costCategory === 'MARKETING').length > 0
-                        ? marketplace.brandCostsSummary.filter(c => c.costCategory === 'MARKETING').map((c, i) => (
-                            <span key={i} className="slab-entry">
-                              {c.brandName ? `${c.brandName}: ` : ''}{c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
-                            </span>
-                          ))
-                        : <span className="slab-entry">-</span>
-                    ) : (
-                      getSlabsForCategory(marketplace.costs || [], 'MARKETING').map((slab, i) => (
-                        <span key={i} className="slab-entry">{slab}</span>
-                      ))
+                      marketplace.costs && marketplace.costs.length > 0 ? (
+                        marketplace.costs.map((cost, i) => (
+                          <span key={i} className="slab-entry">
+                            {cost.costCategory}: {cost.costValueType === 'P' ? `${cost.costValue}%` : `₹${cost.costValue}`}{cost.costProductRange ? ` (${cost.costProductRange})` : ''}
+                          </span>
+                        ))
+                      ) : <span className="slab-entry">-</span>
                     )}
                   </div>
                   {customFields.filter(f => f.enabled).map((field) => (

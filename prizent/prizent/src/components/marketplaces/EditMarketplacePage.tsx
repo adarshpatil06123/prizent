@@ -615,7 +615,7 @@ const EditMarketplacePage: React.FC = () => {
             const hasSubSubCat = productCostSlabs.some(s => s.categoryId !== '');
             return (
               <div className="commission-panel">
-                <div className="commission-table-header" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                <div className="commission-table-header" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
                   <span className="commission-header-label">Brand</span>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                     <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
@@ -632,8 +632,8 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                 </div>
                 {productCostSlabs.map((slab, i) => (
-                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
-                    <select className="commission-dropdown" value={slab.brandId} onChange={e => updateProductCostSlab(i, 'brandId', e.target.value)}>
+                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateProductCostSlab(i, 'brandId', e.target.value)}>
                       <option value="">All Brands</option>
                       {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                     </select>
@@ -700,7 +700,7 @@ const EditMarketplacePage: React.FC = () => {
             const hasSubSubCat = marketingSlabs.some(s => s.categoryId !== '');
             return (
               <div className="commission-panel">
-                <div className="commission-table-header" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                <div className="commission-table-header" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
                   <span className="commission-header-label">Brand</span>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                     <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
@@ -717,8 +717,8 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                 </div>
                 {marketingSlabs.map((slab, i) => (
-                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
-                    <select className="commission-dropdown" value={slab.brandId} onChange={e => updateMarketingSlab(i, 'brandId', e.target.value)}>
+                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateMarketingSlab(i, 'brandId', e.target.value)}>
                       <option value="">All Brands</option>
                       {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                     </select>
@@ -858,7 +858,7 @@ const EditMarketplacePage: React.FC = () => {
             const hasSubSubCat = fixedFeeFilters.subCategoryId !== '';
             return (
               <div className="commission-panel">
-                <div className="commission-table-header" style={{ gridTemplateColumns: '1fr 3fr 0.9fr 0.9fr 0.9fr 1fr' }}>
+                <div className="commission-table-header" style={{ gridTemplateColumns: '2fr 2fr 0.9fr 0.9fr 0.9fr 1fr' }}>
                   <span className="commission-header-label">Brand</span>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                     <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
@@ -875,8 +875,8 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                 </div>
                 {fixedFeeSlabs.map((slab, i) => (
-                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.9fr 0.9fr 0.9fr 1fr' }}>
-                    <select className="commission-dropdown" value={fixedFeeFilters.brandId} onChange={e => setFixedFeeFilters(p => ({ ...p, brandId: e.target.value }))}>
+                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '2fr 2fr 0.9fr 0.9fr 0.9fr 1fr' }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.brandId} onChange={e => setFixedFeeFilters(p => ({ ...p, brandId: e.target.value }))}>
                       <option value="">All Brands</option>
                       {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                     </select>
@@ -1043,7 +1043,7 @@ const EditMarketplacePage: React.FC = () => {
             const hasSubSubCat = pickAndPackSlabs.some(s => s.categoryId !== '');
             return (
               <div className="commission-panel">
-                <div className="commission-table-header" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                <div className="commission-table-header" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
                   <span className="commission-header-label">Brand</span>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                     <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
@@ -1060,8 +1060,8 @@ const EditMarketplacePage: React.FC = () => {
                   </div>
                 </div>
                 {pickAndPackSlabs.map((slab, i) => (
-                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '1fr 3fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
-                    <select className="commission-dropdown" value={slab.brand} onChange={e => updatePickAndPackSlab(i, 'brand', e.target.value)}>
+                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brand} onChange={e => updatePickAndPackSlab(i, 'brand', e.target.value)}>
                       <option value="">All Brands</option>
                       {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                     </select>
