@@ -614,17 +614,18 @@
 .commission-value-toggle {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
+  cursor: pointer;
 }
 
-.commission-value-toggle span {
+.commission-value-toggle > span {
   font-family: 'Murecho';
   font-style: normal;
   font-weight: 400;
-  font-size: 20px;
-  line-height: 29px;
-  color: #7C7C7C;
+  font-size: 18px;
+  line-height: 26px;
+  color: #454545;
+  user-select: none;
 }
 
 /* Add Slab Button */
@@ -814,7 +815,7 @@
 /* ══════════════════ Collection Fee Table Styles ══════════════════ */
 .collection-fee-table-header {
   display: grid;
-  grid-template-columns: repeat(5, 1fr) 0.5fr;
+  grid-template-columns: 1fr 1fr 1.5fr 1.5fr 0.4fr;
   align-items: center;
   padding: 20px 30px;
   background: #FAFBFF;
@@ -827,9 +828,15 @@
   gap: 10px;
 }
 
+.collection-fee-col-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .collection-fee-table-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr) 0.5fr;
+  grid-template-columns: 1fr 1fr 1.5fr 1.5fr 0.4fr;
   align-items: center;
   padding: 20px 30px;
   background: #FAFBFF;

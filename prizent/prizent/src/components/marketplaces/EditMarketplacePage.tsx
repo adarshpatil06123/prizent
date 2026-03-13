@@ -606,7 +606,7 @@ const EditMarketplacePage: React.FC = () => {
               <div className="royalty-content">
                 <label className="royalty-label">Value :</label>
                 <input className="royalty-input" type="text" placeholder="0" value={commissionFlatValue} onChange={e => setCommissionFlatValue(validateNumericInput(e.target.value))} />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{commissionFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -691,7 +691,7 @@ const EditMarketplacePage: React.FC = () => {
               <div className="royalty-content">
                 <label className="royalty-label">Value :</label>
                 <input className="royalty-input" type="text" placeholder="0" value={marketingFlatValue} onChange={e => setMarketingFlatValue(validateNumericInput(e.target.value))} />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{marketingFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -777,7 +777,7 @@ const EditMarketplacePage: React.FC = () => {
               <div className="royalty-content">
                 <label className="royalty-label">Value :</label>
                 <input className="royalty-input" type="text" placeholder="0" value={shippingFlatValue} onChange={e => setShippingFlatValue(validateNumericInput(e.target.value))} />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{shippingFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -849,7 +849,7 @@ const EditMarketplacePage: React.FC = () => {
               <div className="royalty-content">
                 <label className="royalty-label">Value :</label>
                 <input className="royalty-input" type="text" placeholder="0" value={fixedFeeFlatValue} onChange={e => setFixedFeeFlatValue(validateNumericInput(e.target.value))} />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{fixedFeeFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -934,7 +934,7 @@ const EditMarketplacePage: React.FC = () => {
               <div className="royalty-content">
                 <label className="royalty-label">Value :</label>
                 <input className="royalty-input" type="text" placeholder="0" value={reverseShippingFlatValue} onChange={e => setReverseShippingFlatValue(validateNumericInput(e.target.value))} />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{reverseShippingFlatValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}
@@ -981,18 +981,23 @@ const EditMarketplacePage: React.FC = () => {
               <div className="collection-fee-table-header">
                 <span className="commission-header-label">Order Value From</span>
                 <span className="commission-header-label">Order Value To</span>
-                <span className="commission-header-label">Prepaid</span>
-                <div className="commission-value-toggle">
-                  <span>%</span>
-                  <label className="switch"><input type="checkbox" checked={prepaidValueType === 'A'} onChange={e => setPrepaidValueType(e.target.checked ? 'A' : 'P')} /><span className="slider" /></label>
-                  <span>Rs</span>
+                <div className="collection-fee-col-header">
+                  <span className="commission-header-label">Prepaid</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch"><input type="checkbox" checked={prepaidValueType === 'A'} onChange={e => setPrepaidValueType(e.target.checked ? 'A' : 'P')} /><span className="slider" /></label>
+                    <span>Rs</span>
+                  </div>
                 </div>
-                <span className="commission-header-label">Postpaid</span>
-                <div className="commission-value-toggle">
-                  <span>%</span>
-                  <label className="switch"><input type="checkbox" checked={postpaidValueType === 'A'} onChange={e => setPostpaidValueType(e.target.checked ? 'A' : 'P')} /><span className="slider" /></label>
-                  <span>Rs</span>
+                <div className="collection-fee-col-header">
+                  <span className="commission-header-label">Postpaid</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch"><input type="checkbox" checked={postpaidValueType === 'A'} onChange={e => setPostpaidValueType(e.target.checked ? 'A' : 'P')} /><span className="slider" /></label>
+                    <span>Rs</span>
+                  </div>
                 </div>
+                <span></span>
               </div>
               {collectionFeeSlabs.map((slab, i) => (
                 <div className="collection-fee-table-row" key={i}>
@@ -1025,7 +1030,7 @@ const EditMarketplacePage: React.FC = () => {
               <div className="royalty-content">
                 <label className="royalty-label">Value :</label>
                 <input className="royalty-input" type="text" placeholder="5" value={royaltyValue} onChange={e => setRoyaltyValue(validateNumericInput(e.target.value))} />
-                <span className="royalty-unit">Rs</span>
+                <span className="royalty-unit">{royaltyValueType === 'P' ? '%' : 'Rs'}</span>
               </div>
             </div>
           )}

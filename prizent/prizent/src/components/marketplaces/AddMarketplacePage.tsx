@@ -1461,9 +1461,12 @@ const AddMarketplacePage: React.FC = () => {
                 <span>National(₹)</span>
                 <span>Value</span>
                 <div className="commission-value-toggle">
-                  <span className={reverseWeightValueType === 'P' ? 'active' : ''} onClick={() => handleReverseWeightValueTypeChange('P')}>%</span>
-                  <div className="toggle-slider" style={{ left: reverseWeightValueType === 'A' ? '50%' : '0%' }}></div>
-                  <span className={reverseWeightValueType === 'A' ? 'active' : ''} onClick={() => handleReverseWeightValueTypeChange('A')}>Rs</span>
+                  <span>%</span>
+                  <label className="switch">
+                    <input type="checkbox" checked={reverseWeightValueType === 'A'} onChange={e => handleReverseWeightValueTypeChange(e.target.checked ? 'A' : 'P')} />
+                    <span className="slider"></span>
+                  </label>
+                  <span>Rs</span>
                 </div>
               </div>
 
@@ -1526,18 +1529,29 @@ const AddMarketplacePage: React.FC = () => {
               <div className="collection-fee-table-header">
                 <span>Order Value From</span>
                 <span>Order Value To</span>
-                <span>Prepaid</span>
-                <div className="commission-value-toggle">
-                  <span className={prepaidValueType === 'P' ? 'active' : ''} onClick={() => handlePrepaidValueTypeChange('P')}>%</span>
-                  <div className="toggle-slider" style={{ left: prepaidValueType === 'A' ? '50%' : '0%' }}></div>
-                  <span className={prepaidValueType === 'A' ? 'active' : ''} onClick={() => handlePrepaidValueTypeChange('A')}>Rs</span>
+                <div className="collection-fee-col-header">
+                  <span>Prepaid</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch">
+                      <input type="checkbox" checked={prepaidValueType === 'A'} onChange={e => handlePrepaidValueTypeChange(e.target.checked ? 'A' : 'P')} />
+                      <span className="slider"></span>
+                    </label>
+                    <span>Rs</span>
+                  </div>
                 </div>
-                <span>Postpaid</span>
-                <div className="commission-value-toggle">
-                  <span className={postpaidValueType === 'P' ? 'active' : ''} onClick={() => handlePostpaidValueTypeChange('P')}>%</span>
-                  <div className="toggle-slider" style={{ left: postpaidValueType === 'A' ? '50%' : '0%' }}></div>
-                  <span className={postpaidValueType === 'A' ? 'active' : ''} onClick={() => handlePostpaidValueTypeChange('A')}>Rs</span>
+                <div className="collection-fee-col-header">
+                  <span>Postpaid</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch">
+                      <input type="checkbox" checked={postpaidValueType === 'A'} onChange={e => handlePostpaidValueTypeChange(e.target.checked ? 'A' : 'P')} />
+                      <span className="slider"></span>
+                    </label>
+                    <span>Rs</span>
+                  </div>
                 </div>
+                <span></span>
               </div>
 
               {/* Table Rows */}

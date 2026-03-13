@@ -305,6 +305,22 @@ const MarketplacesListPage: React.FC = () => {
     }
   };
 
+  // Returns a short commission summary: "Slab Based", "Flat 12%", "Flat ₹50", or "-"
+  const getCommissionSummary = (marketplace: Marketplace): string => {
+    const commissionCosts = (marketplace.costs || []).filter(c => c.costCategory === 'COMMISSION');
+    if (commissionCosts.length === 0) {
+      if (marketplace.hasBrandMappings) return 'Brand Based';
+      return '-';
+    }
+    // Flat commission is saved with costProductRange === 'flat'
+    const isFlat = commissionCosts.length === 1 && commissionCosts[0].costProductRange === 'flat';
+    if (isFlat) {
+      const c = commissionCosts[0];
+      return c.costValueType === 'P' ? `Flat ${c.costValue}%` : `Flat ₹${c.costValue}`;
+    }
+    return 'Slab Based';
+  };
+
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages = [];
@@ -409,25 +425,7 @@ const MarketplacesListPage: React.FC = () => {
                 <div className="marketplaces-table-row" key={marketplace.id}>
                   <div>{marketplace.name}</div>
                   <div>{marketplace.accNo || '-'}</div>
-                  <div className="slab-cell">
-                    {marketplace.hasBrandMappings && (!marketplace.costs || marketplace.costs.length === 0) ? (
-                      marketplace.brandCostsSummary && marketplace.brandCostsSummary.length > 0
-                        ? marketplace.brandCostsSummary.map((c, i) => (
-                            <span key={i} className="slab-entry">
-                              {c.brandName ? `${c.brandName} - ` : ''}{c.costCategory}: {c.costValueType === 'P' ? `${c.costValue}%` : `₹${c.costValue}`}{c.costProductRange ? ` (${c.costProductRange})` : ''}
-                            </span>
-                          ))
-                        : <span className="slab-entry">-</span>
-                    ) : (
-                      marketplace.costs && marketplace.costs.length > 0 ? (
-                        marketplace.costs.map((cost, i) => (
-                          <span key={i} className="slab-entry">
-                            {cost.costCategory}: {cost.costValueType === 'P' ? `${cost.costValue}%` : `₹${cost.costValue}`}{cost.costProductRange ? ` (${cost.costProductRange})` : ''}
-                          </span>
-                        ))
-                      ) : <span className="slab-entry">-</span>
-                    )}
-                  </div>
+                  <div>{getCommissionSummary(marketplace)}</div>
                   {customFields.filter(f => f.enabled).map((field) => (
                     <div key={field.id}>{getFieldValue(field.id)}</div>
                   ))}
