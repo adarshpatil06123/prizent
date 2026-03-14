@@ -63,6 +63,8 @@ const EditMarketplacePage: React.FC = () => {
   const [shippingFlatValueType, setShippingFlatValueType] = useState<'P' | 'A'>('A');
   const [shippingSlabValueType, setShippingSlabValueType] = useState<'P' | 'A'>('A');
   const [weightSlabs, setWeightSlabs] = useState<WeightSlab[]>([{ weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
+  const [gtSlabValueType, setGtSlabValueType] = useState<'P' | 'A'>('A');
+  const [gtSlabs, setGtSlabs] = useState<BrandSlab[]>([{ from: '0', to: '0', value: '0', valueType: 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '' }]);
 
   const [shippingPercentage, setShippingPercentage] = useState({ local: '0', zonal: '0', national: '0' });
 
@@ -195,6 +197,18 @@ const EditMarketplacePage: React.FC = () => {
             weightValueSlabs.forEach(c => { if (rangeMap[c.costProductRange]) rangeMap[c.costProductRange].value = String(c.costValue); });
             const slabs = Object.values(rangeMap);
             if (slabs.length > 0) setWeightSlabs(slabs);
+          }
+
+          // Shipping GT
+          const gtShippingCosts = costs.filter(c => c.costCategory === 'SHIPPING' && c.costProductRange.startsWith('gt:'));
+          if (gtShippingCosts.length > 0) {
+            setShippingValueType('gt');
+            setGtSlabValueType(gtShippingCosts[0].costValueType);
+            setGtSlabs(gtShippingCosts.map(c => {
+              const { from, to } = parseRange(c.costProductRange.replace('gt:', ''));
+              const cat = resolveCategoryLevel(c.categoryId, allCats);
+              return { from, to, value: String(c.costValue), valueType: c.costValueType, brandId: c.brandId ? String(c.brandId) : '', ...cat };
+            }));
           }
 
           // Shipping Percentage
@@ -351,6 +365,19 @@ const EditMarketplacePage: React.FC = () => {
   const removeWeightSlab = (i: number) => { if (weightSlabs.length > 1) setWeightSlabs(prev => prev.filter((_, idx) => idx !== i)); };
   const updateWeightSlab = (i: number, field: keyof WeightSlab, value: string) => setWeightSlabs(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: validateNumericInput(value) } : s));
 
+  // GT shipping handlers
+  const addGtSlab = () => setGtSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: gtSlabValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '' }]);
+  const removeGtSlab = (i: number) => { if (gtSlabs.length > 1) setGtSlabs(prev => prev.filter((_, idx) => idx !== i)); };
+  const updateGtSlab = (i: number, field: string, value: string) => {
+    const v = ['from', 'to', 'value'].includes(field) ? validateNumericInput(value) : value;
+    setGtSlabs(prev => prev.map((s, idx) => {
+      if (idx !== i) return s;
+      if (field === 'parentCategoryId') return { ...s, parentCategoryId: v, categoryId: '', subCategoryId: '' };
+      if (field === 'categoryId') return { ...s, categoryId: v, subCategoryId: '' };
+      return { ...s, [field]: v };
+    }));
+  };
+
   // Reverse weight handlers
   const addReverseWeightSlab = () => setReverseWeightSlabs(prev => [...prev, { weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
   const removeReverseWeightSlab = (i: number) => { if (reverseWeightSlabs.length > 1) setReverseWeightSlabs(prev => prev.filter((_, idx) => idx !== i)); };
@@ -447,6 +474,13 @@ const EditMarketplacePage: React.FC = () => {
             if (parseFloat(slab.zonal) > 0) costs.push({ costCategory: 'WEIGHT_SHIPPING_ZONAL', costValueType: shippingSlabValueType, costValue: parseFloat(slab.zonal), costProductRange: `${slab.weightFrom}-${slab.weightTo}kg` });
             if (parseFloat(slab.national) > 0) costs.push({ costCategory: 'WEIGHT_SHIPPING_NATIONAL', costValueType: shippingSlabValueType, costValue: parseFloat(slab.national), costProductRange: `${slab.weightFrom}-${slab.weightTo}kg` });
             if (parseFloat(slab.value) > 0) costs.push({ costCategory: 'WEIGHT_SHIPPING', costValueType: shippingSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.weightFrom}-${slab.weightTo}kg` });
+          }
+        });
+      } else if (shippingValueType === 'gt') {
+        gtSlabs.forEach(slab => {
+          if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
+            const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
+            costs.push({ costCategory: 'SHIPPING', costValueType: gtSlabValueType, costValue: parseFloat(slab.value), costProductRange: `gt:${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
           }
         });
       }
@@ -810,6 +844,67 @@ const EditMarketplacePage: React.FC = () => {
               <button className="commission-add-slab" onClick={addWeightSlab} type="button"><span>+</span><span>Add Weight Slab</span></button>
             </div>
           )}
+          {shippingValueType === 'gt' && (() => {
+            const hasSubCat = gtSlabs.some(s => s.parentCategoryId !== '');
+            const hasSubSubCat = gtSlabs.some(s => s.categoryId !== '');
+            return (
+              <div className="commission-panel">
+                <div className="commission-table-header" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                  <span className="commission-header-label">Brand</span>
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
+                    <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
+                    {hasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
+                    {hasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
+                  </div>
+                  <span className="commission-header-label">From</span>
+                  <span className="commission-header-label">To</span>
+                  <span className="commission-header-label">Shipping</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch"><input type="checkbox" checked={gtSlabValueType === 'A'} onChange={e => setGtSlabValueType(e.target.checked ? 'A' : 'P')} /><span className="slider" /></label>
+                    <span>Rs</span>
+                  </div>
+                </div>
+                {gtSlabs.map((slab, i) => (
+                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: '2fr 2fr 0.8fr 0.8fr 0.8fr 0.5fr' }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateGtSlab(i, 'brandId', e.target.value)}>
+                      <option value="">All Brands</option>
+                      {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                    </select>
+                    <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updateGtSlab(i, 'parentCategoryId', e.target.value)}>
+                          <option value="">All Categories</option>
+                          {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      {slab.parentCategoryId && (
+                        <div style={{ flex: 1 }}>
+                          <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateGtSlab(i, 'categoryId', e.target.value)}>
+                            <option value="">All Sub Categories</option>
+                            {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      {slab.categoryId && (
+                        <div style={{ flex: 1 }}>
+                          <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateGtSlab(i, 'subCategoryId', e.target.value)}>
+                            <option value="">All Sub Sub Categories</option>
+                            {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateGtSlab(i, 'from', e.target.value)} />
+                    <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateGtSlab(i, 'to', e.target.value)} />
+                    <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateGtSlab(i, 'value', e.target.value)} />
+                    {gtSlabs.length > 1 ? <button className="commission-delete-btn" onClick={() => removeGtSlab(i)} type="button">X</button> : <div></div>}
+                  </div>
+                ))}
+                <button className="commission-add-slab" onClick={addGtSlab} type="button"><span>+</span><span>Add GT Slab</span></button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* SHIPPING PERCENTAGE */}

@@ -9,7 +9,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/pricing_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
     username: root
-    password: preetam@123P
+    password: Adarsh@.27
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   # ── JPA / Hibernate ─────────────────────────────────────────────────────────

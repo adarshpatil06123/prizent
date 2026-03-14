@@ -6,7 +6,7 @@ import { getCustomFields, saveCustomFieldValue, CustomFieldResponse } from '../.
 import brandService, { Brand } from '../../services/brandService';
 import categoryService from '../../services/categoryService';
 
-interface BrandSlab { from: string; to: string; value: string; valueType: 'P' | 'A'; brandId: string; parentCategoryId: string; categoryId: string; subCategoryId: string; }
+interface BrandSlab { from: string; to: string; value: string; valueType: 'P' | 'A'; brandId: string; parentCategoryId: string; categoryId: string; subCategoryId: string; categoryPath?: string[]; }
 interface WeightSlab { 
   weightFrom: string; 
   weightTo: string; 
@@ -31,6 +31,7 @@ interface PickAndPackSlab {
   parentCategoryId: string;
   categoryId: string;
   subCategoryId: string;
+  categoryPath?: string[];
   from: string;
   to: string;
   pnpValue: string;
@@ -58,8 +59,8 @@ const AddMarketplacePage: React.FC = () => {
   });
   
   // Cost slabs state
-  const [productCostSlabs, setProductCostSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '' }]);
-  const [marketingSlabs, setMarketingSlabs] = useState([{ from: '0', to: '0', value: '0', valueType: 'A' as 'P' | 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '' }]);
+  const [productCostSlabs, setProductCostSlabs] = useState<BrandSlab[]>([{ from: '0', to: '0', value: '0', valueType: 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
+  const [marketingSlabs, setMarketingSlabs] = useState<BrandSlab[]>([{ from: '0', to: '0', value: '0', valueType: 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
   // NEW: Weight-based shipping state
   const [weightSlabs, setWeightSlabs] = useState<WeightSlab[]>([{ weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
   
@@ -84,6 +85,10 @@ const AddMarketplacePage: React.FC = () => {
   const [marketingSlabValueType, setMarketingSlabValueType] = useState<'P' | 'A'>('A');
   const [shippingSlabValueType, setShippingSlabValueType] = useState<'P' | 'A'>('A');
   const [commissionSlabValueType, setCommissionSlabValueType] = useState<'P' | 'A'>('A');
+
+  // GT based shipping slabs
+  const [gtSlabs, setGtSlabs] = useState<BrandSlab[]>([{ from: '0', to: '0', value: '0', valueType: 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
+  const [gtSlabValueType, setGtSlabValueType] = useState<'P' | 'A'>('A');
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -101,6 +106,7 @@ const AddMarketplacePage: React.FC = () => {
   const [commissionFilters, setCommissionFilters] = useState({ brandId: '', categoryId: '', none: false });
   const [marketingFilters, setMarketingFilters] = useState({ brandId: '', categoryId: '', none: false });
   const [fixedFeeFilters, setFixedFeeFilters] = useState({ brandId: '', categoryId: '', subCategoryId: '', subSubCategoryId: '' });
+  const [fixedFeeCategoryPath, setFixedFeeCategoryPath] = useState<string[]>([]);
   const [fixedFeeValueType, setFixedFeeValueType] = useState<'P' | 'A'>('A');
   const [fixedFeeType, setFixedFeeType] = useState<'flat' | 'gt' | 'none'>('gt');
   
@@ -125,7 +131,7 @@ const AddMarketplacePage: React.FC = () => {
   // Pick and Pack states
   const [pickAndPackType, setPickAndPackType] = useState<'slab' | 'none'>('slab');
   const [pickAndPackSlabs, setPickAndPackSlabs] = useState<PickAndPackSlab[]>([
-    { brand: '', parentCategoryId: '', categoryId: '', subCategoryId: '', from: '0', to: '0', pnpValue: '0' }
+    { brand: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [], from: '0', to: '0', pnpValue: '0' }
   ]);
   const [pickAndPackValueType, setPickAndPackValueType] = useState<'P' | 'A'>('A');
 
@@ -147,6 +153,86 @@ const AddMarketplacePage: React.FC = () => {
   // Validate numeric input - only allow numbers and decimal point
   const validateNumericInput = (value: string): string => {
     return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  };
+
+  const buildLegacyCategoryFields = (categoryPath: string[]) => ({
+    parentCategoryId: categoryPath[0] || '',
+    categoryId: categoryPath[1] || '',
+    subCategoryId: categoryPath[2] || ''
+  });
+
+  const getSlabCategoryPath = (slab: BrandSlab): string[] => {
+    if (slab.categoryPath && slab.categoryPath.length > 0) {
+      return slab.categoryPath;
+    }
+
+    return [slab.parentCategoryId, slab.categoryId, slab.subCategoryId].filter(Boolean);
+  };
+
+  const getChildCategories = (parentId: string | null) => {
+    const normalizedParentId = parentId ? Number(parentId) : null;
+    return categories.filter(c => c.parentCategoryId === normalizedParentId);
+  };
+
+  const getVisibleCategoryColumnCount = (slabs: BrandSlab[]) => {
+    return Math.max(1, ...slabs.map((slab) => {
+      const categoryPath = getSlabCategoryPath(slab);
+      let visibleColumns = 0;
+
+      for (let levelIndex = 0; levelIndex <= categoryPath.length; levelIndex++) {
+        const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+        const childCategories = getChildCategories(parentId);
+
+        if (childCategories.length === 0) {
+          break;
+        }
+
+        visibleColumns += 1;
+      }
+
+      return visibleColumns;
+    }));
+  };
+
+  const getVisibleCategoryColumnCountFromPath = (categoryPath: string[]) => {
+    let visibleColumns = 0;
+
+    for (let levelIndex = 0; levelIndex <= categoryPath.length; levelIndex++) {
+      const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+      const childCategories = getChildCategories(parentId);
+
+      if (childCategories.length === 0) {
+        break;
+      }
+
+      visibleColumns += 1;
+    }
+
+    return Math.max(1, visibleColumns);
+  };
+
+  const buildLegacyFixedFeeCategoryFields = (categoryPath: string[]) => ({
+    categoryId: categoryPath[0] || '',
+    subCategoryId: categoryPath[1] || '',
+    subSubCategoryId: categoryPath[2] || ''
+  });
+
+  const getPickAndPackCategoryPath = (slab: PickAndPackSlab): string[] => {
+    if (slab.categoryPath && slab.categoryPath.length > 0) {
+      return slab.categoryPath;
+    }
+
+    return [slab.parentCategoryId, slab.categoryId, slab.subCategoryId].filter(Boolean);
+  };
+
+  const getPickAndPackVisibleCategoryColumnCount = (slabs: PickAndPackSlab[]) => {
+    return Math.max(1, ...slabs.map((slab) => getVisibleCategoryColumnCountFromPath(getPickAndPackCategoryPath(slab))));
+  };
+
+  const getCategoryColumnLabel = (levelIndex: number) => {
+    if (levelIndex === 0) return 'Category';
+    if (levelIndex === 1) return 'Sub-category';
+    return 'Sub-cat';
   };
 
   // Fetch brands
@@ -251,7 +337,7 @@ const AddMarketplacePage: React.FC = () => {
   };
 
   const addProductCostSlab = () => {
-    setProductCostSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: productCostValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '' }]);
+    setProductCostSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: productCostValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
   };
 
   const removeProductCostSlab = (index: number) => {
@@ -272,8 +358,25 @@ const AddMarketplacePage: React.FC = () => {
     }));
   };
 
+  const updateProductCostSlabCategoryPath = (index: number, levelIndex: number, value: string) => {
+    setProductCostSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+
+      const currentPath = getSlabCategoryPath(slab);
+      const nextPath = value
+        ? [...currentPath.slice(0, levelIndex), value]
+        : currentPath.slice(0, levelIndex);
+
+      return {
+        ...slab,
+        ...buildLegacyCategoryFields(nextPath),
+        categoryPath: nextPath
+      };
+    }));
+  };
+
   const addMarketingSlab = () => {
-    setMarketingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: marketingValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '' }]);
+    setMarketingSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: marketingValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
   };
 
   const removeMarketingSlab = (index: number) => {
@@ -290,6 +393,62 @@ const AddMarketplacePage: React.FC = () => {
       if (field === 'parentCategoryId') return { ...slab, parentCategoryId: validatedValue, categoryId: '', subCategoryId: '' };
       if (field === 'categoryId') return { ...slab, categoryId: validatedValue, subCategoryId: '' };
       return { ...slab, [field]: validatedValue };
+    }));
+  };
+
+  const updateMarketingSlabCategoryPath = (index: number, levelIndex: number, value: string) => {
+    setMarketingSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+
+      const currentPath = getSlabCategoryPath(slab);
+      const nextPath = value
+        ? [...currentPath.slice(0, levelIndex), value]
+        : currentPath.slice(0, levelIndex);
+
+      return {
+        ...slab,
+        ...buildLegacyCategoryFields(nextPath),
+        categoryPath: nextPath
+      };
+    }));
+  };
+
+  // ══════════ GT based Shipping Slab Handlers ══════════
+  const addGtSlab = () => {
+    setGtSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: gtSlabValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
+  };
+
+  const removeGtSlab = (index: number) => {
+    if (gtSlabs.length > 1) {
+      setGtSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateGtSlab = (index: number, field: string, value: string) => {
+    const numericFields = ['from', 'to', 'value'];
+    const validatedValue = numericFields.includes(field) ? validateNumericInput(value) : value;
+    setGtSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+      if (field === 'parentCategoryId') return { ...slab, parentCategoryId: validatedValue, categoryId: '', subCategoryId: '' };
+      if (field === 'categoryId') return { ...slab, categoryId: validatedValue, subCategoryId: '' };
+      return { ...slab, [field]: validatedValue };
+    }));
+  };
+
+  const updateGtSlabCategoryPath = (index: number, levelIndex: number, value: string) => {
+    setGtSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+
+      const currentPath = getSlabCategoryPath(slab);
+      const nextPath = value
+        ? [...currentPath.slice(0, levelIndex), value]
+        : currentPath.slice(0, levelIndex);
+
+      return {
+        ...slab,
+        ...buildLegacyCategoryFields(nextPath),
+        categoryPath: nextPath
+      };
     }));
   };
 
@@ -361,7 +520,7 @@ const AddMarketplacePage: React.FC = () => {
 
   // ══════════ Pick and Pack Handlers ══════════
   const addPickAndPackSlab = () => {
-    setPickAndPackSlabs(prev => [...prev, { brand: '', parentCategoryId: '', categoryId: '', subCategoryId: '', from: '0', to: '0', pnpValue: '0' }]);
+    setPickAndPackSlabs(prev => [...prev, { brand: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [], from: '0', to: '0', pnpValue: '0' }]);
   };
 
   const removePickAndPackSlab = (index: number) => {
@@ -407,6 +566,35 @@ const AddMarketplacePage: React.FC = () => {
   // ══════════ NEW: Simple Input Handlers ══════════
   const handleShippingPercentageChange = (field: 'local' | 'zonal' | 'national', value: string) => {
     setShippingPercentage(prev => ({ ...prev, [field]: validateNumericInput(value) }));
+  };
+
+  const updateFixedFeeCategoryPath = (levelIndex: number, value: string) => {
+    const nextPath = value
+      ? [...fixedFeeCategoryPath.slice(0, levelIndex), value]
+      : fixedFeeCategoryPath.slice(0, levelIndex);
+
+    setFixedFeeCategoryPath(nextPath);
+    setFixedFeeFilters(prev => ({
+      ...prev,
+      ...buildLegacyFixedFeeCategoryFields(nextPath)
+    }));
+  };
+
+  const updatePickAndPackSlabCategoryPath = (index: number, levelIndex: number, value: string) => {
+    setPickAndPackSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+
+      const currentPath = getPickAndPackCategoryPath(slab);
+      const nextPath = value
+        ? [...currentPath.slice(0, levelIndex), value]
+        : currentPath.slice(0, levelIndex);
+
+      return {
+        ...slab,
+        ...buildLegacyCategoryFields(nextPath),
+        categoryPath: nextPath
+      };
+    }));
   };
 
 
@@ -476,7 +664,10 @@ const AddMarketplacePage: React.FC = () => {
         // Slab based commission
         productCostSlabs.forEach((slab) => {
           if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
-            const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
+            const categoryPath = getSlabCategoryPath(slab);
+            const categoryId = categoryPath.length > 0
+              ? parseInt(categoryPath[categoryPath.length - 1])
+              : slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
             costs.push({ costCategory: 'COMMISSION', costValueType: commissionSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
           }
         });
@@ -493,7 +684,10 @@ const AddMarketplacePage: React.FC = () => {
           // Slab based marketing
           marketingSlabs.forEach((slab) => {
             if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
-              const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
+              const categoryPath = getSlabCategoryPath(slab);
+              const categoryId = categoryPath.length > 0
+                ? parseInt(categoryPath[categoryPath.length - 1])
+                : slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
               costs.push({ costCategory: 'MARKETING', costValueType: marketingSlabValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
             }
           });
@@ -501,11 +695,22 @@ const AddMarketplacePage: React.FC = () => {
       }
 
       // ── Shipping ──
-      if (shippingValueType === 'A' || shippingValueType === 'gt') {
-        // Flat/GT based shipping
+      if (shippingValueType === 'A') {
+        // Flat based shipping
         if (parseFloat(shippingFlatValue) > 0) {
-          costs.push({ costCategory: 'SHIPPING', costValueType: shippingFlatValueType, costValue: parseFloat(shippingFlatValue), costProductRange: shippingValueType === 'gt' ? 'gt' : 'flat' });
+          costs.push({ costCategory: 'SHIPPING', costValueType: shippingFlatValueType, costValue: parseFloat(shippingFlatValue), costProductRange: 'flat' });
         }
+      } else if (shippingValueType === 'gt') {
+        // GT based shipping slabs
+        gtSlabs.forEach((slab) => {
+          if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
+            const categoryPath = getSlabCategoryPath(slab);
+            const categoryId = categoryPath.length > 0
+              ? parseInt(categoryPath[categoryPath.length - 1])
+              : slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
+            costs.push({ costCategory: 'SHIPPING', costValueType: gtSlabValueType, costValue: parseFloat(slab.value), costProductRange: `gt:${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
+          }
+        });
       } else if (shippingValueType === 'P') {
         // Weight based shipping
         weightSlabs.forEach((slab) => {
@@ -531,7 +736,9 @@ const AddMarketplacePage: React.FC = () => {
       } else if (fixedFeeType === 'gt') {
         fixedFeeSlabs.forEach((slab) => {
           if (parseFloat(slab.aspTo) > parseFloat(slab.aspFrom) && parseFloat(slab.fee) > 0) {
-            const categoryId = fixedFeeFilters.subSubCategoryId ? parseInt(fixedFeeFilters.subSubCategoryId)
+            const categoryId = fixedFeeCategoryPath.length > 0
+              ? parseInt(fixedFeeCategoryPath[fixedFeeCategoryPath.length - 1])
+              : fixedFeeFilters.subSubCategoryId ? parseInt(fixedFeeFilters.subSubCategoryId)
               : fixedFeeFilters.subCategoryId ? parseInt(fixedFeeFilters.subCategoryId)
               : fixedFeeFilters.categoryId ? parseInt(fixedFeeFilters.categoryId)
               : undefined;
@@ -575,7 +782,10 @@ const AddMarketplacePage: React.FC = () => {
       if (pickAndPackType === 'slab') {
         pickAndPackSlabs.forEach((slab) => {
           if (parseFloat(slab.pnpValue) > 0) {
-            const categoryId = slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
+            const categoryPath = getPickAndPackCategoryPath(slab);
+            const categoryId = categoryPath.length > 0
+              ? parseInt(categoryPath[categoryPath.length - 1])
+              : slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
             costs.push({ costCategory: 'PICK_AND_PACK', costValueType: pickAndPackValueType, costValue: parseFloat(slab.pnpValue), costProductRange: `${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brand && { brandId: parseInt(slab.brand) }) });
           }
         });
@@ -811,20 +1021,16 @@ const AddMarketplacePage: React.FC = () => {
 
           {/* Commission Table */}
           {productCostValueType === 'P' && (() => {
-            const commissionHasSubCat = productCostSlabs.some(s => s.parentCategoryId !== '');
-            const commissionHasSubSubCat = productCostSlabs.some(s => s.categoryId !== '');
-            const commissionVisibleCategoryFields = commissionHasSubSubCat ? 3 : commissionHasSubCat ? 2 : 1;
-            const commissionGridTemplate = `1fr ${commissionVisibleCategoryFields}fr 0.8fr 0.8fr 0.8fr 0.5fr`;
+            const commissionCategoryColumnCount = getVisibleCategoryColumnCount(productCostSlabs);
+            const commissionGridTemplate = `1fr repeat(${commissionCategoryColumnCount}, minmax(120px, 1fr)) 0.8fr 0.8fr 0.8fr 0.5fr`;
             return (
           <div className="commission-panel">
             {/* Table Header */}
             <div className="commission-table-header" style={{ gridTemplateColumns: commissionGridTemplate }}>
               <span className="commission-header-label">Brand</span>
-              <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
-                <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                {commissionHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                {commissionHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-              </div>
+              {Array.from({ length: commissionCategoryColumnCount }, (_, levelIndex) => (
+                <span key={levelIndex} className="commission-header-label">{getCategoryColumnLabel(levelIndex)}</span>
+              ))}
               <span className="commission-header-label">From</span>
               <span className="commission-header-label">To</span>
               <span className="commission-header-label">Value</span>
@@ -844,36 +1050,41 @@ const AddMarketplacePage: React.FC = () => {
             </div>
 
             {/* Table Rows */}
-            {productCostSlabs.map((slab, i) => (
+            {productCostSlabs.map((slab, i) => {
+              const categoryPath = getSlabCategoryPath(slab);
+              const categorySelectors: React.ReactElement[] = [];
+
+              for (let levelIndex = 0; levelIndex < commissionCategoryColumnCount; levelIndex++) {
+                const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+                const childCategories = getChildCategories(parentId);
+
+                if (childCategories.length === 0) {
+                  categorySelectors.push(<div key={levelIndex}></div>);
+                  continue;
+                }
+
+                categorySelectors.push(
+                  <div key={levelIndex} style={{ minWidth: 0 }}>
+                    <select
+                      className="commission-dropdown"
+                      style={{ width: '100%' }}
+                      value={categoryPath[levelIndex] || ''}
+                      onChange={e => updateProductCostSlabCategoryPath(i, levelIndex, e.target.value)}
+                    >
+                      <option value="">{levelIndex === 0 ? 'All Categories' : 'All Sub Categories'}</option>
+                      {childCategories.map(category => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
+                    </select>
+                  </div>
+                );
+              }
+
+              return (
               <div key={i} className="commission-table-row" style={{ gridTemplateColumns: commissionGridTemplate }}>
                 <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateProductCostSlab(i, 'brandId', e.target.value)}>
                   <option value="">All Brands</option>
                   {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                 </select>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updateProductCostSlab(i, 'parentCategoryId', e.target.value)}>
-                      <option value="">All Categories</option>
-                      {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  {commissionHasSubCat && (
-                    <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateProductCostSlab(i, 'categoryId', e.target.value)} disabled={!slab.parentCategoryId}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {commissionHasSubSubCat && (
-                    <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateProductCostSlab(i, 'subCategoryId', e.target.value)} disabled={!slab.categoryId}>
-                        <option value="">All Sub Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
+                {categorySelectors}
                 <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateProductCostSlab(i, 'from', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateProductCostSlab(i, 'to', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateProductCostSlab(i, 'value', e.target.value)} />
@@ -885,7 +1096,7 @@ const AddMarketplacePage: React.FC = () => {
                   </button>
                 ) : <div></div>}
               </div>
-            ))}
+            );})}
 
             {/* Add Slab Button */}
             <button className="commission-add-slab" onClick={addProductCostSlab} type="button">
@@ -972,20 +1183,16 @@ const AddMarketplacePage: React.FC = () => {
 
           {/* Marketing Table */}
           {marketingValueType === 'P' && !marketingFilters.none && (() => {
-            const marketingHasSubCat = marketingSlabs.some(s => s.parentCategoryId !== '');
-            const marketingHasSubSubCat = marketingSlabs.some(s => s.categoryId !== '');
-            const marketingVisibleCategoryFields = marketingHasSubSubCat ? 3 : marketingHasSubCat ? 2 : 1;
-            const marketingGridTemplate = `1fr ${marketingVisibleCategoryFields}fr 0.8fr 0.8fr 0.8fr 0.5fr`;
+            const marketingCategoryColumnCount = getVisibleCategoryColumnCount(marketingSlabs);
+            const marketingGridTemplate = `1fr repeat(${marketingCategoryColumnCount}, minmax(120px, 1fr)) 0.8fr 0.8fr 0.8fr 0.5fr`;
             return (
           <div className="commission-panel">
             {/* Table Header */}
             <div className="commission-table-header" style={{ gridTemplateColumns: marketingGridTemplate }}>
               <span className="commission-header-label">Brand</span>
-              <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
-                <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                {marketingHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                {marketingHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-              </div>
+              {Array.from({ length: marketingCategoryColumnCount }, (_, levelIndex) => (
+                <span key={levelIndex} className="commission-header-label">{getCategoryColumnLabel(levelIndex)}</span>
+              ))}
               <span className="commission-header-label">From</span>
               <span className="commission-header-label">To</span>
               <span className="commission-header-label">Contri</span>
@@ -1004,36 +1211,41 @@ const AddMarketplacePage: React.FC = () => {
             </div>
 
             {/* Table Rows */}
-            {marketingSlabs.map((slab, i) => (
+            {marketingSlabs.map((slab, i) => {
+              const categoryPath = getSlabCategoryPath(slab);
+              const categorySelectors: React.ReactElement[] = [];
+
+              for (let levelIndex = 0; levelIndex < marketingCategoryColumnCount; levelIndex++) {
+                const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+                const childCategories = getChildCategories(parentId);
+
+                if (childCategories.length === 0) {
+                  categorySelectors.push(<div key={levelIndex}></div>);
+                  continue;
+                }
+
+                categorySelectors.push(
+                  <div key={levelIndex} style={{ minWidth: 0 }}>
+                    <select
+                      className="commission-dropdown"
+                      style={{ width: '100%' }}
+                      value={categoryPath[levelIndex] || ''}
+                      onChange={e => updateMarketingSlabCategoryPath(i, levelIndex, e.target.value)}
+                    >
+                      <option value="">{levelIndex === 0 ? 'All Categories' : 'All Sub Categories'}</option>
+                      {childCategories.map(category => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
+                    </select>
+                  </div>
+                );
+              }
+
+              return (
               <div key={i} className="commission-table-row" style={{ gridTemplateColumns: marketingGridTemplate }}>
                 <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateMarketingSlab(i, 'brandId', e.target.value)}>
                   <option value="">All Brands</option>
                   {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                 </select>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updateMarketingSlab(i, 'parentCategoryId', e.target.value)}>
-                      <option value="">All Categories</option>
-                      {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  {marketingHasSubCat && (
-                    <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updateMarketingSlab(i, 'categoryId', e.target.value)} disabled={!slab.parentCategoryId}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {marketingHasSubSubCat && (
-                    <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updateMarketingSlab(i, 'subCategoryId', e.target.value)} disabled={!slab.categoryId}>
-                        <option value="">All Sub Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
+                {categorySelectors}
                 <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateMarketingSlab(i, 'from', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateMarketingSlab(i, 'to', e.target.value)} />
                 <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateMarketingSlab(i, 'value', e.target.value)} />
@@ -1045,7 +1257,7 @@ const AddMarketplacePage: React.FC = () => {
                   </button>
                 ) : <div></div>}
               </div>
-            ))}
+            );})}
 
             {/* Add Slab Button */}
             <button className="commission-add-slab" onClick={addMarketingSlab} type="button">
@@ -1105,8 +1317,8 @@ const AddMarketplacePage: React.FC = () => {
             </label>
           </div>
 
-          {/* Flat/GT Based Panel */}
-          {(shippingValueType === 'A' || shippingValueType === 'gt') && (
+          {/* Flat Based Panel */}
+          {shippingValueType === 'A' && (
             <div className="royalty-panel">
               <div className="royalty-toggle-wrapper">
                 <span className="royalty-toggle-label">%</span>
@@ -1133,6 +1345,93 @@ const AddMarketplacePage: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* GT Based Slab Table */}
+          {shippingValueType === 'gt' && (() => {
+            const gtCategoryColumnCount = getVisibleCategoryColumnCount(gtSlabs);
+            const gtGridTemplate = `1fr repeat(${gtCategoryColumnCount}, minmax(120px, 1fr)) 0.8fr 0.8fr 0.8fr 0.5fr`;
+            return (
+              <div className="commission-panel">
+                {/* Table Header */}
+                <div className="commission-table-header" style={{ gridTemplateColumns: gtGridTemplate }}>
+                  <span className="commission-header-label">Brand</span>
+                  {Array.from({ length: gtCategoryColumnCount }, (_, levelIndex) => (
+                    <span key={levelIndex} className="commission-header-label">{getCategoryColumnLabel(levelIndex)}</span>
+                  ))}
+                  <span className="commission-header-label">From</span>
+                  <span className="commission-header-label">To</span>
+                  <span className="commission-header-label">Value</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={gtSlabValueType === 'A'}
+                        onChange={e => setGtSlabValueType(e.target.checked ? 'A' : 'P')}
+                      />
+                      <span className="slider" />
+                    </label>
+                    <span>Rs</span>
+                  </div>
+                </div>
+
+                {/* Table Rows */}
+                {gtSlabs.map((slab, i) => {
+                  const categoryPath = getSlabCategoryPath(slab);
+                  const categorySelectors: React.ReactElement[] = [];
+
+                  for (let levelIndex = 0; levelIndex < gtCategoryColumnCount; levelIndex++) {
+                    const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+                    const childCategories = getChildCategories(parentId);
+
+                    if (childCategories.length === 0) {
+                      categorySelectors.push(<div key={levelIndex}></div>);
+                      continue;
+                    }
+
+                    categorySelectors.push(
+                      <div key={levelIndex} style={{ minWidth: 0 }}>
+                        <select
+                          className="commission-dropdown"
+                          style={{ width: '100%' }}
+                          value={categoryPath[levelIndex] || ''}
+                          onChange={e => updateGtSlabCategoryPath(i, levelIndex, e.target.value)}
+                        >
+                          <option value="">{levelIndex === 0 ? 'All Categories' : 'All Sub Categories'}</option>
+                          {childCategories.map(category => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                  <div key={i} className="commission-table-row" style={{ gridTemplateColumns: gtGridTemplate }}>
+                    <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateGtSlab(i, 'brandId', e.target.value)}>
+                      <option value="">All Brands</option>
+                      {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                    </select>
+                    {categorySelectors}
+                    <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateGtSlab(i, 'from', e.target.value)} />
+                    <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateGtSlab(i, 'to', e.target.value)} />
+                    <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateGtSlab(i, 'value', e.target.value)} />
+                    {gtSlabs.length > 1 ? (
+                      <button className="commission-delete-btn" onClick={() => removeGtSlab(i)} type="button">
+                        <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                        </svg>
+                      </button>
+                    ) : <div></div>}
+                  </div>
+                );})}
+
+                {/* Add GT Slab Button */}
+                <button className="commission-add-slab" onClick={addGtSlab} type="button">
+                  <span>+</span>
+                  <span>Add Slab</span>
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Shipping Table - Weight Based */}
           {shippingValueType === 'P' && (
@@ -1303,20 +1602,41 @@ const AddMarketplacePage: React.FC = () => {
 
           {/* Fixed Fee Table */}
           {fixedFeeType === 'gt' && (() => {
-            const fixedFeeHasSubCat = fixedFeeFilters.categoryId !== '';
-            const fixedFeeHasSubSubCat = fixedFeeFilters.subCategoryId !== '';
-            const visibleCategoryFields = fixedFeeHasSubSubCat ? 3 : fixedFeeHasSubCat ? 2 : 1;
-            const fixedFeeGridTemplate = `1fr ${visibleCategoryFields}fr 0.9fr 0.9fr 0.9fr 1fr`;
+            const fixedFeeCategoryColumnCount = getVisibleCategoryColumnCountFromPath(fixedFeeCategoryPath);
+            const fixedFeeGridTemplate = `1fr repeat(${fixedFeeCategoryColumnCount}, minmax(120px, 1fr)) 0.9fr 0.9fr 0.9fr 1fr`;
+            const fixedFeeCategorySelectors: React.ReactElement[] = [];
+
+            for (let levelIndex = 0; levelIndex < fixedFeeCategoryColumnCount; levelIndex++) {
+              const parentId = levelIndex === 0 ? null : (fixedFeeCategoryPath[levelIndex - 1] || null);
+              const childCategories = getChildCategories(parentId);
+
+              if (childCategories.length === 0) {
+                fixedFeeCategorySelectors.push(<div key={levelIndex}></div>);
+                continue;
+              }
+
+              fixedFeeCategorySelectors.push(
+                <div key={levelIndex} style={{ minWidth: 0 }}>
+                  <select
+                    className="commission-dropdown"
+                    style={{ width: '100%' }}
+                    value={fixedFeeCategoryPath[levelIndex] || ''}
+                    onChange={e => updateFixedFeeCategoryPath(levelIndex, e.target.value)}
+                  >
+                    <option value="">{levelIndex === 0 ? 'All Categories' : 'All Sub Categories'}</option>
+                    {childCategories.map(category => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
+                  </select>
+                </div>
+              );
+            }
             return (
           <div className="commission-panel">
             {/* Table Header */}
             <div className="commission-table-header" style={{ gridTemplateColumns: fixedFeeGridTemplate }}>
               <span className="commission-header-label">Brand</span>
-              <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
-                <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                {fixedFeeHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                {fixedFeeHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-              </div>
+              {Array.from({ length: fixedFeeCategoryColumnCount }, (_, levelIndex) => (
+                <span key={levelIndex} className="commission-header-label">{getCategoryColumnLabel(levelIndex)}</span>
+              ))}
               <span className="commission-header-label">ASP From</span>
               <span className="commission-header-label">ASP To</span>
               <span className="commission-header-label">Fixed Fee</span>
@@ -1341,30 +1661,7 @@ const AddMarketplacePage: React.FC = () => {
                   <option value="">All Brands</option>
                   {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                 </select>
-                <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                    <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.categoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, categoryId: e.target.value, subCategoryId: '', subSubCategoryId: '' }))}>
-                      <option value="">All Categories</option>
-                      {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  {fixedFeeHasSubCat && (
-                    <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.subCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subCategoryId: e.target.value, subSubCategoryId: '' }))}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && c.parentCategoryId === parseInt(fixedFeeFilters.categoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {fixedFeeHasSubSubCat && (
-                    <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                      <select className="commission-dropdown" style={{ width: '100%' }} value={fixedFeeFilters.subSubCategoryId} onChange={e => setFixedFeeFilters(prev => ({ ...prev, subSubCategoryId: e.target.value }))}>
-                        <option value="">All Sub Categories</option>
-                        {categories.filter(c => c.parentCategoryId !== null && c.parentCategoryId === parseInt(fixedFeeFilters.subCategoryId || '0')).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
+                {fixedFeeCategorySelectors}
                 <input className="commission-input" placeholder="500" value={slab.aspFrom} onChange={e => updateFixedFeeSlab(i, 'aspFrom', e.target.value)} />
                 <input className="commission-input" placeholder="500" value={slab.aspTo} onChange={e => updateFixedFeeSlab(i, 'aspTo', e.target.value)} />
                 <input className="commission-input" placeholder="500" value={slab.fee} onChange={e => updateFixedFeeSlab(i, 'fee', e.target.value)} />
@@ -1660,20 +1957,16 @@ const AddMarketplacePage: React.FC = () => {
 
           {/* Slab Based Table */}
           {pickAndPackType === 'slab' && (() => {
-            const pnpHasSubCat = pickAndPackSlabs.some(s => s.parentCategoryId !== '');
-            const pnpHasSubSubCat = pickAndPackSlabs.some(s => s.categoryId !== '');
-            const pnpVisibleCategoryFields = pnpHasSubSubCat ? 3 : pnpHasSubCat ? 2 : 1;
-            const pnpGridTemplate = `1fr ${pnpVisibleCategoryFields}fr 0.8fr 0.8fr 0.8fr 0.5fr`;
+            const pnpCategoryColumnCount = getPickAndPackVisibleCategoryColumnCount(pickAndPackSlabs);
+            const pnpGridTemplate = `1fr repeat(${pnpCategoryColumnCount}, minmax(120px, 1fr)) 0.8fr 0.8fr 0.8fr 0.5fr`;
             return (
               <div className="commission-panel">
                 {/* Table Header */}
                 <div className="commission-table-header" style={{ gridTemplateColumns: pnpGridTemplate }}>
                   <span className="commission-header-label">Brand</span>
-                  <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
-                    <span className="commission-header-label" style={{ flex: 1 }}>Category</span>
-                    {pnpHasSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                    {pnpHasSubSubCat && <span className="commission-header-label" style={{ flex: 1 }}>Sub-category</span>}
-                  </div>
+                  {Array.from({ length: pnpCategoryColumnCount }, (_, levelIndex) => (
+                    <span key={levelIndex} className="commission-header-label">{getCategoryColumnLabel(levelIndex)}</span>
+                  ))}
                   <span className="commission-header-label">From</span>
                   <span className="commission-header-label">To</span>
                   <span className="commission-header-label">Pnp Value</span>
@@ -1692,36 +1985,41 @@ const AddMarketplacePage: React.FC = () => {
                 </div>
 
                 {/* Table Rows */}
-                {pickAndPackSlabs.map((slab, index) => (
+                {pickAndPackSlabs.map((slab, index) => {
+                  const categoryPath = getPickAndPackCategoryPath(slab);
+                  const categorySelectors: React.ReactElement[] = [];
+
+                  for (let levelIndex = 0; levelIndex < pnpCategoryColumnCount; levelIndex++) {
+                    const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+                    const childCategories = getChildCategories(parentId);
+
+                    if (childCategories.length === 0) {
+                      categorySelectors.push(<div key={levelIndex}></div>);
+                      continue;
+                    }
+
+                    categorySelectors.push(
+                      <div key={levelIndex} style={{ minWidth: 0 }}>
+                        <select
+                          className="commission-dropdown"
+                          style={{ width: '100%' }}
+                          value={categoryPath[levelIndex] || ''}
+                          onChange={e => updatePickAndPackSlabCategoryPath(index, levelIndex, e.target.value)}
+                        >
+                          <option value="">{levelIndex === 0 ? 'All Categories' : 'All Sub Categories'}</option>
+                          {childCategories.map(category => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
                   <div key={index} className="commission-table-row" style={{ gridTemplateColumns: pnpGridTemplate }}>
                     <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brand} onChange={e => updatePickAndPackSlab(index, 'brand', e.target.value)}>
                       <option value="">All Brands</option>
                       {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
                     </select>
-                    <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                        <select className="commission-dropdown" style={{ width: '100%' }} value={slab.parentCategoryId} onChange={e => updatePickAndPackSlab(index, 'parentCategoryId', e.target.value)}>
-                          <option value="">All Categories</option>
-                          {categories.filter(c => c.parentCategoryId === null).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      {pnpHasSubCat && (
-                        <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                          <select className="commission-dropdown" style={{ width: '100%' }} value={slab.categoryId} onChange={e => updatePickAndPackSlab(index, 'categoryId', e.target.value)} disabled={!slab.parentCategoryId}>
-                            <option value="">All Sub Categories</option>
-                            {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.parentCategoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                          </select>
-                        </div>
-                      )}
-                      {pnpHasSubSubCat && (
-                        <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                          <select className="commission-dropdown" style={{ width: '100%' }} value={slab.subCategoryId} onChange={e => updatePickAndPackSlab(index, 'subCategoryId', e.target.value)} disabled={!slab.categoryId}>
-                            <option value="">All Sub Categories</option>
-                            {categories.filter(c => c.parentCategoryId !== null && String(c.parentCategoryId) === slab.categoryId).map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                          </select>
-                        </div>
-                      )}
-                    </div>
+                    {categorySelectors}
                     <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updatePickAndPackSlab(index, 'from', e.target.value)} />
                     <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updatePickAndPackSlab(index, 'to', e.target.value)} />
                     <input className="commission-input" placeholder="0" value={slab.pnpValue} onChange={e => updatePickAndPackSlab(index, 'pnpValue', e.target.value)} />
@@ -1733,7 +2031,7 @@ const AddMarketplacePage: React.FC = () => {
                       </button>
                     ) : <div></div>}
                   </div>
-                ))}
+                );})}
 
                 <button className="commission-add-slab" onClick={addPickAndPackSlab} type="button">
                   <span>+</span>
