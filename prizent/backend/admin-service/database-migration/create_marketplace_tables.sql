@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS p_marketplaces (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     client_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
+    acc_no VARCHAR(255),
     description VARCHAR(500),
     enabled BOOLEAN DEFAULT TRUE,
     create_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -23,10 +24,11 @@ CREATE TABLE IF NOT EXISTS p_marketplace_costs (
     marketplace_id BIGINT NOT NULL,
     brand_id BIGINT DEFAULT NULL COMMENT 'NULL for marketplace defaults, set for brand-specific costs',
     brand_name VARCHAR(100) DEFAULT NULL COMMENT 'Denormalized brand name for display',
-    cost_category VARCHAR(20) NOT NULL COMMENT 'COMMISSION / SHIPPING / MARKETING',
+    cost_category VARCHAR(50) NOT NULL COMMENT 'COMMISSION / SHIPPING / MARKETING and extended fee categories',
     cost_value_type CHAR(1) NOT NULL COMMENT 'A (amount) or P (percentage)',
     cost_value DECIMAL(12,2) NOT NULL,
     cost_product_range VARCHAR(100) NOT NULL,
+    category_id BIGINT DEFAULT NULL COMMENT 'Optional category filter for this cost slab',
     enabled BOOLEAN DEFAULT TRUE,
     create_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_by BIGINT,
@@ -36,11 +38,11 @@ CREATE TABLE IF NOT EXISTS p_marketplace_costs (
     INDEX idx_marketplace_costs_brand_id (brand_id),
     INDEX idx_marketplace_costs_client_marketplace (client_id, marketplace_id),
     INDEX idx_marketplace_costs_client_marketplace_brand (client_id, marketplace_id, brand_id),
+    INDEX idx_marketplace_costs_category_id (category_id),
     
     FOREIGN KEY (marketplace_id) REFERENCES p_marketplaces(id) ON DELETE CASCADE,
     FOREIGN KEY (brand_id) REFERENCES p_brands(id) ON DELETE SET NULL,
     
-    CHECK (cost_category IN ('COMMISSION', 'SHIPPING', 'MARKETING')),
     CHECK (cost_value_type IN ('A', 'P')),
     CHECK (cost_value >= 0)
 );
