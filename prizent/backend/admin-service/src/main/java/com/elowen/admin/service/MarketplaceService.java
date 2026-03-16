@@ -106,6 +106,9 @@ public class MarketplaceService {
         
         marketplace.setName(normalizedName);
         marketplace.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
+        if (request.getAccNo() != null) {
+            marketplace.setAccNo(request.getAccNo().trim());
+        }
         if (request.getEnabled() != null) {
             marketplace.setEnabled(request.getEnabled());
         }
@@ -387,6 +390,7 @@ public class MarketplaceService {
                         cost.setCostValueType(costReq.getCostValueType());
                         cost.setCostValue(costReq.getCostValue());
                         cost.setCostProductRange(costReq.getCostProductRange());
+                        cost.setCategoryId(costReq.getCategoryId());
                         cost.setEnabled(true);
                         cost.setUpdatedBy(userId);
                         costsToSave.add(cost);

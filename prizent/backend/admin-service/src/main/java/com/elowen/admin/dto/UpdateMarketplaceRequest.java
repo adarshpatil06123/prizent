@@ -19,6 +19,9 @@ public class UpdateMarketplaceRequest {
     
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
+
+    @Size(max = 100, message = "Account number must not exceed 100 characters")
+    private String accNo;
     
     private Boolean enabled;
     
@@ -43,6 +46,14 @@ public class UpdateMarketplaceRequest {
     
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getAccNo() {
+        return accNo;
+    }
+
+    public void setAccNo(String accNo) {
+        this.accNo = accNo;
     }
     
     public Boolean getEnabled() {
