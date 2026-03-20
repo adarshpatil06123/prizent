@@ -111,11 +111,14 @@ const AddMarketplacePage: React.FC = () => {
   const [fixedFeeType, setFixedFeeType] = useState<'flat' | 'gt' | 'none'>('gt');
   
   // Reverse Shipping Cost states
-  const [reverseShippingType, setReverseShippingType] = useState<'flat' | 'weight' | 'none'>('weight');
+  const [reverseShippingType, setReverseShippingType] = useState<'flat' | 'weight' | 'none' | 'gt'>('weight');
   const [reverseWeightSlabs, setReverseWeightSlabs] = useState<WeightSlab[]>([{ weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
   const [reverseWeightValueType, setReverseWeightValueType] = useState<'P' | 'A'>('A');
   const [reverseShippingFlatValue, setReverseShippingFlatValue] = useState('0');
   const [reverseShippingFlatValueType, setReverseShippingFlatValueType] = useState<'P' | 'A'>('A');
+  // Reverse GT based slabs (GT based on seller ASP)
+  const [reverseGtSlabs, setReverseGtSlabs] = useState<BrandSlab[]>([{ from: '0', to: '0', value: '0', valueType: 'A', brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
+  const [reverseGtValueType, setReverseGtValueType] = useState<'P' | 'A'>('A');
 
   // Collection Fee states
   const [collectionFeeType, setCollectionFeeType] = useState<'value' | 'none'>('value');
@@ -452,6 +455,45 @@ const AddMarketplacePage: React.FC = () => {
     }));
   };
 
+  // ══════════ Reverse GT (GT based on seller ASP) Slab Handlers ══════════
+  const addReverseGtSlab = () => {
+    setReverseGtSlabs(prev => [...prev, { from: '0', to: '0', value: '0', valueType: reverseGtValueType, brandId: '', parentCategoryId: '', categoryId: '', subCategoryId: '', categoryPath: [] }]);
+  };
+
+  const removeReverseGtSlab = (index: number) => {
+    if (reverseGtSlabs.length > 1) {
+      setReverseGtSlabs(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateReverseGtSlab = (index: number, field: string, value: string) => {
+    const numericFields = ['from', 'to', 'value'];
+    const validatedValue = numericFields.includes(field) ? validateNumericInput(value) : value;
+    setReverseGtSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+      if (field === 'parentCategoryId') return { ...slab, parentCategoryId: validatedValue, categoryId: '', subCategoryId: '' };
+      if (field === 'categoryId') return { ...slab, categoryId: validatedValue, subCategoryId: '' };
+      return { ...slab, [field]: validatedValue };
+    }));
+  };
+
+  const updateReverseGtSlabCategoryPath = (index: number, levelIndex: number, value: string) => {
+    setReverseGtSlabs(prev => prev.map((slab, i) => {
+      if (i !== index) return slab;
+
+      const currentPath = getSlabCategoryPath(slab);
+      const nextPath = value
+        ? [...currentPath.slice(0, levelIndex), value]
+        : currentPath.slice(0, levelIndex);
+
+      return {
+        ...slab,
+        ...buildLegacyCategoryFields(nextPath),
+        categoryPath: nextPath
+      };
+    }));
+  };
+
   // ══════════ NEW: Weight-based Shipping Handlers ══════════
   const addWeightSlab = () => {
     setWeightSlabs(prev => [...prev, { weightFrom: '0', weightTo: '0', local: '0', zonal: '0', national: '0', value: '0' }]);
@@ -759,6 +801,16 @@ const AddMarketplacePage: React.FC = () => {
             if (parseFloat(slab.zonal) > 0) costs.push({ costCategory: 'REVERSE_SHIPPING_ZONAL', costValueType: reverseWeightValueType, costValue: parseFloat(slab.zonal), costProductRange: `${slab.weightFrom}-${slab.weightTo}kg` });
             if (parseFloat(slab.national) > 0) costs.push({ costCategory: 'REVERSE_SHIPPING_NATIONAL', costValueType: reverseWeightValueType, costValue: parseFloat(slab.national), costProductRange: `${slab.weightFrom}-${slab.weightTo}kg` });
             if (parseFloat(slab.value) > 0) costs.push({ costCategory: 'REVERSE_WEIGHT_SHIPPING', costValueType: reverseWeightValueType, costValue: parseFloat(slab.value), costProductRange: `${slab.weightFrom}-${slab.weightTo}kg` });
+          }
+        });
+      } else if (reverseShippingType === 'gt') {
+        reverseGtSlabs.forEach((slab) => {
+          if (parseFloat(slab.to) > parseFloat(slab.from) && parseFloat(slab.value) > 0) {
+            const categoryPath = getSlabCategoryPath(slab);
+            const categoryId = categoryPath.length > 0
+              ? parseInt(categoryPath[categoryPath.length - 1])
+              : slab.subCategoryId ? parseInt(slab.subCategoryId) : slab.categoryId ? parseInt(slab.categoryId) : slab.parentCategoryId ? parseInt(slab.parentCategoryId) : undefined;
+            costs.push({ costCategory: 'REVERSE_SHIPPING', costValueType: reverseGtValueType, costValue: parseFloat(slab.value), costProductRange: `gt:${slab.from}-${slab.to}`, ...(categoryId !== undefined && { categoryId }), ...(slab.brandId && { brandId: parseInt(slab.brandId) }) });
           }
         });
       }
@@ -1705,6 +1757,14 @@ const AddMarketplacePage: React.FC = () => {
               />
               <span>Flat based Shipping</span>
             </label>
+            <label className={`commission-toggle-option ${reverseShippingType === 'gt' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                checked={reverseShippingType === 'gt'}
+                onChange={() => setReverseShippingType('gt')}
+              />
+              <span>GT based on seller ASP</span>
+            </label>
             <label className={`commission-toggle-option ${reverseShippingType === 'weight' ? 'active' : ''}`}>
               <input
                 type="radio"
@@ -1799,6 +1859,91 @@ const AddMarketplacePage: React.FC = () => {
               </button>
             </div>
           )}
+
+          {/* GT Based Panel for Reverse Shipping */}
+          {reverseShippingType === 'gt' && (() => {
+            const gtCategoryColumnCount = getVisibleCategoryColumnCount(reverseGtSlabs);
+            const gtGridTemplate = `1fr repeat(${gtCategoryColumnCount}, minmax(120px, 1fr)) 0.8fr 0.8fr 0.8fr 0.5fr`;
+            return (
+              <div className="commission-panel">
+                <div className="commission-table-header" style={{ gridTemplateColumns: gtGridTemplate }}>
+                  <span className="commission-header-label">Brand</span>
+                  {Array.from({ length: gtCategoryColumnCount }, (_, levelIndex) => (
+                    <span key={levelIndex} className="commission-header-label">{getCategoryColumnLabel(levelIndex)}</span>
+                  ))}
+                  <span className="commission-header-label">From</span>
+                  <span className="commission-header-label">To</span>
+                  <span className="commission-header-label">Value</span>
+                  <div className="commission-value-toggle">
+                    <span>%</span>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={reverseGtValueType === 'A'}
+                        onChange={e => setReverseGtValueType(e.target.checked ? 'A' : 'P')}
+                      />
+                      <span className="slider" />
+                    </label>
+                    <span>Rs</span>
+                  </div>
+                </div>
+
+                {reverseGtSlabs.map((slab, i) => {
+                  const categoryPath = getSlabCategoryPath(slab);
+                  const categorySelectors: React.ReactElement[] = [];
+
+                  for (let levelIndex = 0; levelIndex < gtCategoryColumnCount; levelIndex++) {
+                    const parentId = levelIndex === 0 ? null : (categoryPath[levelIndex - 1] || null);
+                    const childCategories = getChildCategories(parentId);
+
+                    if (childCategories.length === 0) {
+                      categorySelectors.push(<div key={levelIndex}></div>);
+                      continue;
+                    }
+
+                    categorySelectors.push(
+                      <div key={levelIndex} style={{ minWidth: 0 }}>
+                        <select
+                          className="commission-dropdown"
+                          style={{ width: '100%' }}
+                          value={categoryPath[levelIndex] || ''}
+                          onChange={e => updateReverseGtSlabCategoryPath(i, levelIndex, e.target.value)}
+                        >
+                          <option value="">{levelIndex === 0 ? 'All Categories' : 'All Sub Categories'}</option>
+                          {childCategories.map(category => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={i} className="commission-table-row" style={{ gridTemplateColumns: gtGridTemplate }}>
+                      <select className="commission-dropdown" style={{ width: '100%' }} value={slab.brandId} onChange={e => updateReverseGtSlab(i, 'brandId', e.target.value)}>
+                        <option value="">All Brands</option>
+                        {brands.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                      </select>
+                      {categorySelectors}
+                      <input className="commission-input" placeholder="0" value={slab.from} onChange={e => updateReverseGtSlab(i, 'from', e.target.value)} />
+                      <input className="commission-input" placeholder="0" value={slab.to} onChange={e => updateReverseGtSlab(i, 'to', e.target.value)} />
+                      <input className="commission-input" placeholder="0" value={slab.value} onChange={e => updateReverseGtSlab(i, 'value', e.target.value)} />
+                      {reverseGtSlabs.length > 1 ? (
+                        <button className="commission-delete-btn" onClick={() => removeReverseGtSlab(i)} type="button">
+                          <svg width="15" height="16" viewBox="0 0 15 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5.55545 0C4.96388 0 4.47766 0.449134 4.47766 0.998756V1.55795H1.36658C0.615143 1.55795 0 2.12808 0 2.82538C0 3.45977 0.508322 3.98752 1.16547 4.07775L1.1662 13.8999C1.1662 15.06 2.18285 16 3.43369 16H11.5684C12.8193 16 13.8338 15.06 13.8338 13.8999L13.8345 4.07845C14.4924 3.9889 15 3.46047 15 2.82608C15 2.12878 14.3871 1.55865 13.6356 1.55865H10.5245V0.999456C10.5245 0.450517 10.0383 0.000699971 9.44601 0.000699971L5.55545 0ZM5.55545 0.499728H9.44599C9.74657 0.499728 9.98526 0.719168 9.98526 0.998091V1.55729L5.01689 1.55797V0.998775C5.01689 0.719851 5.25484 0.500412 5.55543 0.500412L5.55545 0.499728ZM1.36655 2.05768H13.6349C14.0975 2.05768 14.4622 2.39607 14.4622 2.82538C14.4622 3.25468 14.0975 3.59171 13.6349 3.59171H1.3673C0.904656 3.59171 0.539252 3.25468 0.539252 2.82538C0.539252 2.39607 0.904656 2.05768 1.3673 2.05768H1.36655ZM1.7047 4.09142L13.2975 4.0921V13.8999C13.2975 14.7914 12.5313 15.5016 11.5692 15.5016L3.43372 15.5023C2.47158 15.5023 1.70468 14.792 1.70468 13.9006L1.7047 4.09142ZM4.30091 6.66871C4.22945 6.66871 4.16093 6.69537 4.11084 6.74185C4.06001 6.78902 4.03201 6.85328 4.03201 6.91959V12.6743C4.03275 12.8124 4.15283 12.9231 4.30091 12.9238C4.37237 12.9238 4.44162 12.8978 4.49245 12.8514C4.54254 12.8042 4.57128 12.7406 4.57201 12.6743V6.9196C4.57201 6.8526 4.54328 6.78903 4.49319 6.74186C4.44235 6.69469 4.3731 6.66802 4.30091 6.66871ZM7.50119 6.66871C7.42973 6.66802 7.36048 6.69469 7.30965 6.74185C7.25882 6.78902 7.23082 6.8526 7.23082 6.91959V12.6743C7.23156 12.7406 7.26029 12.8042 7.31039 12.8513C7.36122 12.8978 7.42973 12.9238 7.50119 12.9238C7.64927 12.9231 7.76935 12.8117 7.77009 12.6743V6.91958C7.77009 6.85327 7.74209 6.7897 7.692 6.74253C7.64117 6.69536 7.57264 6.66871 7.50119 6.66871ZM10.6999 6.66871C10.6285 6.66871 10.56 6.69537 10.5091 6.74254C10.459 6.78971 10.431 6.85328 10.431 6.91959V12.6743C10.4318 12.8117 10.5519 12.9231 10.6999 12.9238C10.8488 12.9245 10.9696 12.8124 10.9703 12.6743V6.91959C10.9703 6.8526 10.9423 6.78902 10.8915 6.74186C10.8407 6.69469 10.7714 6.66802 10.6999 6.66871Z" fill="#656565"/>
+                          </svg>
+                        </button>
+                      ) : <div></div>}
+                    </div>
+                  );
+                })}
+
+                <button className="commission-add-slab" onClick={addReverseGtSlab} type="button">
+                  <span>+</span>
+                  <span>Add Slab</span>
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ══════════════════ Collection Fee Section ══════════════════ */}
