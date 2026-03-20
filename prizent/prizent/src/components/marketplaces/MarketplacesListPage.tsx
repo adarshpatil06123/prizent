@@ -371,8 +371,11 @@ const MarketplacesListPage: React.FC = () => {
   };
 
   const parseRange = (range: string): { from: string; to: string } => {
-    const [baseRange] = (range || '').split('|');
-    const cleanRange = baseRange.replace(/kg/gi, '');
+    let cleanRange = (range || '').split('|')[0] || '';
+    if (cleanRange.startsWith('gt:')) {
+      cleanRange = cleanRange.substring(3);
+    }
+    cleanRange = cleanRange.replace(/kg/gi, '');
     const [from, to] = cleanRange.split('-');
     return {
       from: from?.trim() || '-',
@@ -512,7 +515,7 @@ const MarketplacesListPage: React.FC = () => {
     const commissionCosts = costs.filter(c => c.costCategory === 'COMMISSION');
     const marketingCosts = costs.filter(c => c.costCategory === 'MARKETING');
     const shippingFlatCost = costs.find(c => c.costCategory === 'SHIPPING' && c.costProductRange === 'flat');
-    const shippingGtCost = costs.find(c => c.costCategory === 'SHIPPING' && c.costProductRange === 'gt');
+      const shippingGtCosts = costs.filter(c => c.costCategory === 'SHIPPING' && c.costProductRange?.startsWith('gt:'));
     const fixedFeeCosts = costs.filter(c => c.costCategory === 'FIXED_FEE');
     const reverseShippingFlatCost = costs.find(c => c.costCategory === 'REVERSE_SHIPPING' && c.costProductRange === 'flat');
     const royaltyCost = costs.find(c => c.costCategory === 'ROYALTY');
@@ -539,6 +542,21 @@ const MarketplacesListPage: React.FC = () => {
     const shippingNationalPercent = costs.filter(c => c.costCategory === 'SHIPPING_PERCENTAGE_NATIONAL');
     const shippingPercentRowCount = Math.max(shippingLocalPercent.length, shippingZonalPercent.length, shippingNationalPercent.length);
 
+    const shippingGtRows = shippingGtCosts.map(cost => {
+      const catId = cost.categoryId ?? (cost as any).category_id ?? (cost as any).category ?? (cost as any).brandCategory;
+      const category = getCategoryDisplay(catId);
+      const parsed = parseRange(cost.costProductRange);
+      return [
+        getBrandDisplay(cost),
+        category.category,
+        category.subCategory,
+        category.subSubCategory,
+        parsed.from,
+        parsed.to,
+        formatCurrencyOrPercentage(cost),
+      ];
+    });
+
     const shippingPercentRows = Array.from({ length: shippingPercentRowCount }, (_, index) => [
       shippingLocalPercent[index] ? formatCurrencyOrPercentage(shippingLocalPercent[index]) : '-',
       shippingZonalPercent[index] ? formatCurrencyOrPercentage(shippingZonalPercent[index]) : '-',
@@ -553,7 +571,8 @@ const MarketplacesListPage: React.FC = () => {
     ]);
 
     const commissionRows = commissionCosts.map(cost => {
-      const category = getCategoryDisplay(cost.categoryId);
+        const catId = cost.categoryId ?? (cost as any).category_id ?? (cost as any).category ?? (cost as any).brandCategory;
+        const category = getCategoryDisplay(catId);
       const parsed = parseRange(cost.costProductRange);
       const isFlat = cost.costProductRange === 'flat';
       return [
@@ -568,7 +587,8 @@ const MarketplacesListPage: React.FC = () => {
     });
 
     const marketingRows = marketingCosts.map(cost => {
-      const category = getCategoryDisplay(cost.categoryId);
+        const catId = cost.categoryId ?? (cost as any).category_id ?? (cost as any).category ?? (cost as any).brandCategory;
+        const category = getCategoryDisplay(catId);
       const parsed = parseRange(cost.costProductRange);
       const isFlat = cost.costProductRange === 'flat';
       return [
@@ -585,7 +605,8 @@ const MarketplacesListPage: React.FC = () => {
     const fixedFeeRows = fixedFeeCosts
       .filter(cost => cost.costProductRange !== 'flat')
       .map(cost => {
-        const category = getCategoryDisplay(cost.categoryId);
+          const catId = cost.categoryId ?? (cost as any).category_id ?? (cost as any).category ?? (cost as any).brandCategory;
+          const category = getCategoryDisplay(catId);
         const parsed = parseRange(cost.costProductRange);
         return [
           getBrandDisplay(cost),
@@ -599,7 +620,8 @@ const MarketplacesListPage: React.FC = () => {
       });
 
     const pickAndPackRows = pickAndPackCosts.map(cost => {
-      const category = getCategoryDisplay(cost.categoryId);
+        const catId = cost.categoryId ?? (cost as any).category_id ?? (cost as any).category ?? (cost as any).brandCategory;
+        const category = getCategoryDisplay(catId);
       const parsed = parseRange(cost.costProductRange);
       return [
         getBrandDisplay(cost),
@@ -618,7 +640,7 @@ const MarketplacesListPage: React.FC = () => {
     const marketingMode = marketingCosts.length === 0
       ? 'None'
       : (marketingCosts.length === 1 && marketingCosts[0].costProductRange === 'flat' ? 'Flat Based' : 'Slab Based');
-    const shippingMode = shippingGtCost
+    const shippingMode = shippingGtCosts.length > 0
       ? 'GT Based'
       : shippingFlatCost
         ? 'Flat Based'
@@ -677,17 +699,23 @@ const MarketplacesListPage: React.FC = () => {
 
         <div className="expanded-section">
           <h4 className="expanded-section-title">Shipping ({shippingMode})</h4>
-          {shippingFlatCost || shippingGtCost ? (
-            renderDataTable(
-              ['Type', 'Range', 'Value'],
-              [[
-                shippingGtCost ? 'GT' : 'Flat',
-                shippingGtCost ? 'gt' : 'flat',
-                formatCurrencyOrPercentage(shippingGtCost || shippingFlatCost as MarketplaceCost),
-              ]],
-              'No shipping details available.',
-            )
-          ) : renderDataTable(
+            {shippingGtRows.length > 0 ? (
+              renderDataTable(
+                ['Brand', 'Category', 'Sub Category', 'Sub Sub Category', 'From', 'To', 'Value'],
+                shippingGtRows,
+                'No shipping details available.',
+              )
+            ) : shippingFlatCost ? (
+              renderDataTable(
+                ['Type', 'Range', 'Value'],
+                [[
+                  'Flat',
+                  'flat',
+                  formatCurrencyOrPercentage(shippingFlatCost as MarketplaceCost),
+                ]],
+                'No shipping details available.',
+              )
+            ) : renderDataTable(
             ['Weight From (kg)', 'Weight To (kg)', 'Local', 'Zonal', 'National', 'Value'],
             shippingWeightRows.map(row => [
               row.weightFrom,

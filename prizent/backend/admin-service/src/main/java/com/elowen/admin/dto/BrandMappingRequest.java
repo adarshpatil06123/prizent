@@ -68,6 +68,8 @@ public class BrandMappingRequest {
         @NotBlank(message = "Cost product range is required")
         @Size(max = 100, message = "Cost product range must not exceed 100 characters")
         private String costProductRange;
+
+        private Long categoryId;
         
         public CostRequest() {}
         
@@ -101,6 +103,14 @@ public class BrandMappingRequest {
         
         public void setCostProductRange(String costProductRange) {
             this.costProductRange = costProductRange;
+        }
+
+        public Long getCategoryId() {
+            return categoryId;
+        }
+
+        public void setCategoryId(Long categoryId) {
+            this.categoryId = categoryId;
         }
     }
 }

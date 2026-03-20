@@ -64,6 +64,7 @@ export interface BrandMappingCostRequest {
   costValueType: 'P' | 'A';
   costValue: number;
   costProductRange: string;
+  categoryId?: number;
 }
 
 export interface BrandMappingRequest {
@@ -77,6 +78,7 @@ export interface BrandMappingCost {
   costValueType: 'P' | 'A';
   costValue: number;
   costProductRange: string;
+  categoryId?: number;
 }
 
 export interface BrandMapping {

@@ -1,32 +1,29 @@
 server:
-  port: 8081
+  port: 8086
 
 spring:
   application:
-    name: identity-service
-  security:
-    user:
-      name: disabled  
-      password: disabled
+    name: db-service
   datasource:
     url: jdbc:mysql://localhost:3306/prizent_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: Adarsh@.27
-
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:
         format_sql: true
 
-jwt:
-  secret: ${JWT_SECRET:mySecretKeyForDevelopmentOnlyChangeInProduction}
-  expiration: 14400000 # 4 hours in milliseconds
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
 
 logging:
   level:
-    com.elowen.identity: DEBUG
+    com.elowen.db: DEBUG

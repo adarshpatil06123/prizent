@@ -6,7 +6,6 @@ import com.elowen.admin.enums.MarketplaceCostCategory;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class BrandMappingResponse {
@@ -67,6 +66,7 @@ public class BrandMappingResponse {
         private CostValueType costValueType;
         private BigDecimal costValue;
         private String costProductRange;
+        private Long categoryId;
         
         public CostResponse() {}
         
@@ -76,6 +76,7 @@ public class BrandMappingResponse {
             this.costValueType = cost.getCostValueType();
             this.costValue = cost.getCostValue();
             this.costProductRange = cost.getCostProductRange();
+            this.categoryId = cost.getCategoryId();
         }
         
         public Long getId() {
@@ -116,6 +117,14 @@ public class BrandMappingResponse {
         
         public void setCostProductRange(String costProductRange) {
             this.costProductRange = costProductRange;
+        }
+
+        public Long getCategoryId() {
+            return categoryId;
+        }
+
+        public void setCategoryId(Long categoryId) {
+            this.categoryId = categoryId;
         }
     }
 }
