@@ -20,9 +20,24 @@
 }
 
 .products-header .breadcrumb {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1e1e1e;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 29px;
+  color: #5B5B5B;
+}
+
+.products-header .breadcrumb-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.products-header .breadcrumb-link:hover {
+  text-decoration: underline;
+}
+
+.products-header .breadcrumb-separator {
+  margin: 0 6px;
+  color: #5B5B5B;
 }
 
 .products-divider {
@@ -69,14 +84,16 @@
 
 .products-list-title {
   margin: 0;
-  font-size: 26px;
-  font-weight: 700;
-  color: #1e1e1e;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 35px;
+  color: #000000;
 }
 
 .products-list-count {
-  color: #6a6a6a;
+  color: #454545;
   font-size: 14px;
+  line-height: 20px;
 }
 
 .products-toolbar-actions {
@@ -170,8 +187,8 @@
   font-family: 'Murecho', sans-serif;
   font-style: normal;
   font-weight: 500;
-  font-size: 20px;
-  line-height: 29px;
+  font-size: 16px;
+  line-height: 23px;
   color: #1A1A1A;
   border-bottom: 0.75px solid #E4E4E4;
 }
@@ -201,8 +218,8 @@
   font-family: 'Murecho', sans-serif;
   font-style: normal;
   font-weight: 400;
-  font-size: 16px;
-  line-height: 23px;
+  font-size: 14px;
+  line-height: 20px;
   color: #454545;
   white-space: nowrap;
   overflow: hidden;
@@ -303,14 +320,14 @@
 }
 
 .show-label {
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
   font-weight: 400;
   color: rgba(30, 30, 30, 0.35);
 }
 
 .show-value {
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
   font-weight: 700;
   color: rgba(30, 30, 30, 0.9);
@@ -326,7 +343,7 @@
   gap: 8px;
   color: rgba(30, 30, 30, 0.35);
   font-weight: 400;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -388,7 +405,7 @@
 .form-section-header h3 {
   font-family: 'Murecho', sans-serif;
   font-weight: 600;
-  font-size: 20px;
+  font-size: 18px;
   color: #000000;
   margin: 0;
 }
@@ -438,7 +455,7 @@
 .field-label {
   font-family: 'Murecho', sans-serif;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 14px;
   color: #000000;
 }
 
@@ -451,7 +468,7 @@
   padding: 0 10px;
   font-family: 'Murecho', sans-serif;
   font-weight: 400;
-  font-size: 13px;
+  font-size: 14px;
   color: #000000;
   box-sizing: border-box;
 }

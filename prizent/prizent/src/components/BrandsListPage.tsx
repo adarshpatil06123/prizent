@@ -1,11 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import brandService, { Brand } from '../services/brandService';
 import './BrandsListPage.css';
 import brandLogo from '../assets/brand_logo.png';
 
 const BrandsListPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const brandsPerPage = 8;
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -237,13 +238,34 @@ const BrandsListPage: React.FC = () => {
     return pageNumbers;
   };
 
+  const getBreadcrumbItems = (path: string) => {
+    if (path.startsWith('/brands') || path.startsWith('/add-brand') || path.startsWith('/edit-brand')) {
+      return [
+        { label: 'Configuration', to: '/brands' },
+        { label: 'Brands', to: '/brands' }
+      ];
+    }
+    return [{ label: 'Configuration', to: '/brands' }];
+  };
+
+  const breadcrumbItems = getBreadcrumbItems(location.pathname);
+
   return (
     <div className="brands-page">
       {/* Main Content */}
       <main className="main-content">
         {/* Header */}
         <header className="page-header">
-          <h2 className="breadcrumb">Configuration &gt; Brands</h2>
+          <h2 className="breadcrumb">
+            {breadcrumbItems.map((item, index) => (
+              <span key={`${item.label}-${index}`}>
+                {index > 0 && <span className="breadcrumb-separator">&gt;</span>}
+                <Link to={item.to} className="breadcrumb-link">
+                  {item.label}
+                </Link>
+              </span>
+            ))}
+          </h2>
           <div className="header-actions">
             <button className="icon-btn">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

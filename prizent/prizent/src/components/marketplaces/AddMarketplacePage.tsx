@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./AddMarketplacePage.css";
 import marketplaceService, { CreateMarketplaceRequest, CreateMarketplaceCostRequest } from '../../services/marketplaceService';
 import { getCustomFields, saveCustomFieldValue, CustomFieldResponse } from '../../services/customFieldService';
@@ -844,7 +844,13 @@ const AddMarketplacePage: React.FC = () => {
               <path d="M15 18L9 12L15 6" stroke="#1E1E1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <h2 className="breadcrumb">Add Marketplace</h2>
+          <h2 className="breadcrumb">
+            <Link to="/brands" className="breadcrumb-link">Configuration</Link>
+            <span className="breadcrumb-separator">&gt;</span>
+            <Link to="/marketplaces" className="breadcrumb-link">Marketplaces</Link>
+            <span className="breadcrumb-separator">&gt;</span>
+            <Link to="/marketplaces/add" className="breadcrumb-link">Add Marketplace</Link>
+          </h2>
 
           <div className="header-actions">
             <button className="icon-btn">

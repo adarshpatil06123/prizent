@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import brandService from '../services/brandService';
 import './AddBrandPage.css';
 import prizentLogo from '../assets/prizent_logo.png';
 
 const AddBrandPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [brandName, setBrandName] = useState('');
   const [brandDescription, setBrandDescription] = useState('');
   const [activateBrand, setActivateBrand] = useState(true);
@@ -41,10 +42,36 @@ const AddBrandPage: React.FC = () => {
     navigate('/brands');
   };
 
+  const getBreadcrumbItems = (path: string) => {
+    if (path.startsWith('/add-brand')) {
+      return [
+        { label: 'Configuration', to: '/brands' },
+        { label: 'Brands', to: '/brands' },
+        { label: 'Add Brand', to: '/add-brand' }
+      ];
+    }
+    return [
+      { label: 'Configuration', to: '/brands' },
+      { label: 'Brands', to: '/brands' }
+    ];
+  };
+
+  const breadcrumbItems = getBreadcrumbItems(location.pathname);
+
   return (
     <div className="add-brand-page">
       {/* Main Content */}
       <main className="main-content">
+        <div className="breadcrumb">
+          {breadcrumbItems.map((item, index) => (
+            <span key={`${item.label}-${index}`}>
+              {index > 0 && <span className="breadcrumb-separator">&gt;</span>}
+              <Link to={item.to} className="breadcrumb-link">
+                {item.label}
+              </Link>
+            </span>
+          ))}
+        </div>
         <header className="header">
           <div className="header-left">
             <button className="back-btn" onClick={handleCancel}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCategories } from '../contexts/CategoryContext';
 import { getCustomFields, getCustomFieldValues, saveCustomFieldValue, CustomFieldResponse, CustomFieldValueResponse } from '../services/customFieldService';
 import './CategoriesListPage.css';
@@ -267,7 +267,11 @@ const CategoriesListPage: React.FC = () => {
       <main className="main-content">
         {/* Top Header */}
         <header className="page-top-header">
-          <h1 className="page-breadcrumb">Configuration &gt; Categories</h1>
+          <h1 className="page-breadcrumb">
+            <Link to="/brands" className="breadcrumb-link">Configuration</Link>
+            <span className="breadcrumb-separator">&gt;</span>
+            <Link to="/categories" className="breadcrumb-link">Categories</Link>
+          </h1>
           
           <div className="header-actions">
             <button className="icon-btn">

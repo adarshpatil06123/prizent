@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import './CustomFieldsPage.css';
 import {
   createCustomField,
@@ -230,7 +231,11 @@ const CustomFieldsPage: React.FC = () => {
     <div className="custom-fields-page">
       {/* Header */}
       <header className="page-header">
-        <h2 className="breadcrumb">Configuration &gt; Custom Fields</h2>
+        <h2 className="breadcrumb">
+          <Link to="/brands" className="breadcrumb-link">Configuration</Link>
+          <span className="breadcrumb-separator">&gt;</span>
+          <Link to="/custom-fields" className="breadcrumb-link">Custom Fields</Link>
+        </h2>
         <div className="header-actions">
           <button className="icon-btn">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

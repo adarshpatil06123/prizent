@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import "./MarketplacesListPage.css";
 import marketplaceService, { Marketplace, MarketplaceCost } from '../../services/marketplaceService';
 import { getCustomFields, getCustomFieldValues, CustomFieldResponse, CustomFieldValueResponse } from '../../services/customFieldService';
@@ -845,7 +845,11 @@ const MarketplacesListPage: React.FC = () => {
     <div className="marketplaces-bg">
       <main className="marketplaces-main">
         <header className="marketplaces-header">
-          <span className="breadcrumb">Configuration &gt; Marketplaces</span>
+          <span className="breadcrumb">
+            <Link to="/brands" className="breadcrumb-link">Configuration</Link>
+            <span className="breadcrumb-separator">&gt;</span>
+            <Link to="/marketplaces" className="breadcrumb-link">Marketplaces</Link>
+          </span>
           <div className="header-actions">
             <button className="icon-btn">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import userService, { User } from '../services/userService';
@@ -249,7 +250,11 @@ const SuperAdminUsersPage: React.FC = () => {
       <main className="main-content">
         {/* Header */}
         <header className="page-header">
-          <h2 className="breadcrumb">Configuration &gt; Users</h2>
+          <h2 className="breadcrumb">
+            <Link to="/brands" className="breadcrumb-link">Configuration</Link>
+            <span className="breadcrumb-separator">&gt;</span>
+            <Link to="/superadmin" className="breadcrumb-link">Users</Link>
+          </h2>
           <div className="header-actions">
             <button className="icon-btn">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

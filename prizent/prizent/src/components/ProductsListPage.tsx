@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './ProductsListPage.css';
 import productThumb from '../assets/brand_logo.png';
 import productService, { Product, PagedResponse } from '../services/productService';
@@ -378,7 +378,11 @@ const ProductsListPage: React.FC = () => {
     <div className="products-bg">
       <main className="products-main">
         <header className="products-header">
-          <span className="breadcrumb">Configuration &gt; Products</span>
+          <span className="breadcrumb">
+            <Link to="/brands" className="breadcrumb-link">Configuration</Link>
+            <span className="breadcrumb-separator">&gt;</span>
+            <Link to="/products" className="breadcrumb-link">Products</Link>
+          </span>
           <div className="header-actions">
             <button className="icon-btn" aria-label="Search">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
