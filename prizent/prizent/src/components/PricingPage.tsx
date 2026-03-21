@@ -1,321 +1,454 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import './PricingPage.css';
-import marketplaceService, { Marketplace } from '../services/marketplaceService';
+import marketplaceService, { Marketplace, MarketplaceCost } from '../services/marketplaceService';
 import productService, { Product } from '../services/productService';
 import categoryService, { Category } from '../services/categoryService';
 import brandService, { Brand } from '../services/brandService';
 import { calculatePricing } from '../services/pricingService';
 
+type UploadRow = {
+  rowNumber: number;
+  product: Product;
+  asp: number;
+  inputGst: number;
+};
+
+type OutputRow = {
+  rowNumber: number;
+  productId: number;
+  skuCode: string;
+  productName: string;
+  asp: number;
+  inputGst: number;
+  reverseFixedFee: number;
+  pickAndPack: number;
+  baseProfit: number;
+  finalProfit: number;
+  finalProfitPercentage: number;
+  status: 'success' | 'error';
+  message: string;
+};
+
 const PricingPage: React.FC = () => {
-  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-
-  // --- Data states ---
   const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // --- Selection states ---
-  const [selectedBrandId, setSelectedBrandId] = useState('');
   const [selectedMarketplaceId, setSelectedMarketplaceId] = useState('');
-  const [selectedSKUProductId, setSelectedSKUProductId] = useState('');
-  const [selectedParentCategoryId, setSelectedParentCategoryId] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [selectedCategoryProductId, setSelectedCategoryProductId] = useState('');
-  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-
-  // --- Calculation states ---
-  const [sellingPrice, setSellingPrice] = useState('');
-  const [calculatedProfit, setCalculatedProfit] = useState('');
-  const [profitPercentage, setProfitPercentage] = useState('');
-  const [calculatedSellingPrice, setCalculatedSellingPrice] = useState('');
-  const [marketplaceCosts, setMarketplaceCosts] = useState<{ commission: string; shipping: string; marketing: string } | null>(null);
-  const [rawCosts, setRawCosts] = useState<import('../services/marketplaceService').MarketplaceCost[]>([]);
-  const [inputGst, setInputGst] = useState('');
-  // Set of marketplace IDs configured for the selected brand (null = no brand filter)
+  const [selectedBrandId, setSelectedBrandId] = useState('');
+  const [selectedFirstCategoryId, setSelectedFirstCategoryId] = useState('');
+  const [selectedSecondCategoryId, setSelectedSecondCategoryId] = useState('');
   const [brandMarketplaceIds, setBrandMarketplaceIds] = useState<Set<number> | null>(null);
 
-  // --- Rebate Discount Analysis states ---
-  const [rebateDiscount, setRebateDiscount] = useState('');
-  const [rebateResult, setRebateResult] = useState('');
+  const [selectedMarketplaceCosts, setSelectedMarketplaceCosts] = useState<MarketplaceCost[]>([]);
 
-  // Load all data on mount
+  const [calculateReverseFixedFee, setCalculateReverseFixedFee] = useState(true);
+  const [calculatePickAndPack, setCalculatePickAndPack] = useState(true);
+  const [calculateInputGst, setCalculateInputGst] = useState(true);
+
+  const [uploadedRows, setUploadedRows] = useState<UploadRow[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [outputRows, setOutputRows] = useState<OutputRow[]>([]);
+  const [processing, setProcessing] = useState(false);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
         const [mpRes, prodRes, catRes, brandRes] = await Promise.all([
-          marketplaceService.getAllMarketplaces(0, 100),
+          marketplaceService.getAllMarketplaces(0, 200),
           productService.getAllProducts(0, 500),
           categoryService.getAllCategories(),
           brandService.getAllBrands(),
         ]);
-        if (mpRes.marketplaces?.content) {
-          setMarketplaces(mpRes.marketplaces.content.filter((m: Marketplace) => m.enabled));
-        }
-        if (prodRes?.content) {
-          const enabledProds = prodRes.content.filter((p: Product) => p.enabled);
-          setProducts(enabledProds);
-        }
-        if (catRes.categories) {
-          const allCats = catRes.categories.filter((c: Category) => c.enabled);
-          setCategories(allCats);
-        }
-        if (brandRes.brands) {
-          setBrands(brandRes.brands.filter((b: Brand) => b.enabled));
-        }
-      } catch (err: any) {
-        setError('Failed to load data. Please refresh.');
-        console.error(err);
+
+        setMarketplaces(mpRes.marketplaces?.content ?? []);
+        setProducts((prodRes.content ?? []).filter(p => p.enabled));
+        setCategories((catRes.categories ?? []).filter(c => c.enabled));
+        setBrands((brandRes.brands ?? []).filter(b => b.enabled));
+      } catch (e) {
+        console.error(e);
+        setError('Failed to load pricing data. Please refresh the page.');
       } finally {
         setLoading(false);
       }
     };
+
     loadData();
   }, []);
 
-  // --- Derived lists ---
-  const displayedMarketplaces = brandMarketplaceIds
-    ? marketplaces.filter(m => brandMarketplaceIds.has(m.id))
-    : marketplaces;
-  const brandFilteredProducts = selectedBrandId
-    ? products.filter(p => Number(p.brandId) === parseInt(selectedBrandId))
-    : products;
-  const parentCategories = categories.filter(c => c.parentCategoryId === null);
-  const childCategories = selectedParentCategoryId
-    ? categories.filter(c => c.parentCategoryId === parseInt(selectedParentCategoryId))
-    : [];
-  const categoryFilteredProducts = selectedCategoryId
-    ? brandFilteredProducts.filter(p => Number(p.categoryId) === parseInt(selectedCategoryId))
-    : [];
+  const parentCategories = useMemo(
+    () => categories.filter(c => c.parentCategoryId === null),
+    [categories]
+  );
 
-  // --- Handlers: Brand ---
-  const handleBrandChange = async (val: string) => {
-    setSelectedBrandId(val);
-    setSelectedSKUProductId('');
-    setSelectedParentCategoryId('');
-    setSelectedCategoryId('');
-    setSelectedCategoryProductId('');
-    setActiveProduct(null);
-    setCalculatedProfit('');
-    setCalculatedSellingPrice('');
-    setSelectedMarketplaceId('');
-    setMarketplaceCosts(null);
-    setRawCosts([]);
-    if (!val) {
-      setBrandMarketplaceIds(null);
-      return;
+  const secondCategories = useMemo(() => {
+    if (!selectedFirstCategoryId) return [];
+    const parentId = Number(selectedFirstCategoryId);
+    return categories.filter(c => c.parentCategoryId === parentId);
+  }, [categories, selectedFirstCategoryId]);
+
+  const displayedMarketplaces = useMemo(() => {
+    if (!brandMarketplaceIds) {
+      return marketplaces;
     }
-    // Fetch brand mappings for all marketplaces in parallel, keep only those with this brand
-    const brandId = parseInt(val);
+
+    const filtered = marketplaces.filter(m => brandMarketplaceIds.has(m.id));
+    // If no mapping exists for selected brand, fall back to all marketplaces.
+    return filtered.length > 0 ? filtered : marketplaces;
+  }, [marketplaces, brandMarketplaceIds]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const brandOk = selectedBrandId ? product.brandId === Number(selectedBrandId) : true;
+      const secondCategoryOk = selectedSecondCategoryId ? product.categoryId === Number(selectedSecondCategoryId) : true;
+
+      let firstCategoryOk = true;
+      if (selectedFirstCategoryId) {
+        const firstId = Number(selectedFirstCategoryId);
+        const category = categories.find(c => c.id === product.categoryId);
+        firstCategoryOk = !!category && (category.id === firstId || category.parentCategoryId === firstId);
+      }
+
+      return brandOk && firstCategoryOk && secondCategoryOk;
+    });
+  }, [products, categories, selectedBrandId, selectedFirstCategoryId, selectedSecondCategoryId]);
+
+  const brandNameMap = useMemo(() => {
+    const map = new Map<number, string>();
+    brands.forEach((b) => map.set(b.id, b.name));
+    return map;
+  }, [brands]);
+
+  const categoryNameMap = useMemo(() => {
+    const map = new Map<number, string>();
+    categories.forEach((c) => map.set(c.id, c.name));
+    return map;
+  }, [categories]);
+
+  const fetchMarketplaceCosts = async (marketplaceId: number, brandId?: number) => {
     try {
-      const results = await Promise.all(
-        marketplaces.map(m =>
-          marketplaceService.getBrandMappings(m.id)
-            .then(res => ({ marketplaceId: m.id, hasBrand: res.mappings?.some((bm: any) => bm.brandId === brandId) ?? false }))
-            .catch(() => ({ marketplaceId: m.id, hasBrand: false }))
-        )
-      );
-      const ids = new Set(results.filter(r => r.hasBrand).map(r => r.marketplaceId));
-      setBrandMarketplaceIds(ids);
-    } catch {
-      setBrandMarketplaceIds(null);
-    }
-    // Re-fetch marketplace costs with new brand context if marketplace already selected
-    if (selectedMarketplaceId) {
-      fetchMarketplaceCosts(parseInt(selectedMarketplaceId), val ? parseInt(val) : undefined);
-    }
-  };
-
-  // --- Handlers: SKU path clears category path ---
-  const handleSKUChange = (val: string) => {
-    setSelectedSKUProductId(val);
-    setSelectedParentCategoryId('');
-    setSelectedCategoryId('');
-    setSelectedCategoryProductId('');
-    const found = val ? brandFilteredProducts.find(p => p.id === parseInt(val)) || null : null;
-    setActiveProduct(found);
-    setCalculatedProfit('');
-    setCalculatedSellingPrice('');
-  };
-
-  // --- Handlers: Category path clears SKU ---
-  const handleParentCategoryChange = (val: string) => {
-    setSelectedParentCategoryId(val);
-    setSelectedCategoryId('');
-    setSelectedCategoryProductId('');
-    setSelectedSKUProductId('');
-    setActiveProduct(null);
-    setCalculatedProfit('');
-    setCalculatedSellingPrice('');
-  };
-
-  const handleCategoryChange = (val: string) => {
-    setSelectedCategoryId(val);
-    setSelectedCategoryProductId('');
-    setSelectedSKUProductId('');
-    setActiveProduct(null);
-    setCalculatedProfit('');
-    setCalculatedSellingPrice('');
-  };
-
-  const handleCategoryProductChange = (val: string) => {
-    setSelectedCategoryProductId(val);
-    setSelectedSKUProductId('');
-    const found = val ? products.find(p => p.id === parseInt(val)) || null : null;
-    setActiveProduct(found);
-    setCalculatedProfit('');
-    setCalculatedSellingPrice('');
-  };
-
-  const costPrice = activeProduct?.productCost ?? 0;
-
-  const formatCostValue = (cost: import('../services/marketplaceService').MarketplaceCost | import('../services/marketplaceService').BrandMappingCost) =>
-    cost.costValueType === 'P' ? `${cost.costValue}%` : `₹${cost.costValue}`;
-
-  /** Parse a range string like "0-300" into [from, to], or null if unparseable. */
-  const parseRangeBounds = (range: string | undefined): [number, number] | null => {
-    if (!range) return null;
-    const dashIdx = range.indexOf('-', 1);
-    if (dashIdx < 0) return null;
-    const from = parseFloat(range.substring(0, dashIdx).trim());
-    const to   = parseFloat(range.substring(dashIdx + 1).trim());
-    return isNaN(from) || isNaN(to) ? null : [from, to];
-  };
-
-  const fetchMarketplaceCosts = async (mpId: number, brandId?: number) => {
-    try {
-      setMarketplaceCosts(null);
-      setRawCosts([]);
-      let costs: import('../services/marketplaceService').MarketplaceCost[] = [];
+      let costs: MarketplaceCost[] = [];
 
       if (brandId) {
-        const bmRes = await marketplaceService.getBrandMappings(mpId);
-        const mapping = bmRes.mappings?.find((m: any) => m.brandId === brandId);
-        if (mapping?.costs?.length) {
-          costs = mapping.costs as import('../services/marketplaceService').MarketplaceCost[];
+        const bmRes = await marketplaceService.getBrandMappings(marketplaceId);
+        const brandMapping = bmRes.mappings?.find((m: any) => m.brandId === brandId);
+        if (brandMapping?.costs?.length) {
+          costs = brandMapping.costs as MarketplaceCost[];
         }
       }
 
       if (!costs.length) {
-        const mpRes = await marketplaceService.getMarketplaceCosts(mpId);
-        costs = (mpRes.costs ?? mpRes.marketplace?.costs ?? []) as import('../services/marketplaceService').MarketplaceCost[];
+        const mpRes = await marketplaceService.getMarketplaceCosts(marketplaceId);
+        costs = (mpRes.costs ?? mpRes.marketplace?.costs ?? []) as MarketplaceCost[];
       }
 
-      setRawCosts(costs);
+      setSelectedMarketplaceCosts(costs);
+    } catch (e) {
+      console.error(e);
+      setSelectedMarketplaceCosts([]);
+    }
+  };
 
-      // Summary display (used for the simple one-liner fallback)
-      const get = (cat: string) => {
-        const c = costs.find(x => x.costCategory === cat);
-        return c ? formatCostValue(c) : '—';
-      };
-      setMarketplaceCosts({
-        commission: get('COMMISSION'),
-        shipping: get('SHIPPING'),
-        marketing: get('MARKETING'),
-      });
+  const handleBrandChange = async (value: string) => {
+    setSelectedBrandId(value);
+    setSelectedMarketplaceId('');
+    setSelectedMarketplaceCosts([]);
+    setUploadedRows([]);
+    setUploadErrors([]);
+    setOutputRows([]);
+
+    if (!value) {
+      setBrandMarketplaceIds(null);
+      return;
+    }
+
+    const brandId = Number(value);
+    try {
+      const results = await Promise.all(
+        marketplaces.map((m) =>
+          marketplaceService
+            .getBrandMappings(m.id)
+            .then((res) => ({
+              marketplaceId: m.id,
+              hasBrand: res.mappings?.some((bm: any) => bm.brandId === brandId) ?? false,
+            }))
+            .catch(() => ({ marketplaceId: m.id, hasBrand: false }))
+        )
+      );
+
+      const ids = new Set(results.filter(r => r.hasBrand).map(r => r.marketplaceId));
+      setBrandMarketplaceIds(ids.size > 0 ? ids : null);
     } catch {
-      setMarketplaceCosts(null);
-      setRawCosts([]);
+      setBrandMarketplaceIds(null);
     }
   };
 
-  const handleCalculateProfit = async () => {
-    if (!activeProduct) { alert('Please select a product first'); return; }
-    if (!selectedMarketplaceId) { alert('Please select a marketplace first'); return; }
-    if (!sellingPrice) { alert('Please enter selling price'); return; }
+  const handleMarketplaceChange = async (value: string) => {
+    setSelectedMarketplaceId(value);
+    setUploadedRows([]);
+    setUploadErrors([]);
+    setOutputRows([]);
+
+    if (!value) {
+      setSelectedMarketplaceCosts([]);
+      return;
+    }
+
+    await fetchMarketplaceCosts(Number(value), selectedBrandId ? Number(selectedBrandId) : undefined);
+  };
+
+  const parseRangeBounds = (range: string | undefined): [number, number] | null => {
+    if (!range) return null;
+    const normalized = range.replace('gt:', '').replace('kg', '');
+    if (normalized.toLowerCase() === 'flat') return null;
+
+    const dashIndex = normalized.indexOf('-', 1);
+    if (dashIndex < 0) return null;
+
+    const from = parseFloat(normalized.substring(0, dashIndex).trim());
+    const to = parseFloat(normalized.substring(dashIndex + 1).trim());
+    if (Number.isNaN(from) || Number.isNaN(to)) return null;
+
+    return [from, to];
+  };
+
+  const getCostAmount = (cost: MarketplaceCost, asp: number) =>
+    cost.costValueType === 'P' ? (asp * cost.costValue) / 100 : cost.costValue;
+
+  const getMatchedCostSum = (categoriesToInclude: string[], asp: number): number => {
+    const relevant = selectedMarketplaceCosts.filter(c => categoriesToInclude.includes(c.costCategory));
+    if (!relevant.length) return 0;
+
+    const matched = relevant.filter((cost) => {
+      const bounds = parseRangeBounds(cost.costProductRange);
+      if (!bounds) return (cost.costProductRange ?? '').toLowerCase() === 'flat';
+      return asp >= bounds[0] && asp <= bounds[1];
+    });
+
+    const picked = matched.length ? matched : relevant.filter(c => (c.costProductRange ?? '').toLowerCase() === 'flat');
+    return picked.reduce((acc, cost) => acc + getCostAmount(cost, asp), 0);
+  };
+
+  const downloadWorkbook = (rows: Record<string, string | number>[], fileName: string) => {
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pricing');
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const handleDownloadSample = () => {
+    const marketplaceName = selectedMarketplaceId
+      ? (displayedMarketplaces.find(m => m.id === Number(selectedMarketplaceId))?.name ?? '')
+      : '';
+
+    const rows = filteredProducts.map((product) => ({
+      'Product ID': product.id,
+      'SKU Code': product.skuCode,
+      'Product Name': product.name,
+      'Marketplace': marketplaceName,
+      'Brand': brandNameMap.get(product.brandId) ?? '',
+      '1st List Category': (() => {
+        const cat = categories.find(c => c.id === product.categoryId);
+        if (!cat) return '';
+        if (cat.parentCategoryId === null) return cat.name;
+        return categoryNameMap.get(cat.parentCategoryId) ?? '';
+      })(),
+      '2nd List Category': categoryNameMap.get(product.categoryId) ?? '',
+      'Product Cost': product.productCost,
+      'MRP': product.mrp,
+      'ASP': '',
+      'Input GST': '',
+      'Profit in Rs': '',
+    }));
+
+    downloadWorkbook(rows, 'pricing-sample.xlsx');
+    setPageMessage(`Sample downloaded with ${rows.length} products.`);
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const parsePositiveNumber = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return null;
+    const n = typeof value === 'number' ? value : parseFloat(String(value));
+    if (Number.isNaN(n) || n < 0) return null;
+    return n;
+  };
+
+  const getProductFromRow = (row: Record<string, any>) => {
+    const byIdRaw = row['Product ID'];
+    if (byIdRaw !== undefined && byIdRaw !== null && byIdRaw !== '') {
+      const id = Number(byIdRaw);
+      if (!Number.isNaN(id)) {
+        return filteredProducts.find(p => p.id === id) ?? null;
+      }
+    }
+
+    const sku = String(row['SKU Code'] ?? '').trim();
+    if (sku) {
+      return filteredProducts.find(p => p.skuCode.toLowerCase() === sku.toLowerCase()) ?? null;
+    }
+
+    return null;
+  };
+
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadErrors([]);
+    setUploadedRows([]);
+    setOutputRows([]);
+
     try {
-      const result = await calculatePricing({
-        skuId: activeProduct.id,
-        marketplaceId: parseInt(selectedMarketplaceId),
-        mode: 'SELLING_PRICE',
-        value: parseFloat(sellingPrice),
-        inputGst: activeProduct.productCost * (parseFloat(inputGst) || 0) / 100,
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+
+      const errors: string[] = [];
+      const parsed: UploadRow[] = [];
+
+      rows.forEach((row, index) => {
+        const rowNumber = index + 2;
+        const product = getProductFromRow(row);
+        if (!product) {
+          errors.push(`Row ${rowNumber}: Product not found in selected filters (check Product ID/SKU Code).`);
+          return;
+        }
+
+        const asp = parsePositiveNumber(row['ASP']);
+        if (asp === null || asp <= 0) {
+          errors.push(`Row ${rowNumber}: ASP must be a positive number.`);
+          return;
+        }
+
+        const inputGst = parsePositiveNumber(row['Input GST']) ?? 0;
+
+        parsed.push({ rowNumber, product, asp, inputGst });
       });
-      const isLoss = result.profit < 0;
-      setCalculatedProfit(JSON.stringify({
-        isLoss,
-        text: `${Math.abs(result.profitPercentage).toFixed(2)}% (₹${Math.abs(result.profit).toFixed(2)})`,
-        outputGst: result.outputGst,
-        inputGst: result.inputGst,
-        gstDifference: result.gstDifference,
-      }));
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
-      alert(msg);
+
+      setUploadErrors(errors);
+      setUploadedRows(parsed);
+      setPageMessage(`Uploaded ${parsed.length} valid rows${errors.length ? `, ${errors.length} invalid rows` : ''}.`);
+    } catch (e) {
+      console.error(e);
+      setUploadErrors(['Failed to read file. Upload a valid .xlsx file.']);
+      setUploadedRows([]);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
-  const handleCalculateSellingPrice = async () => {
-    if (!activeProduct) { alert('Please select a product first'); return; }
-    if (!selectedMarketplaceId) { alert('Please select a marketplace first'); return; }
-    if (!profitPercentage) { alert('Please enter profit percentage'); return; }
-    try {
-      const result = await calculatePricing({
-        skuId: activeProduct.id,
-        marketplaceId: parseInt(selectedMarketplaceId),
-        mode: 'PROFIT_PERCENT',
-        value: parseFloat(profitPercentage),
-        inputGst: activeProduct.productCost * (parseFloat(inputGst) || 0) / 100,
-      });
-      setCalculatedSellingPrice(JSON.stringify({
-        sp: result.sellingPrice,
-        outputGst: result.outputGst,
-        inputGst: result.inputGst,
-        gstDifference: result.gstDifference,
-      }));
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
-      alert(msg);
+  const handleCalculate = async () => {
+    if (!selectedMarketplaceId) {
+      setError('Please select a marketplace before calculation.');
+      return;
     }
-  };
+    if (!uploadedRows.length) {
+      setError('Please upload a sample file with valid rows first.');
+      return;
+    }
 
-  const handleCalculateRebate = async () => {
-    if (!activeProduct) { alert('Please select a product first'); return; }
-    if (!selectedMarketplaceId) { alert('Please select a marketplace first'); return; }
-    if (!rebateDiscount) { alert('Please enter rebate discount %'); return; }
-    // Base SP: use whatever the user entered in Calculate Profit, else proposed SP, else MRP
-    const baseSP = parseFloat(sellingPrice) || activeProduct.proposedSellingPriceSales || activeProduct.mrp;
-    // Derive commission rate from the slab that matches the rebate SP
-    const rebateSP = baseSP * (1 - parseFloat(rebateDiscount) / 100);
-    if (rebateSP <= 0) { alert('Rebate SP must be positive'); return; }
-    const commissionCosts = rawCosts.filter(x => x.costCategory === 'COMMISSION');
-    const matchedCommission = commissionCosts.find(x => {
-      const bounds = parseRangeBounds(x.costProductRange);
-      return bounds ? baseSP >= bounds[0] && baseSP <= bounds[1] : false;
-    }) ?? commissionCosts[0];
-    const commissionRatePct = matchedCommission?.costValue ?? 0;
+    setError(null);
+    setPageMessage(null);
+    setProcessing(true);
+
     try {
-      const result = await calculatePricing({
-        skuId: activeProduct.id,
-        marketplaceId: parseInt(selectedMarketplaceId),
-        mode: 'SELLING_PRICE',
-        value: rebateSP,
-        inputGst: activeProduct.productCost * (parseFloat(inputGst) || 0) / 100,
-        commissionRebatePct: commissionRatePct,
-        rebateMode: 'NET',
-      });
-      const isLoss = result.profit < 0;
-      setRebateResult(JSON.stringify({
-        isLoss,
-        sp: result.sellingPrice,
-        profit: result.profit,
-        profitPct: result.profitPercentage,
-        commission: result.commission,
-        commissionBeforeRebate: result.commissionBeforeRebate,
-        pendingRebateGross: result.pendingRebateGross,
-        mode: 'NET',
-        commissionRatePct,
-        commissionValueType: matchedCommission?.costValueType ?? 'P',
+      const marketplaceId = Number(selectedMarketplaceId);
+      const computed: OutputRow[] = [];
+
+      for (const row of uploadedRows) {
+        try {
+          const result = await calculatePricing({
+            skuId: row.product.id,
+            marketplaceId,
+            mode: 'SELLING_PRICE',
+            value: row.asp,
+            inputGst: calculateInputGst ? row.inputGst : 0,
+          });
+
+          const reverseFixedFee = calculateReverseFixedFee
+            ? getMatchedCostSum(['FIXED_FEE', 'REVERSE_SHIPPING'], row.asp)
+            : 0;
+
+          const pickAndPack = calculatePickAndPack
+            ? getMatchedCostSum(['PICK_AND_PACK'], row.asp)
+            : 0;
+
+          const finalProfit = result.profit - reverseFixedFee - pickAndPack;
+          const denominator = result.sellingPrice > 0 ? result.sellingPrice : 1;
+          const finalProfitPercentage = (finalProfit / denominator) * 100;
+
+          computed.push({
+            rowNumber: row.rowNumber,
+            productId: row.product.id,
+            skuCode: row.product.skuCode,
+            productName: row.product.name,
+            asp: row.asp,
+            inputGst: calculateInputGst ? row.inputGst : 0,
+            reverseFixedFee,
+            pickAndPack,
+            baseProfit: result.profit,
+            finalProfit,
+            finalProfitPercentage,
+            status: 'success',
+            message: 'Calculated',
+          });
+        } catch (e: any) {
+          computed.push({
+            rowNumber: row.rowNumber,
+            productId: row.product.id,
+            skuCode: row.product.skuCode,
+            productName: row.product.name,
+            asp: row.asp,
+            inputGst: calculateInputGst ? row.inputGst : 0,
+            reverseFixedFee: 0,
+            pickAndPack: 0,
+            baseProfit: 0,
+            finalProfit: 0,
+            finalProfitPercentage: 0,
+            status: 'error',
+            message: e?.response?.data?.message ?? e?.message ?? 'Calculation failed',
+          });
+        }
+      }
+
+      setOutputRows(computed);
+
+      const exportRows = computed.map((r) => ({
+        'Row Number': r.rowNumber,
+        'Product ID': r.productId,
+        'SKU Code': r.skuCode,
+        'Product Name': r.productName,
+        'ASP': r.asp,
+        'Input GST': r.inputGst,
+        'Reverse Fixed Fee': Number(r.reverseFixedFee.toFixed(2)),
+        'Pick and Pack': Number(r.pickAndPack.toFixed(2)),
+        'Base Profit': Number(r.baseProfit.toFixed(2)),
+        'Profit in Rs': Number(r.finalProfit.toFixed(2)),
+        'Profit %': Number(r.finalProfitPercentage.toFixed(2)),
+        'Status': r.status,
+        'Message': r.message,
       }));
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.message ?? 'Calculation failed. Please check that the pricing service is running.';
-      alert(msg);
+
+      downloadWorkbook(exportRows, 'pricing-calculation-result.xlsx');
+      setPageMessage(`Calculation completed for ${computed.length} rows. Result file downloaded.`);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -323,364 +456,192 @@ const PricingPage: React.FC = () => {
     return (
       <div className="pricing-bg">
         <main className="pricing-main">
-          <p style={{ padding: '40px', color: '#454545' }}>Loading pricing data...</p>
+          <p className="pricing-note">Loading pricing data...</p>
         </main>
       </div>
     );
   }
+
   return (
     <div className="pricing-bg">
       <main className="pricing-main">
         <header className="pricing-header">
-          <h1 className="pricing-title">Pricing</h1>
-          <div className="header-actions">
-            <button className="icon-btn">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8.85713 0.000114168C3.97542 0.000114168 0 3.97554 0 8.85724C0 13.7389 3.97542 17.7144 8.85713 17.7144C10.9899 17.7144 12.9497 16.9555 14.4811 15.6932L18.5368 19.7489C18.8717 20.0837 19.4141 20.0837 19.7489 19.7489C20.0837 19.4141 20.0837 18.8705 19.7489 18.5368L15.6932 14.4811C16.9555 12.9499 17.7144 10.99 17.7144 8.85713C17.7144 3.97542 13.7388 0.000114168 8.85713 0.000114168ZM8.85713 1.7144C12.8125 1.7144 16 4.90182 16 8.85724C16 12.8127 12.8125 16.0001 8.85713 16.0001C4.90171 16.0001 1.71428 12.8127 1.71428 8.85724C1.71428 4.90182 4.90171 1.7144 8.85713 1.7144Z" fill="#1E1E1E"/>
-              </svg>
-            </button>
-            <button className="icon-btn">
-              <svg width="16" height="21" viewBox="0 0 16 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7.74966 0.25C6.66274 0.25 5.77627 1.13519 5.77627 2.22038V3.15169C3.34058 3.96277 1.58929 6.23466 1.58929 8.9187V14.0271L0.283816 16.7429C0.25865 16.7955 0.247214 16.8535 0.250574 16.9116C0.253933 16.9697 0.271978 17.026 0.303028 17.0753C0.334077 17.1246 0.37712 17.1652 0.428145 17.1934C0.47917 17.2216 0.536515 17.2364 0.594837 17.2366H4.71029V17.2493C4.71029 18.9083 6.07492 20.25 7.74966 20.25C9.4244 20.25 10.787 18.9083 10.787 17.2493V17.2366H14.9025C14.961 17.2369 15.0187 17.2224 15.0701 17.1944C15.1215 17.1664 15.1649 17.1258 15.1963 17.0765C15.2276 17.0271 15.2459 16.9706 15.2494 16.9123C15.2529 16.8539 15.2414 16.7957 15.2162 16.7429L13.91 14.0271V8.9187C13.91 6.23391 12.1578 3.96151 9.72103 3.15102V2.22038C9.72103 1.13519 8.83658 0.25 7.74966 0.25ZM7.7166 0.940239C7.72771 0.939962 7.73847 0.940239 7.74966 0.940239C8.46558 0.940239 9.0295 1.50507 9.0295 2.22038V2.96515C8.61676 2.87928 8.18848 2.83384 7.74966 2.83384C7.30964 2.83384 6.8809 2.8795 6.46712 2.96583V2.22038C6.46712 1.51625 7.01656 0.957515 7.7166 0.940239ZM7.74966 3.5234C10.7881 3.5234 13.2192 5.92639 13.2192 8.9187V14.1032C13.2187 14.1551 13.23 14.2064 13.2522 14.2534L14.354 16.547H1.14266L2.24439 14.2534C2.26753 14.2067 2.27975 14.1553 2.28015 14.1032V8.9187C2.28015 5.92639 4.71119 3.52341 7.74966 3.5234ZM5.40115 17.2366H10.0955V17.2493C10.0955 18.534 9.0578 19.5604 7.74966 19.5604C6.44152 19.5604 5.40115 18.534 5.40115 17.2493V17.2366Z" fill="black" stroke="#1E1E1E" strokeWidth="0.5"/>
-              </svg>
-            </button>
-            <button className="icon-btn profile-btn">
-              <svg width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <mask id="path-1-inside-1_166_508" fill="white">
-                  <path d="M5.6703 11.1873H14.606C16.166 11.1873 17.5839 11.8254 18.6113 12.8528C19.6387 13.8802 20.2769 15.2981 20.2769 16.8582V19.5251C20.2769 19.7871 20.0639 20 19.802 20H0.474905C0.21231 20 0 19.7871 0 19.5251V16.8582C0 15.2981 0.638172 13.8809 1.66558 12.8528C2.69299 11.8248 4.11087 11.1873 5.67092 11.1873H5.6703ZM10.1381 0C11.5032 0 12.7386 0.553124 13.6338 1.44768C14.5284 2.34224 15.0815 3.57823 15.0815 4.94273C15.0815 6.30785 14.5284 7.54384 13.6338 8.4384C12.7392 9.33296 11.5032 9.88608 10.1381 9.88608C8.77301 9.88608 7.53763 9.33296 6.64246 8.4384C5.7479 7.54384 5.19477 6.30785 5.19477 4.94273C5.19477 3.57823 5.7479 2.34224 6.64246 1.44768C7.53701 0.553124 8.77301 0 10.1381 0ZM12.9615 2.12C12.2389 1.3974 11.2406 0.95043 10.1381 0.95043C9.0356 0.95043 8.03737 1.3974 7.31477 2.12C6.59217 2.8426 6.1452 3.84083 6.1452 4.94335C6.1452 6.04588 6.59217 7.04473 7.31477 7.76671C8.03737 8.48931 9.0356 8.93565 10.1381 8.93565C11.2406 8.93565 12.2389 8.48869 12.9615 7.76671C13.6841 7.04411 14.131 6.04588 14.131 4.94335C14.131 3.84083 13.6841 2.8426 12.9615 2.12ZM14.606 12.1377H5.6703C4.37223 12.1377 3.19272 12.6691 2.33665 13.5245C1.48121 14.38 0.949809 15.5601 0.949809 16.8576V19.0496H19.3264V16.8576C19.3264 15.5601 18.795 14.38 17.9396 13.5245C17.0841 12.6691 15.904 12.1377 14.606 12.1377Z"/>
-                </mask>
-                <path d="M5.6703 11.1873H14.606C16.166 11.1873 17.5839 11.8254 18.6113 12.8528C19.6387 13.8802 20.2769 15.2981 20.2769 16.8582V19.5251C20.2769 19.7871 20.0639 20 19.802 20H0.474905C0.21231 20 0 19.7871 0 19.5251V16.8582C0 15.2981 0.638172 13.8809 1.66558 12.8528C2.69299 11.8248 4.11087 11.1873 5.67092 11.1873H5.6703ZM10.1381 0C11.5032 0 12.7386 0.553124 13.6338 1.44768C14.5284 2.34224 15.0815 3.57823 15.0815 4.94273C15.0815 6.30785 14.5284 7.54384 13.6338 8.4384C12.7392 9.33296 11.5032 9.88608 10.1381 9.88608C8.77301 9.88608 7.53763 9.33296 6.64246 8.4384C5.7479 7.54384 5.19477 6.30785 5.19477 4.94273C5.19477 3.57823 5.7479 2.34224 6.64246 1.44768C7.53701 0.553124 8.77301 0 10.1381 0ZM12.9615 2.12C12.2389 1.3974 11.2406 0.95043 10.1381 0.95043C9.0356 0.95043 8.03737 1.3974 7.31477 2.12C6.59217 2.8426 6.1452 3.84083 6.1452 4.94335C6.1452 6.04588 6.59217 7.04473 7.31477 7.76671C8.03737 8.48931 9.0356 8.93565 10.1381 8.93565C11.2406 8.93565 12.2389 8.48869 12.9615 7.76671C13.6841 7.04411 14.131 6.04588 14.131 4.94335C14.131 3.84083 13.6841 2.8426 12.9615 2.12ZM14.606 12.1377H5.6703C4.37223 12.1377 3.19272 12.6691 2.33665 13.5245C1.48121 14.38 0.949809 15.5601 0.949809 16.8576V19.0496H19.3264V16.8576C19.3264 15.5601 18.795 14.38 17.9396 13.5245C17.0841 12.6691 15.904 12.1377 14.606 12.1377Z" stroke="#1E1E1E" strokeWidth="2" mask="url(#path-1-inside-1_166_508)"/>
-              </svg>
-            </button>
-          </div>
+          <h1 className="pricing-title">Pricing Module</h1>
         </header>
 
         <div className="pricing-divider" />
-        {error && (
-          <div style={{ color: 'red', padding: '10px 0', marginBottom: '16px' }}>{error}</div>
-        )}
 
-        {/* Select Brand Section */}
-        <section className="marketplace-section">
-          <h2 className="section-title">Select Brand</h2>
-          <div className="marketplace-card">
-            <div className="dropdown-wrapper">
-              <label className="dropdown-label">Brand</label>
-              <select
-                className="dropdown-select"
-                value={selectedBrandId}
-                onChange={(e) => handleBrandChange(e.target.value)}
-              >
+        {error && <div className="pricing-alert pricing-alert-error">{error}</div>}
+        {pageMessage && <div className="pricing-alert pricing-alert-info">{pageMessage}</div>}
+
+        <section className="pricing-block">
+          <div className={`pricing-grid-row ${selectedFirstCategoryId ? 'has-second-category' : 'three-fields'}`}>
+            <div className="pricing-field">
+              <label>Marketplace</label>
+              <select value={selectedMarketplaceId} onChange={(e) => handleMarketplaceChange(e.target.value)}>
+                <option value="">Select Marketplace</option>
+                {displayedMarketplaces.map(m => (
+                  <option key={m.id} value={m.id}>{m.enabled ? m.name : `${m.name} (Inactive)`}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="pricing-field">
+              <label>Brand</label>
+              <select value={selectedBrandId} onChange={(e) => void handleBrandChange(e.target.value)}>
                 <option value="">Select Brand</option>
                 {brands.map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
-              <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          </div>
-        </section>
-        {/* Select Product Section */}
-        <section className="product-section">
-          <h2 className="section-title">Select Product</h2>
-          <div className="product-card">
-            <div className="product-dropdowns">
-              {/* SKU / Product Name */}
-              <div className="dropdown-wrapper">
-                <label className="dropdown-label">SKU / Product Name</label>
-                <select
-                  className="dropdown-select"
-                  value={selectedSKUProductId}
-                  onChange={(e) => handleSKUChange(e.target.value)}
-                >
-                  <option value="">Select SKU</option>
-                  {brandFilteredProducts.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.skuCode} — {p.name}
-                    </option>
-                  ))}
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              <div className="or-divider">OR</div>
-
-              {/* Parent Category */}
-              <div className="dropdown-wrapper">
-                <label className="dropdown-label">Parent Category</label>
-                <select
-                  className="dropdown-select"
-                  value={selectedParentCategoryId}
-                  onChange={(e) => handleParentCategoryChange(e.target.value)}
-                >
-                  <option value="">Select Parent Category</option>
-                  {parentCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              {/* Category */}
-              <div className="dropdown-wrapper">
-                <label className="dropdown-label">Category</label>
-                <select
-                  className="dropdown-select"
-                  value={selectedCategoryId}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  disabled={!selectedParentCategoryId}
-                >
-                  <option value="">Select Category</option>
-                  {childCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-
-              {/* Product under Category */}
-              <div className="dropdown-wrapper">
-                <label className="dropdown-label">Product</label>
-                <select
-                  className="dropdown-select"
-                  value={selectedCategoryProductId}
-                  onChange={(e) => handleCategoryProductChange(e.target.value)}
-                  disabled={!selectedCategoryId}
-                >
-                  <option value="">Select Product</option>
-                  {categoryFilteredProducts.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
             </div>
 
-            {/* Selected product summary */}
-            {activeProduct && (
-              <div style={{ marginTop: '14px', padding: '10px 16px', background: '#F5F9FA', borderRadius: '8px', display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#454545' }}>
-                <span><strong>SKU:</strong> {activeProduct.skuCode}</span>
-                <span><strong>MRP:</strong> ₹{activeProduct.mrp}</span>
-                <span><strong>Cost:</strong> ₹{activeProduct.productCost}</span>
-                <span><strong>Proposed SP:</strong> ₹{activeProduct.proposedSellingPriceSales}</span>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Select Marketplace Section */}
-        <section className="marketplace-section">
-          <h2 className="section-title">Select Marketplace</h2>
-          <div className="marketplace-card">
-            <div className="dropdown-wrapper">
-              <label className="dropdown-label">Marketplace</label>
+            <div className="pricing-field">
+              <label>1st List Category</label>
               <select
-                className="dropdown-select"
-                value={selectedMarketplaceId}
+                value={selectedFirstCategoryId}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedMarketplaceId(val);
-                  setCalculatedProfit('');
-                  setCalculatedSellingPrice('');
-                  if (val) {
-                    fetchMarketplaceCosts(parseInt(val), selectedBrandId ? parseInt(selectedBrandId) : undefined);
-                  } else {
-                    setMarketplaceCosts(null);
-                    setRawCosts([]);
-                  }
+                  setSelectedFirstCategoryId(e.target.value);
+                  setSelectedSecondCategoryId('');
+                  setUploadedRows([]);
+                  setUploadErrors([]);
+                  setOutputRows([]);
                 }}
               >
-                <option value="">Select Marketplace</option>
-                {displayedMarketplaces.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
+                <option value="">Select Category</option>
+                {parentCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <svg className="dropdown-icon" width="10" height="5" viewBox="0 0 10 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 1L5 4L9 1" stroke="#454545" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
             </div>
 
-            {marketplaceCosts && (
-              <div style={{ marginTop: '14px', padding: '10px 16px', background: '#F5F9FA', borderRadius: '8px', display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#454545' }}>
-                <span><strong>Commission:</strong> {marketplaceCosts.commission}</span>
-                <span><strong>Shipping:</strong> {marketplaceCosts.shipping}</span>
-                <span><strong>Marketing:</strong> {marketplaceCosts.marketing}</span>
+            {selectedFirstCategoryId && (
+              <div className="pricing-field">
+                <label>2nd List Category</label>
+                <select
+                  value={selectedSecondCategoryId}
+                  onChange={(e) => {
+                    setSelectedSecondCategoryId(e.target.value);
+                    setUploadedRows([]);
+                    setUploadErrors([]);
+                    setOutputRows([]);
+                  }}
+                >
+                  <option value="">Select Category</option>
+                  {secondCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             )}
-
           </div>
-        </section>
 
-        {/* Input GST Section */}
-        <section className="marketplace-section">
-          <h2 className="section-title">Input GST (%)</h2>
-          <div className="marketplace-card">
-            <div className="input-group">
-              <label className="input-label">GST Percentage</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input
-                  type="number"
-                  className="input-field"
-                  placeholder="0"
-                  value={inputGst}
-                  onChange={(e) => { setInputGst(e.target.value); setCalculatedProfit(''); setCalculatedSellingPrice(''); }}
-                  style={{ maxWidth: 220 }}
-                  min="0"
-                  max="100"
-                />
-                <span style={{ fontSize: 13, color: '#7C7C7C' }}>% of product cost paid as Input GST on purchase</span>
-              </div>
+          <div className="pricing-checklist">
+            <label>
+              <input
+                type="checkbox"
+                checked={calculateReverseFixedFee}
+                onChange={(e) => setCalculateReverseFixedFee(e.target.checked)}
+              />
+              <span>Calculate Reverse Fixed Fee</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={calculatePickAndPack}
+                onChange={(e) => setCalculatePickAndPack(e.target.checked)}
+              />
+              <span>Calculate Pick and Pack</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={calculateInputGst}
+                onChange={(e) => setCalculateInputGst(e.target.checked)}
+              />
+              <span>Calculate Input GST</span>
+            </label>
+          </div>
+
+          <div className="pricing-actions-row">
+            <button className="pricing-btn pricing-btn-secondary" onClick={handleDownloadSample}>
+              Download Sample
+            </button>
+            <button className="pricing-btn pricing-btn-secondary" onClick={handleUploadClick}>
+              Upload File
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden-file-input"
+              onChange={handleFileSelected}
+            />
+
+            <div className="pricing-calculate-wrap">
+              <button
+                className="pricing-btn pricing-btn-primary"
+                onClick={handleCalculate}
+                disabled={processing}
+              >
+                {processing ? 'Calculating...' : 'Calculate'}
+              </button>
             </div>
           </div>
-        </section>
 
-        {/* Calculation Section */}
-        <section className="calculation-section">
-          <div className="calc-container">
-            {/* Calculate Profit */}
-            <div className="calc-card">
-              <h3 className="calc-title">Calculate Profit</h3>
-              <div className="calc-content">
-                <div className="input-group">
-                  <label className="input-label">
-                    Selling Price
-                    {activeProduct && <span style={{ color: '#7C7C7C', fontWeight: 400 }}> (Cost: ₹{costPrice})</span>}
-                  </label>
-                  <input
-                    type="number"
-                    className="input-field"
-                    placeholder="Enter selling price"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
-                  />
-                </div>
-                <button className="calc-button" onClick={handleCalculateProfit}>
-                  Calculate
-                </button>
-                {calculatedProfit && (() => {
-                  const p = JSON.parse(calculatedProfit);
-                  return (
-                    <>
-                      <div className="result-display">
-                        <span className="result-label" style={{ color: p.isLoss ? '#c00' : undefined }}>
-                          {p.isLoss ? 'Loss:' : 'Profit:'}
-                        </span>
-                        <span className="result-value" style={{ color: p.isLoss ? '#c00' : '#008000' }}>
-                          {p.text}
-                        </span>
-                      </div>
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#F5F9FA', borderRadius: 6, fontSize: 12, color: '#454545', lineHeight: '1.8' }}>
-                        <div><strong>Output GST:</strong> ₹{(p.outputGst ?? 0).toFixed(2)}</div>
-                        <div><strong>Input GST:</strong> ₹{(p.inputGst ?? 0).toFixed(2)}</div>
-                        <div><strong>GST Difference:</strong> <span style={{ color: (p.gstDifference ?? 0) < 0 ? '#008000' : '#c00' }}>₹{(p.gstDifference ?? 0).toFixed(2)}</span></div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Calculate Selling Price */}
-            <div className="calc-card">
-              <h3 className="calc-title">Calculate Selling Price</h3>
-              <div className="calc-content">
-                <div className="input-group">
-                  <label className="input-label">
-                    Profit %
-                    {activeProduct && <span style={{ color: '#7C7C7C', fontWeight: 400 }}> (Cost: ₹{costPrice})</span>}
-                  </label>
-                  <input
-                    type="number"
-                    className="input-field"
-                    placeholder="Enter profit %"
-                    value={profitPercentage}
-                    onChange={(e) => setProfitPercentage(e.target.value)}
-                  />
-                </div>
-                <button className="calc-button" onClick={handleCalculateSellingPrice}>
-                  Calculate
-                </button>
-                {calculatedSellingPrice && (() => {
-                  const s = JSON.parse(calculatedSellingPrice);
-                  return (
-                    <>
-                      <div className="result-display">
-                        <span className="result-label">Selling Price:</span>
-                        <span className="result-value">₹{(s.sp ?? 0).toFixed(2)}</span>
-                      </div>
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#F5F9FA', borderRadius: 6, fontSize: 12, color: '#454545', lineHeight: '1.8' }}>
-                        <div><strong>Output GST:</strong> ₹{(s.outputGst ?? 0).toFixed(2)}</div>
-                        <div><strong>Input GST:</strong> ₹{(s.inputGst ?? 0).toFixed(2)}</div>
-                        <div><strong>GST Difference:</strong> <span style={{ color: (s.gstDifference ?? 0) < 0 ? '#008000' : '#c00' }}>₹{(s.gstDifference ?? 0).toFixed(2)}</span></div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
+          <div className="pricing-stats-row">
+            <span>Filtered Products: {filteredProducts.length}</span>
+            <span>Uploaded Valid Rows: {uploadedRows.length}</span>
+            <span>Result Rows: {outputRows.length}</span>
           </div>
-        </section>
 
-        {/* Rebate Discount Analysis Section */}
-        <section className="calculation-section">
-          <div className="calc-container">
-            <div className="calc-card">
-              <h3 className="calc-title">Rebate Discount Analysis</h3>
-              <div className="calc-content">
-                <div className="input-group">
-                  <label className="input-label">
-                    Rebate Discount (%)
-                  </label>
-                  <input
-                    type="number"
-                    className="input-field"
-                    placeholder="Enter value"
-                    value={rebateDiscount}
-                    onChange={e => { setRebateDiscount(e.target.value); setRebateResult(''); }}
-                    min="0" max="100"
-                  />
-                </div>
-                <button className="calc-button" onClick={handleCalculateRebate}>
-                  Calculate Rebate
-                </button>
-                {rebateResult && (() => {
-                  const r = JSON.parse(rebateResult);
-                  return (
-                    <>
-                      <div className="result-display">
-                        <span className="result-label" style={{ color: r.isLoss ? '#c00' : undefined }}>
-                          {r.isLoss ? 'Loss:' : 'Profit:'}
-                        </span>
-                        <span className="result-value" style={{ color: r.isLoss ? '#c00' : '#008000' }}>
-                          {Math.abs(r.profitPct ?? 0).toFixed(2)}% (₹{Math.abs(r.profit ?? 0).toFixed(2)})
-                        </span>
-                      </div>
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#F5F9FA', borderRadius: 6, fontSize: 12, color: '#454545', lineHeight: '1.8' }}>
-                        <div><strong>Rebate SP:</strong> ₹{(r.sp ?? 0).toFixed(2)}</div>
-                        {r.commissionBeforeRebate != null && (
-                          <div>
-                            <strong>Commission:</strong> ₹{(r.commission ?? 0).toFixed(2)}{' '}
-                            <span style={{ color: '#7C7C7C' }}>(reduced from ₹{r.commissionBeforeRebate.toFixed(2)} — {r.commissionRatePct}{r.commissionValueType === 'P' ? '%' : '₹'} rebate)</span>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+          {uploadErrors.length > 0 && (
+            <div className="pricing-errors-box">
+              <h4>Upload Validation Errors</h4>
+              <ul>
+                {uploadErrors.slice(0, 20).map((err) => (
+                  <li key={err}>{err}</li>
+                ))}
+              </ul>
+              {uploadErrors.length > 20 && (
+                <p>+ {uploadErrors.length - 20} more errors</p>
+              )}
             </div>
-          </div>
+          )}
+
+          {outputRows.length > 0 && (
+            <div className="pricing-result-table-wrap">
+              <table className="pricing-result-table">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>SKU</th>
+                    <th>ASP</th>
+                    <th>Input GST</th>
+                    <th>Reverse Fixed Fee</th>
+                    <th>Pick and Pack</th>
+                    <th>Profit in Rs</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {outputRows.slice(0, 50).map((row) => (
+                    <tr key={`${row.rowNumber}-${row.skuCode}`}>
+                      <td>{row.rowNumber}</td>
+                      <td>{row.skuCode}</td>
+                      <td>{row.asp.toFixed(2)}</td>
+                      <td>{row.inputGst.toFixed(2)}</td>
+                      <td>{row.reverseFixedFee.toFixed(2)}</td>
+                      <td>{row.pickAndPack.toFixed(2)}</td>
+                      <td>{row.finalProfit.toFixed(2)}</td>
+                      <td className={row.status === 'success' ? 'status-success' : 'status-error'}>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {outputRows.length > 50 && <p>Showing first 50 rows in preview. Full data is in downloaded result file.</p>}
+            </div>
+          )}
         </section>
       </main>
     </div>

@@ -26,6 +26,8 @@ import PriceCalculationPage from './components/PriceCalculationPage';
 import ProductDetailsPage from './components/ProductDetailsPage';
 import { CategoryProvider } from './contexts/CategoryContext';
 
+const SafePricingPage: React.ComponentType = (PricingPage as any)?.default ?? (PricingPage as any);
+
 const App: React.FC = () => {
   return (
     <CategoryProvider>
@@ -36,7 +38,7 @@ const App: React.FC = () => {
 
           {/* Routes that show the common sidebar/layout */}
           <Route element={<CommonLayout />}>
-            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/pricing" element={<SafePricingPage />} />
             <Route path="/price-calculator" element={<PriceCalculationPage />} />
             <Route path="/product-details" element={<ProductDetailsPage />} />
             <Route path="/superadmin" element={<SuperAdminUsersPage />} />
