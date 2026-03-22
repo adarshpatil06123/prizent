@@ -29,6 +29,21 @@ export interface PricingCalcResponse {
   marketplaceId: number;
   marketplaceName: string;
   sellingPrice: number;
+  mrp?: number;
+  sellerPrice?: number;
+  gt?: number;
+  desiredSellingPrice?: number;
+  commissionPercentage?: number;
+  commissionAmount?: number;
+  fixedFee?: number;
+  excessFixedFee?: number;
+  pickAndPackFee?: number;
+  returnShippingCost?: number;
+  excessGst?: number;
+  nr?: number;
+  finalSettlement?: number;
+  codbWithGtPercentage?: number;
+  finalDiscountPercentage?: number;
   commission: number;
   shipping: number;
   marketing: number;
@@ -36,6 +51,7 @@ export interface PricingCalcResponse {
   outputGst: number;        // SP × GST slab rate
   inputGst: number;         // flat ₹ purchase GST paid by seller
   gstDifference: number;    // outputGst - inputGst
+  netSellerAsp: number;
   netRealisation: number;
   profit: number;
   profitPercentage: number;

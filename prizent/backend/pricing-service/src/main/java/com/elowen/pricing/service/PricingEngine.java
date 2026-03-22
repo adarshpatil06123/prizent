@@ -29,7 +29,16 @@ public class PricingEngine {
 
     private static final Set<String> VALID_COST_TYPES = Set.of("P", "A");
     private static final Set<String> VALID_CATEGORIES =
-            Set.of("COMMISSION", "SHIPPING", "MARKETING");
+            Set.of(
+                "COMMISSION",
+                "SHIPPING",
+                "MARKETING",
+                "FIXED_FEE",
+                "PICK_AND_PACK",
+                "RETURN_SHIPPING",
+                "REVERSE_SHIPPING",
+                "GT"
+            );
 
     // GST slab: 5% when SP < ₹2625, 18% when SP >= ₹2625  (GST is inclusive in SP/MRP)
     private static final double GST_THRESHOLD = 2625.0;
@@ -142,7 +151,7 @@ public class PricingEngine {
 
             if (cat == null || !VALID_CATEGORIES.contains(cat.toUpperCase()))
                 throw new IllegalArgumentException(
-                    "Unknown cost category '" + cat + "'. Expected: COMMISSION | SHIPPING | MARKETING");
+                    "Unknown cost category '" + cat + "'. Expected pricing categories configured in pricing-engine.");
 
             if (type == null || !VALID_COST_TYPES.contains(type.toUpperCase()))
                 throw new IllegalArgumentException(
@@ -164,31 +173,84 @@ public class PricingEngine {
             throw new IllegalArgumentException("Selling price must be >= 0.");
 
         List<MarketplaceCostDto> costs = safeCosts(marketplace);
-        double commission    = extractCost(costs, "COMMISSION", sellingPrice);
-        double shipping      = extractCost(costs, "SHIPPING",   sellingPrice);
-        double marketing     = extractCost(costs, "MARKETING",  sellingPrice);
+        Long productCategoryId = product.getCategoryId();
+        // Spreadsheet model uses incoming request value as Seller Price, then applies GT to get Desired Selling Price.
+        double sellerPrice = sellingPrice;
+        double gt = extractCostFirst(costs, sellerPrice, productCategoryId, "GT");
+        double desiredSellingPrice = sellerPrice + gt;
 
-        // GST is INCLUSIVE in the selling price (MRP includes GST)
-        // Formula: =AJ6-(AJ6*(IF(AJ6<2625,(100/105),(100/118))))
-        double gstRate       = computeGstRate(sellingPrice);
-        double netSellerAsp  = sellingPrice * 100.0 / (100.0 + gstRate * 100.0);  // SP × 100/(100+rate%)
-        double outputGst     = sellingPrice - netSellerAsp;                       // GST embedded in price
-        double gstDifference = outputGst - inputGst;  // positive = GST payable, negative = credit
+        // Use a single base for all downstream slab resolution and calculations.
+        double calcBaseAsp = desiredSellingPrice;
 
-        // Net realisation: base price (ex-GST) minus all marketplace deductions
+        // Costs and percentages resolved against the same ASP base.
+        double commissionPct = extractPercentFirst(costs, calcBaseAsp, productCategoryId, "COMMISSION");
+        double commission = extractCostFirst(costs, calcBaseAsp, productCategoryId, "COMMISSION");
+        double fixedFee = extractCostFirst(costs, calcBaseAsp, productCategoryId, "FIXED_FEE");
+        double excessFixedFee = fixedFee * 0.67;
+        double pickAndPack = extractCostFirst(costs, calcBaseAsp, productCategoryId, "PICK_AND_PACK");
+        double marketing = extractCostFirst(costs, calcBaseAsp, productCategoryId, "MARKETING");
+        double returnShipping = extractCostFirst(costs, calcBaseAsp, productCategoryId, "RETURN_SHIPPING", "REVERSE_SHIPPING");
+
+        // GST is inclusive in desired selling price.
+        double gstRate = computeGstRate(calcBaseAsp);
+        double netSellerAsp = calcBaseAsp * 100.0 / (100.0 + gstRate * 100.0);
+        double outputGst = calcBaseAsp - netSellerAsp;
+
+        // Sheet formula for Input GST:
+        // = ProductCost*0.05 + (Commission + FixedFee + ExcessFixedFee + PickAndPack + Marketing + ReturnShipping)*0.18
+        // If caller provides manual inputGst > 0, keep manual value; else use formula-based auto value.
+        double autoInputGst = productCost * 0.05
+            + (commission + fixedFee + excessFixedFee + pickAndPack + marketing + returnShipping) * 0.18;
+        double resolvedInputGst = inputGst > 0 ? inputGst : autoInputGst;
+        double excessGst = outputGst - resolvedInputGst;
+
+        // Sheet-equivalent staging.
+        double nr = calcBaseAsp
+            - (commission + fixedFee + excessFixedFee + pickAndPack + marketing + returnShipping + outputGst);
+        double profit = (nr - productCost) + (excessGst < 0 ? excessGst : 0);
+        double profitPct = netSellerAsp > 0 ? (profit / netSellerAsp) * 100.0 : 0.0;
+        double finalSettlement = calcBaseAsp - ((commission + fixedFee + pickAndPack) * 1.18);
+        if (commissionPct <= 0 && calcBaseAsp > 0) {
+            commissionPct = (commission / calcBaseAsp) * 100.0;
+        }
+
+        // Sheet formula: (GT + Commission + Fixed Fee + Excess Fixed Fee + Pick&Pack + Return Shipping) / Desired Selling Price
+        double codbWithGtPct = calcBaseAsp > 0
+            ? ((gt + commission + fixedFee + excessFixedFee + pickAndPack + returnShipping) / calcBaseAsp) * 100.0
+            : 0.0;
+        double mrp = product.getMrp() != null ? safeDouble(product.getMrp(), "mrp") : calcBaseAsp;
+        // Sheet formula: (MRP - Desired Selling Price) / MRP
+        double finalDiscountPct = mrp > 0 ? ((mrp - calcBaseAsp) / mrp) * 100.0 : 0.0;
+
+        // Backward-compatible fields for existing consumers.
+        double shipping = pickAndPack + returnShipping;
         double netRealisation = netSellerAsp - commission - shipping - marketing;
-
-        // Profit: net realisation minus cost, then adjust by GST difference
-        double profit    = netRealisation - productCost + gstDifference;
-        double profitPct = netSellerAsp > 0 ? (profit / netSellerAsp) * 100 : 0;
+        double gstDifference = excessGst;
 
         return PricingResponse.of(
                 product.getId(), product.getName(), product.getSkuCode(), productCost,
                 marketplace.getId(), marketplace.getName(),
-                sellingPrice, commission, shipping, marketing,
-                outputGst, inputGst, gstDifference,
+            desiredSellingPrice, commission, shipping, marketing,
+                outputGst, resolvedInputGst, gstDifference,
                 netSellerAsp, netRealisation, profit, profitPct
-        );
+        )
+            .withSheetBreakdown(
+                mrp,
+                sellerPrice,
+                gt,
+                desiredSellingPrice,
+                commissionPct,
+                commission,
+                fixedFee,
+                excessFixedFee,
+                pickAndPack,
+                returnShipping,
+                excessGst,
+                nr,
+                finalSettlement,
+                codbWithGtPct,
+                finalDiscountPct
+            );
     }
 
     // ── Mode: PROFIT_PERCENT ─────────────────────────────────────────────────
@@ -440,16 +502,21 @@ public class PricingEngine {
      * Falls back to the slab with the highest upper bound when no range matches.
      * P → base × rate / 100, A → fixed amount.
      */
-    private double extractCost(List<MarketplaceCostDto> costs, String category, double base) {
-        List<MarketplaceCostDto> catCosts = costs.stream()
-                .filter(c -> category.equalsIgnoreCase(c.getCostCategory()))
-                .collect(Collectors.toList());
+    private double extractCost(List<MarketplaceCostDto> costs, String category, double base, Long productCategoryId) {
+        List<MarketplaceCostDto> catCosts = getScopedCostsForCategory(costs, category, productCategoryId);
         if (catCosts.isEmpty()) return 0.0;
 
         // Prefer the slab whose range contains the selling price
         java.util.Optional<MarketplaceCostDto> matched = catCosts.stream()
                 .filter(c -> isInRange(c.getCostProductRange(), base))
                 .findFirst();
+
+        if (!matched.isPresent()) {
+            // Flat entries apply for all ASPs within the scoped category set.
+            matched = catCosts.stream()
+                    .filter(c -> isFlatRange(c.getCostProductRange()))
+                    .findFirst();
+        }
 
         if (!matched.isPresent()) {
             // Fallback: pick the slab whose upper-bound is highest (handles SP above all defined ranges)
@@ -461,9 +528,85 @@ public class PricingEngine {
         }
 
         return matched.map(c -> {
-            double rate = c.getCostValue() != null ? c.getCostValue() : 0;
+            double rate = c.getCostValue() != null ? c.getCostValue().doubleValue() : 0.0;
             return "P".equalsIgnoreCase(c.getCostValueType()) ? base * rate / 100.0 : rate;
         }).orElse(0.0);
+    }
+
+    private double extractCostFirst(List<MarketplaceCostDto> costs, double base, Long productCategoryId, String... categories) {
+        for (String category : categories) {
+            List<MarketplaceCostDto> catCosts = getScopedCostsForCategory(costs, category, productCategoryId);
+            if (!catCosts.isEmpty()) {
+                return extractCost(costs, category, base, productCategoryId);
+            }
+        }
+        return 0.0;
+    }
+
+    private double extractPercentFirst(List<MarketplaceCostDto> costs, double base, Long productCategoryId, String... categories) {
+        for (String category : categories) {
+            List<MarketplaceCostDto> catCosts = getScopedCostsForCategory(costs, category, productCategoryId);
+            if (catCosts.isEmpty()) continue;
+
+            java.util.Optional<MarketplaceCostDto> matched = catCosts.stream()
+                    .filter(c -> isInRange(c.getCostProductRange(), base))
+                    .findFirst();
+
+            if (!matched.isPresent()) {
+                matched = catCosts.stream()
+                        .filter(c -> isFlatRange(c.getCostProductRange()))
+                        .findFirst();
+            }
+
+            if (!matched.isPresent()) {
+                matched = catCosts.stream()
+                        .max(Comparator.comparingDouble(c -> {
+                            double[] b = parseRangeBounds(c.getCostProductRange());
+                            return b != null ? b[1] : (c.getId() != null ? c.getId().doubleValue() : 0.0);
+                        }));
+            }
+
+            if (matched.isPresent()
+                    && "P".equalsIgnoreCase(matched.get().getCostValueType())
+                    && matched.get().getCostValue() != null) {
+                return matched.get().getCostValue();
+            }
+            return 0.0;
+        }
+        return 0.0;
+    }
+
+    private List<MarketplaceCostDto> getScopedCostsForCategory(List<MarketplaceCostDto> costs,
+                                                               String category,
+                                                               Long productCategoryId) {
+        List<MarketplaceCostDto> byCategory = costs.stream()
+                .filter(c -> category.equalsIgnoreCase(c.getCostCategory()))
+                .collect(Collectors.toList());
+        if (byCategory.isEmpty()) return byCategory;
+
+        if (productCategoryId == null) {
+            return byCategory;
+        }
+
+        List<MarketplaceCostDto> categoryScoped = byCategory.stream()
+                .filter(c -> c.getCategoryId() != null && productCategoryId.equals(c.getCategoryId()))
+                .collect(Collectors.toList());
+        if (!categoryScoped.isEmpty()) {
+            return categoryScoped;
+        }
+
+        List<MarketplaceCostDto> globalScoped = byCategory.stream()
+                .filter(c -> c.getCategoryId() == null)
+                .collect(Collectors.toList());
+        if (!globalScoped.isEmpty()) {
+            return globalScoped;
+        }
+
+        return byCategory;
+    }
+
+    private boolean isFlatRange(String range) {
+        return range == null || range.isBlank() || "flat".equalsIgnoreCase(range.trim());
     }
 
     /** Returns true if {@code value} falls within the {@code range} string (e.g. "0-300"). */

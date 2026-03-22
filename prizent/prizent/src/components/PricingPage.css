@@ -71,17 +71,9 @@
 
 .pricing-grid-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
   margin-bottom: 22px;
-}
-
-.pricing-grid-row.three-fields {
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-}
-
-.pricing-grid-row.has-second-category {
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
 }
 
 .pricing-field {
@@ -135,11 +127,18 @@
 }
 
 .pricing-actions-row {
-  display: grid;
-  grid-template-columns: 190px 190px 1fr;
+  display: flex;
+  justify-content: space-between;
   gap: 14px;
+  flex-wrap: wrap;
   align-items: center;
   margin-bottom: 18px;
+}
+
+.pricing-secondary-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .pricing-calculate-wrap {
@@ -266,12 +265,7 @@
     grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 
-  .pricing-actions-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .pricing-calculate-wrap {
-    grid-column: 1 / -1;
     justify-content: flex-start;
   }
 }
@@ -281,9 +275,18 @@
     padding: 20px 14px 28px;
   }
 
-  .pricing-grid-row,
-  .pricing-actions-row {
+  .pricing-grid-row {
     grid-template-columns: 1fr;
+  }
+
+  .pricing-actions-row,
+  .pricing-secondary-actions {
+    width: 100%;
+  }
+
+  .pricing-secondary-actions .pricing-btn,
+  .pricing-calculate-wrap .pricing-btn {
+    width: 100%;
   }
 
   .pricing-checklist label {

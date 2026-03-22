@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import './PricingPage.css';
-import marketplaceService, { Marketplace, MarketplaceCost } from '../services/marketplaceService';
+import marketplaceService, { Marketplace } from '../services/marketplaceService';
 import productService, { Product } from '../services/productService';
 import categoryService, { Category } from '../services/categoryService';
 import brandService, { Brand } from '../services/brandService';
@@ -12,6 +13,16 @@ type UploadRow = {
   product: Product;
   asp: number;
   inputGst: number;
+};
+
+type SheetRow = Record<string, unknown>;
+
+type DownloadWorkbookOptions = {
+  sheetName?: string;
+  orangeColumns?: string[];
+  includeInstructions?: boolean;
+  instructionsTitle?: string;
+  instructions?: string[];
 };
 
 type OutputRow = {
@@ -26,6 +37,9 @@ type OutputRow = {
   baseProfit: number;
   finalProfit: number;
   finalProfitPercentage: number;
+  finalSettlement: number;
+  codbWithGtPercentage: number;
+  finalDiscountPercentage: number;
   status: 'success' | 'error';
   message: string;
 };
@@ -44,11 +58,9 @@ const PricingPage: React.FC = () => {
 
   const [selectedMarketplaceId, setSelectedMarketplaceId] = useState('');
   const [selectedBrandId, setSelectedBrandId] = useState('');
-  const [selectedFirstCategoryId, setSelectedFirstCategoryId] = useState('');
-  const [selectedSecondCategoryId, setSelectedSecondCategoryId] = useState('');
+  const [selectedCategoryPath, setSelectedCategoryPath] = useState<number[]>([]);
   const [brandMarketplaceIds, setBrandMarketplaceIds] = useState<Set<number> | null>(null);
-
-  const [selectedMarketplaceCosts, setSelectedMarketplaceCosts] = useState<MarketplaceCost[]>([]);
+  const [marketplaceBrandIds, setMarketplaceBrandIds] = useState<Set<number> | null>(null);
 
   const [calculateReverseFixedFee, setCalculateReverseFixedFee] = useState(true);
   const [calculatePickAndPack, setCalculatePickAndPack] = useState(true);
@@ -86,16 +98,29 @@ const PricingPage: React.FC = () => {
     loadData();
   }, []);
 
-  const parentCategories = useMemo(
-    () => categories.filter(c => c.parentCategoryId === null),
-    [categories]
-  );
+  const parentById = useMemo(() => {
+    const map = new Map<number, number | null>();
+    categories.forEach((c) => map.set(c.id, c.parentCategoryId));
+    return map;
+  }, [categories]);
 
-  const secondCategories = useMemo(() => {
-    if (!selectedFirstCategoryId) return [];
-    const parentId = Number(selectedFirstCategoryId);
-    return categories.filter(c => c.parentCategoryId === parentId);
-  }, [categories, selectedFirstCategoryId]);
+  const categoryLevels = useMemo(() => {
+    const levels: Category[][] = [];
+    let parentId: number | null = null;
+
+    while (true) {
+      const options = categories.filter(c => c.parentCategoryId === parentId);
+      if (!options.length) break;
+
+      levels.push(options);
+      const selectedAtLevel = selectedCategoryPath[levels.length - 1];
+      if (!selectedAtLevel) break;
+
+      parentId = selectedAtLevel;
+    }
+
+    return levels;
+  }, [categories, selectedCategoryPath]);
 
   const displayedMarketplaces = useMemo(() => {
     if (!brandMarketplaceIds) {
@@ -107,21 +132,49 @@ const PricingPage: React.FC = () => {
     return filtered.length > 0 ? filtered : marketplaces;
   }, [marketplaces, brandMarketplaceIds]);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const brandOk = selectedBrandId ? product.brandId === Number(selectedBrandId) : true;
-      const secondCategoryOk = selectedSecondCategoryId ? product.categoryId === Number(selectedSecondCategoryId) : true;
+  const displayedBrands = useMemo(() => {
+    if (!selectedMarketplaceId || !marketplaceBrandIds) {
+      return brands;
+    }
 
-      let firstCategoryOk = true;
-      if (selectedFirstCategoryId) {
-        const firstId = Number(selectedFirstCategoryId);
-        const category = categories.find(c => c.id === product.categoryId);
-        firstCategoryOk = !!category && (category.id === firstId || category.parentCategoryId === firstId);
+    const filtered = brands.filter((b) => marketplaceBrandIds.has(b.id));
+    return filtered;
+  }, [brands, selectedMarketplaceId, marketplaceBrandIds]);
+
+  const filteredProducts = useMemo(() => {
+    const selectedCategoryId = selectedCategoryPath.length
+      ? selectedCategoryPath[selectedCategoryPath.length - 1]
+      : null;
+
+    const isInSelectedCategoryBranch = (productCategoryId: number): boolean => {
+      if (!selectedCategoryId) return true;
+
+      let currentId: number | null = productCategoryId;
+      while (currentId !== null) {
+        if (currentId === selectedCategoryId) return true;
+        currentId = parentById.get(currentId) ?? null;
       }
 
-      return brandOk && firstCategoryOk && secondCategoryOk;
+      return false;
+    };
+
+    return products.filter((product) => {
+      const brandOk = selectedBrandId ? product.brandId === Number(selectedBrandId) : true;
+      const categoryOk = isInSelectedCategoryBranch(product.categoryId);
+
+      return brandOk && categoryOk;
     });
-  }, [products, categories, selectedBrandId, selectedFirstCategoryId, selectedSecondCategoryId]);
+  }, [products, selectedBrandId, selectedCategoryPath, parentById]);
+
+  const handleCategoryLevelChange = (levelIndex: number, value: string) => {
+    const trimmedPath = selectedCategoryPath.slice(0, levelIndex);
+    const nextPath = value ? [...trimmedPath, Number(value)] : trimmedPath;
+
+    setSelectedCategoryPath(nextPath);
+    setUploadedRows([]);
+    setUploadErrors([]);
+    setOutputRows([]);
+  };
 
   const brandNameMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -135,34 +188,8 @@ const PricingPage: React.FC = () => {
     return map;
   }, [categories]);
 
-  const fetchMarketplaceCosts = async (marketplaceId: number, brandId?: number) => {
-    try {
-      let costs: MarketplaceCost[] = [];
-
-      if (brandId) {
-        const bmRes = await marketplaceService.getBrandMappings(marketplaceId);
-        const brandMapping = bmRes.mappings?.find((m: any) => m.brandId === brandId);
-        if (brandMapping?.costs?.length) {
-          costs = brandMapping.costs as MarketplaceCost[];
-        }
-      }
-
-      if (!costs.length) {
-        const mpRes = await marketplaceService.getMarketplaceCosts(marketplaceId);
-        costs = (mpRes.costs ?? mpRes.marketplace?.costs ?? []) as MarketplaceCost[];
-      }
-
-      setSelectedMarketplaceCosts(costs);
-    } catch (e) {
-      console.error(e);
-      setSelectedMarketplaceCosts([]);
-    }
-  };
-
   const handleBrandChange = async (value: string) => {
     setSelectedBrandId(value);
-    setSelectedMarketplaceId('');
-    setSelectedMarketplaceCosts([]);
     setUploadedRows([]);
     setUploadErrors([]);
     setOutputRows([]);
@@ -193,6 +220,22 @@ const PricingPage: React.FC = () => {
     }
   };
 
+  const getMappedBrandIdsFromProducts = async (marketplaceId: number): Promise<Set<number>> => {
+    const checks = await Promise.all(
+      products.map(async (product) => {
+        try {
+          const mappings = await productService.getMarketplaceMappings(product.id);
+          const isMapped = mappings.some((m) => m.marketplaceId === marketplaceId);
+          return isMapped ? product.brandId : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return new Set(checks.filter((id): id is number => id !== null));
+  };
+
   const handleMarketplaceChange = async (value: string) => {
     setSelectedMarketplaceId(value);
     setUploadedRows([]);
@@ -200,79 +243,272 @@ const PricingPage: React.FC = () => {
     setOutputRows([]);
 
     if (!value) {
-      setSelectedMarketplaceCosts([]);
+      setMarketplaceBrandIds(null);
       return;
     }
 
-    await fetchMarketplaceCosts(Number(value), selectedBrandId ? Number(selectedBrandId) : undefined);
+    try {
+      const res = await marketplaceService.getBrandMappings(Number(value));
+      let ids = new Set((res.mappings ?? []).map((m) => m.brandId));
+
+      // If no explicit brand mappings exist at marketplace level,
+      // derive mapped brands from product-marketplace mappings.
+      if (!ids.size) {
+        ids = await getMappedBrandIdsFromProducts(Number(value));
+      }
+
+      setMarketplaceBrandIds(ids.size > 0 ? ids : new Set<number>());
+
+      if (selectedBrandId && !ids.has(Number(selectedBrandId))) {
+        setSelectedBrandId('');
+        setBrandMarketplaceIds(null);
+      }
+    } catch {
+      setMarketplaceBrandIds(new Set<number>());
+      setSelectedBrandId('');
+      setBrandMarketplaceIds(null);
+    }
   };
 
-  const parseRangeBounds = (range: string | undefined): [number, number] | null => {
-    if (!range) return null;
-    const normalized = range.replace('gt:', '').replace('kg', '');
-    if (normalized.toLowerCase() === 'flat') return null;
+  const downloadWorkbook = async (
+    rows: Record<string, string | number>[],
+    fileName: string,
+    options?: DownloadWorkbookOptions
+  ) => {
+    if (!rows.length) return;
 
-    const dashIndex = normalized.indexOf('-', 1);
-    if (dashIndex < 0) return null;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Prizent';
+    workbook.created = new Date();
 
-    const from = parseFloat(normalized.substring(0, dashIndex).trim());
-    const to = parseFloat(normalized.substring(dashIndex + 1).trim());
-    if (Number.isNaN(from) || Number.isNaN(to)) return null;
-
-    return [from, to];
-  };
-
-  const getCostAmount = (cost: MarketplaceCost, asp: number) =>
-    cost.costValueType === 'P' ? (asp * cost.costValue) / 100 : cost.costValue;
-
-  const getMatchedCostSum = (categoriesToInclude: string[], asp: number): number => {
-    const relevant = selectedMarketplaceCosts.filter(c => categoriesToInclude.includes(c.costCategory));
-    if (!relevant.length) return 0;
-
-    const matched = relevant.filter((cost) => {
-      const bounds = parseRangeBounds(cost.costProductRange);
-      if (!bounds) return (cost.costProductRange ?? '').toLowerCase() === 'flat';
-      return asp >= bounds[0] && asp <= bounds[1];
+    const worksheet = workbook.addWorksheet(options?.sheetName ?? 'Pricing', {
+      views: [{ state: 'frozen', ySplit: 1 }],
     });
 
-    const picked = matched.length ? matched : relevant.filter(c => (c.costProductRange ?? '').toLowerCase() === 'flat');
-    return picked.reduce((acc, cost) => acc + getCostAmount(cost, asp), 0);
+    const columns = Object.keys(rows[0]);
+    worksheet.columns = columns.map((header) => ({
+      header,
+      key: header,
+      width: Math.max(14, Math.min(40, header.length + 6)),
+    }));
+
+    const orangeColumns = new Set(options?.orangeColumns ?? []);
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 26;
+    headerRow.eachCell((cell, colNumber) => {
+      const header = columns[colNumber - 1];
+      cell.font = {
+        bold: true,
+        color: { argb: 'FFFFFFFF' },
+        name: 'Calibri',
+        size: 11,
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: {
+          argb: orangeColumns.has(header) ? 'FFFFA500' : 'FF1F4E78',
+        },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF4B5563' } },
+        left: { style: 'thin', color: { argb: 'FF4B5563' } },
+        bottom: { style: 'thin', color: { argb: 'FF4B5563' } },
+        right: { style: 'thin', color: { argb: 'FF4B5563' } },
+      };
+    });
+
+    const numericCurrencyColumns = new Set([
+      'Product Cost',
+      'MRP',
+      'ASP',
+      'Input GST',
+      'Profit in Rs',
+      'Base Profit',
+      'Final Settlement',
+      'Excess Fixed Fee',
+      'Pick and Pack',
+    ]);
+
+    const numericPercentColumns = new Set([
+      'Profit in %',
+      'Profit %',
+      'CODB with GT %',
+      'Final Disc %',
+    ]);
+
+    rows.forEach((rowData, index) => {
+      const row = worksheet.addRow(rowData);
+      row.height = 22;
+
+      row.eachCell((cell, colNumber) => {
+        const header = columns[colNumber - 1];
+        const evenRow = index % 2 === 0;
+
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: evenRow ? 'FFF9FAFB' : 'FFFFFFFF' },
+        };
+
+        cell.font = {
+          name: 'Calibri',
+          size: 10,
+          color: { argb: 'FF111827' },
+        };
+
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        };
+
+        if (numericCurrencyColumns.has(header)) {
+          cell.numFmt = '#,##0.00';
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        } else if (numericPercentColumns.has(header)) {
+          cell.numFmt = '0.00';
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        } else {
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        }
+      });
+    });
+
+    worksheet.columns.forEach((column, i) => {
+      const header = columns[i];
+      let maxLength = header.length;
+      column.eachCell?.({ includeEmpty: true }, (cell) => {
+        const cellLength = String(cell.value ?? '').length;
+        if (cellLength > maxLength) maxLength = cellLength;
+      });
+      column.width = Math.max(14, Math.min(42, maxLength + 3));
+    });
+
+    if (options?.includeInstructions) {
+      const infoSheet = workbook.addWorksheet('Instructions');
+      const title = options.instructionsTitle ?? '=== Pricing Import Instructions ===';
+      const lines = options.instructions ?? [
+        'Fill data in the Products sheet starting from row 2.',
+        'Orange headers are required fields.',
+        'Required: Product ID OR SKU Code, ASP.',
+        'Optional: Input GST, Profit in %, Profit in Rs.',
+        'Do not change header names.',
+      ];
+
+      infoSheet.getCell('A1').value = title;
+      infoSheet.getCell('A1').font = { bold: true, size: 12, color: { argb: 'FF1F4E78' } };
+
+      lines.forEach((line, idx) => {
+        infoSheet.getCell(`A${idx + 2}`).value = line;
+      });
+
+      infoSheet.getColumn(1).width = 80;
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const downloadWorkbook = (rows: Record<string, string | number>[], fileName: string) => {
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pricing');
-    XLSX.writeFile(workbook, fileName);
-  };
-
-  const handleDownloadSample = () => {
+  const handleDownloadSample = async () => {
     const marketplaceName = selectedMarketplaceId
       ? (displayedMarketplaces.find(m => m.id === Number(selectedMarketplaceId))?.name ?? '')
       : '';
 
-    const rows = filteredProducts.map((product) => ({
-      'Product ID': product.id,
-      'SKU Code': product.skuCode,
-      'Product Name': product.name,
-      'Marketplace': marketplaceName,
-      'Brand': brandNameMap.get(product.brandId) ?? '',
-      '1st List Category': (() => {
-        const cat = categories.find(c => c.id === product.categoryId);
-        if (!cat) return '';
-        if (cat.parentCategoryId === null) return cat.name;
-        return categoryNameMap.get(cat.parentCategoryId) ?? '';
-      })(),
-      '2nd List Category': categoryNameMap.get(product.categoryId) ?? '',
-      'Product Cost': product.productCost,
-      'MRP': product.mrp,
-      'ASP': '',
-      'Input GST': '',
-      'Profit in Rs': '',
-    }));
+    let sampleProducts = filteredProducts;
 
-    downloadWorkbook(rows, 'pricing-sample.xlsx');
-    setPageMessage(`Sample downloaded with ${rows.length} products.`);
+    if (selectedMarketplaceId) {
+      const marketplaceId = Number(selectedMarketplaceId);
+      const mappingChecks = await Promise.all(
+        filteredProducts.map(async (product) => {
+          try {
+            const mappings = await productService.getMarketplaceMappings(product.id);
+            const isMapped = mappings.some((m) => m.marketplaceId === marketplaceId);
+            return { product, isMapped };
+          } catch {
+            return { product, isMapped: false };
+          }
+        })
+      );
+
+      sampleProducts = mappingChecks.filter((x) => x.isMapped).map((x) => x.product);
+    }
+
+    const rows: Record<string, string | number>[] = sampleProducts.map((product) => {
+      const pathNames: string[] = [];
+      let current = categories.find(c => c.id === product.categoryId) ?? null;
+      while (current) {
+        pathNames.unshift(current.name);
+        if (current.parentCategoryId === null) break;
+        current = categories.find(c => c.id === current!.parentCategoryId) ?? null;
+      }
+
+      const category = pathNames[0] ?? '';
+      const subCategory = pathNames.length > 1 ? pathNames.slice(1).join(' > ') : '';
+
+      return {
+        'Product ID': product.id,
+        'SKU Code': product.skuCode,
+        'Product Name': product.name,
+        'Marketplace': marketplaceName,
+        'Brand': brandNameMap.get(product.brandId) ?? '',
+        'Category': category,
+        'Sub Category': subCategory,
+        'Product Cost': product.productCost,
+        'MRP': product.mrp,
+        'ASP': '',
+        'Profit in %': '',
+        'Profit in Rs': '',
+      };
+    });
+
+    if (!rows.length) {
+      rows.push({
+        'Product ID': '',
+        'SKU Code': '',
+        'Product Name': '',
+        'Marketplace': marketplaceName,
+        'Brand': '',
+        'Category': '',
+        'Sub Category': '',
+        'Product Cost': '',
+        'MRP': '',
+        'ASP': '',
+        'Profit in %': '',
+        'Profit in Rs': '',
+      });
+      setPageMessage('No mapped products found for current selection. Downloaded a template with headers.');
+    } else {
+      setPageMessage(`Sample downloaded with ${rows.length} products.`);
+    }
+
+    await downloadWorkbook(rows, 'pricing-sample.xlsx', {
+      sheetName: 'Products',
+      orangeColumns: ['ASP', 'Profit in %', 'Profit in Rs'],
+      includeInstructions: true,
+      instructionsTitle: '=== Pricing Import Instructions ===',
+      instructions: [
+        'Fill pricing data in the Products sheet.',
+        'Orange headers are required fields.',
+        'Required: Product ID or SKU Code, ASP.',
+        'Optional: Profit in %, Profit in Rs.',
+        'Use values only; do not rename headers.',
+      ],
+    });
   };
 
   const handleUploadClick = () => {
@@ -286,7 +522,7 @@ const PricingPage: React.FC = () => {
     return n;
   };
 
-  const getProductFromRow = (row: Record<string, any>) => {
+  const getProductFromRow = (row: SheetRow) => {
     const byIdRaw = row['Product ID'];
     if (byIdRaw !== undefined && byIdRaw !== null && byIdRaw !== '') {
       const id = Number(byIdRaw);
@@ -315,12 +551,12 @@ const PricingPage: React.FC = () => {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(firstSheet, { defval: '' });
+      const rows = XLSX.utils.sheet_to_json<SheetRow>(firstSheet, { defval: '' });
 
       const errors: string[] = [];
       const parsed: UploadRow[] = [];
 
-      rows.forEach((row, index) => {
+      rows.forEach((row: SheetRow, index: number) => {
         const rowNumber = index + 2;
         const product = getProductFromRow(row);
         if (!product) {
@@ -378,33 +614,29 @@ const PricingPage: React.FC = () => {
             marketplaceId,
             mode: 'SELLING_PRICE',
             value: row.asp,
-            inputGst: calculateInputGst ? row.inputGst : 0,
+            inputGst: calculateInputGst ? 0 : row.inputGst,
           });
 
-          const reverseFixedFee = calculateReverseFixedFee
-            ? getMatchedCostSum(['FIXED_FEE', 'REVERSE_SHIPPING'], row.asp)
-            : 0;
-
-          const pickAndPack = calculatePickAndPack
-            ? getMatchedCostSum(['PICK_AND_PACK'], row.asp)
-            : 0;
-
-          const finalProfit = result.profit - reverseFixedFee - pickAndPack;
-          const denominator = result.sellingPrice > 0 ? result.sellingPrice : 1;
-          const finalProfitPercentage = (finalProfit / denominator) * 100;
+          const reverseFixedFee = calculateReverseFixedFee ? (result.excessFixedFee ?? 0) : 0;
+          const pickAndPack = calculatePickAndPack ? (result.pickAndPackFee ?? 0) : 0;
+          const finalProfit = result.profit;
+          const finalProfitPercentage = result.profitPercentage;
 
           computed.push({
             rowNumber: row.rowNumber,
             productId: row.product.id,
             skuCode: row.product.skuCode,
             productName: row.product.name,
-            asp: row.asp,
-            inputGst: calculateInputGst ? row.inputGst : 0,
+            asp: result.desiredSellingPrice ?? result.sellingPrice,
+            inputGst: result.inputGst,
             reverseFixedFee,
             pickAndPack,
             baseProfit: result.profit,
             finalProfit,
             finalProfitPercentage,
+            finalSettlement: result.finalSettlement ?? 0,
+            codbWithGtPercentage: result.codbWithGtPercentage ?? 0,
+            finalDiscountPercentage: result.finalDiscountPercentage ?? 0,
             status: 'success',
             message: 'Calculated',
           });
@@ -421,6 +653,9 @@ const PricingPage: React.FC = () => {
             baseProfit: 0,
             finalProfit: 0,
             finalProfitPercentage: 0,
+            finalSettlement: 0,
+            codbWithGtPercentage: 0,
+            finalDiscountPercentage: 0,
             status: 'error',
             message: e?.response?.data?.message ?? e?.message ?? 'Calculation failed',
           });
@@ -436,16 +671,21 @@ const PricingPage: React.FC = () => {
         'Product Name': r.productName,
         'ASP': r.asp,
         'Input GST': r.inputGst,
-        'Reverse Fixed Fee': Number(r.reverseFixedFee.toFixed(2)),
+        'Excess Fixed Fee': Number(r.reverseFixedFee.toFixed(2)),
         'Pick and Pack': Number(r.pickAndPack.toFixed(2)),
         'Base Profit': Number(r.baseProfit.toFixed(2)),
         'Profit in Rs': Number(r.finalProfit.toFixed(2)),
         'Profit %': Number(r.finalProfitPercentage.toFixed(2)),
+        'Final Settlement': Number(r.finalSettlement.toFixed(2)),
+        'CODB with GT %': Number(r.codbWithGtPercentage.toFixed(2)),
+        'Final Disc %': Number(r.finalDiscountPercentage.toFixed(2)),
         'Status': r.status,
         'Message': r.message,
       }));
 
-      downloadWorkbook(exportRows, 'pricing-calculation-result.xlsx');
+      await downloadWorkbook(exportRows, 'pricing-calculation-result.xlsx', {
+        sheetName: 'Pricing Result',
+      });
       setPageMessage(`Calculation completed for ${computed.length} rows. Result file downloaded.`);
     } finally {
       setProcessing(false);
@@ -475,10 +715,10 @@ const PricingPage: React.FC = () => {
         {pageMessage && <div className="pricing-alert pricing-alert-info">{pageMessage}</div>}
 
         <section className="pricing-block">
-          <div className={`pricing-grid-row ${selectedFirstCategoryId ? 'has-second-category' : 'three-fields'}`}>
+          <div className="pricing-grid-row">
             <div className="pricing-field">
               <label>Marketplace</label>
-              <select value={selectedMarketplaceId} onChange={(e) => handleMarketplaceChange(e.target.value)}>
+              <select value={selectedMarketplaceId} onChange={(e) => void handleMarketplaceChange(e.target.value)}>
                 <option value="">Select Marketplace</option>
                 {displayedMarketplaces.map(m => (
                   <option key={m.id} value={m.id}>{m.enabled ? m.name : `${m.name} (Inactive)`}</option>
@@ -490,50 +730,32 @@ const PricingPage: React.FC = () => {
               <label>Brand</label>
               <select value={selectedBrandId} onChange={(e) => void handleBrandChange(e.target.value)}>
                 <option value="">Select Brand</option>
-                {brands.map(b => (
+                {displayedBrands.map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
             </div>
 
-            <div className="pricing-field">
-              <label>1st List Category</label>
-              <select
-                value={selectedFirstCategoryId}
-                onChange={(e) => {
-                  setSelectedFirstCategoryId(e.target.value);
-                  setSelectedSecondCategoryId('');
-                  setUploadedRows([]);
-                  setUploadErrors([]);
-                  setOutputRows([]);
-                }}
-              >
-                <option value="">Select Category</option>
-                {parentCategories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+            {categoryLevels.map((levelCategories, levelIndex) => {
+              const selectedAtLevel = selectedCategoryPath[levelIndex];
+              const label = levelIndex === 0 ? 'Category' : 'Sub Category';
+              const placeholder = levelIndex === 0 ? 'Category' : 'Sub Category';
 
-            {selectedFirstCategoryId && (
-              <div className="pricing-field">
-                <label>2nd List Category</label>
-                <select
-                  value={selectedSecondCategoryId}
-                  onChange={(e) => {
-                    setSelectedSecondCategoryId(e.target.value);
-                    setUploadedRows([]);
-                    setUploadErrors([]);
-                    setOutputRows([]);
-                  }}
-                >
-                  <option value="">Select Category</option>
-                  {secondCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+              return (
+                <div className="pricing-field" key={`category-level-${levelIndex}`}>
+                  <label>{label}</label>
+                  <select
+                    value={selectedAtLevel ? String(selectedAtLevel) : ''}
+                    onChange={(e) => handleCategoryLevelChange(levelIndex, e.target.value)}
+                  >
+                    <option value="">{placeholder}</option>
+                    {levelCategories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
           </div>
 
           <div className="pricing-checklist">
@@ -543,7 +765,7 @@ const PricingPage: React.FC = () => {
                 checked={calculateReverseFixedFee}
                 onChange={(e) => setCalculateReverseFixedFee(e.target.checked)}
               />
-              <span>Calculate Reverse Fixed Fee</span>
+              <span>Calculate Excess Fixed Fee</span>
             </label>
             <label>
               <input
@@ -564,12 +786,14 @@ const PricingPage: React.FC = () => {
           </div>
 
           <div className="pricing-actions-row">
-            <button className="pricing-btn pricing-btn-secondary" onClick={handleDownloadSample}>
-              Download Sample
-            </button>
-            <button className="pricing-btn pricing-btn-secondary" onClick={handleUploadClick}>
-              Upload File
-            </button>
+            <div className="pricing-secondary-actions">
+              <button className="pricing-btn pricing-btn-secondary" onClick={handleDownloadSample}>
+                Download Sample
+              </button>
+              <button className="pricing-btn pricing-btn-secondary" onClick={handleUploadClick}>
+                Upload File
+              </button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -618,9 +842,12 @@ const PricingPage: React.FC = () => {
                     <th>SKU</th>
                     <th>ASP</th>
                     <th>Input GST</th>
-                    <th>Reverse Fixed Fee</th>
+                    <th>Excess Fixed Fee</th>
                     <th>Pick and Pack</th>
                     <th>Profit in Rs</th>
+                    <th>Final Settlement</th>
+                    <th>CODB with GT %</th>
+                    <th>Final Disc %</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -634,6 +861,9 @@ const PricingPage: React.FC = () => {
                       <td>{row.reverseFixedFee.toFixed(2)}</td>
                       <td>{row.pickAndPack.toFixed(2)}</td>
                       <td>{row.finalProfit.toFixed(2)}</td>
+                      <td>{row.finalSettlement.toFixed(2)}</td>
+                      <td>{row.codbWithGtPercentage.toFixed(2)}</td>
+                      <td>{row.finalDiscountPercentage.toFixed(2)}</td>
                       <td className={row.status === 'success' ? 'status-success' : 'status-error'}>{row.status}</td>
                     </tr>
                   ))}

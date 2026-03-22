@@ -22,6 +22,23 @@ public class PricingResponse {
     // Pricing breakdown
     private Double sellingPrice;
 
+    // Spreadsheet-style breakdown (new fields)
+    private Double mrp;
+    private Double sellerPrice;
+    private Double gt;
+    private Double desiredSellingPrice;
+    private Double commissionPercentage;
+    private Double commissionAmount;
+    private Double fixedFee;
+    private Double excessFixedFee;
+    private Double pickAndPackFee;
+    private Double returnShippingCost;
+    private Double excessGst;
+    private Double nr;
+    private Double finalSettlement;
+    private Double codbWithGtPercentage;
+    private Double finalDiscountPercentage;
+
     // Rebate fields (populated only when a rebate is requested)
     /** NET mode: original commission ₹ before rebate reduction */
     private Double commissionBeforeRebate;
@@ -84,6 +101,21 @@ public class PricingResponse {
     public Long   getMarketplaceId()   { return marketplaceId; }
     public String getMarketplaceName() { return marketplaceName; }
     public Double getSellingPrice()    { return sellingPrice; }
+    public Double getMrp()             { return mrp; }
+    public Double getSellerPrice()     { return sellerPrice; }
+    public Double getGt()              { return gt; }
+    public Double getDesiredSellingPrice() { return desiredSellingPrice; }
+    public Double getCommissionPercentage() { return commissionPercentage; }
+    public Double getCommissionAmount() { return commissionAmount; }
+    public Double getFixedFee()        { return fixedFee; }
+    public Double getExcessFixedFee()  { return excessFixedFee; }
+    public Double getPickAndPackFee()  { return pickAndPackFee; }
+    public Double getReturnShippingCost() { return returnShippingCost; }
+    public Double getExcessGst()       { return excessGst; }
+    public Double getNr()              { return nr; }
+    public Double getFinalSettlement() { return finalSettlement; }
+    public Double getCodbWithGtPercentage() { return codbWithGtPercentage; }
+    public Double getFinalDiscountPercentage() { return finalDiscountPercentage; }
     public Double getCommission()      { return commission; }
     public Double getShipping()        { return shipping; }
     public Double getMarketing()       { return marketing; }
@@ -101,4 +133,58 @@ public class PricingResponse {
 
     public Double getPendingRebateGross() { return pendingRebateGross; }
     public void   setPendingRebateGross(Double v) { this.pendingRebateGross = v; }
+
+    public void setMrp(Double mrp) { this.mrp = roundNullable(mrp); }
+    public void setSellerPrice(Double sellerPrice) { this.sellerPrice = roundNullable(sellerPrice); }
+    public void setGt(Double gt) { this.gt = roundNullable(gt); }
+    public void setDesiredSellingPrice(Double desiredSellingPrice) { this.desiredSellingPrice = roundNullable(desiredSellingPrice); }
+    public void setCommissionPercentage(Double commissionPercentage) { this.commissionPercentage = roundNullable(commissionPercentage); }
+    public void setCommissionAmount(Double commissionAmount) { this.commissionAmount = roundNullable(commissionAmount); }
+    public void setFixedFee(Double fixedFee) { this.fixedFee = roundNullable(fixedFee); }
+    public void setExcessFixedFee(Double excessFixedFee) { this.excessFixedFee = roundNullable(excessFixedFee); }
+    public void setPickAndPackFee(Double pickAndPackFee) { this.pickAndPackFee = roundNullable(pickAndPackFee); }
+    public void setReturnShippingCost(Double returnShippingCost) { this.returnShippingCost = roundNullable(returnShippingCost); }
+    public void setExcessGst(Double excessGst) { this.excessGst = roundNullable(excessGst); }
+    public void setNr(Double nr) { this.nr = roundNullable(nr); }
+    public void setFinalSettlement(Double finalSettlement) { this.finalSettlement = roundNullable(finalSettlement); }
+    public void setCodbWithGtPercentage(Double codbWithGtPercentage) { this.codbWithGtPercentage = roundNullable(codbWithGtPercentage); }
+    public void setFinalDiscountPercentage(Double finalDiscountPercentage) { this.finalDiscountPercentage = roundNullable(finalDiscountPercentage); }
+
+    public PricingResponse withSheetBreakdown(
+            Double mrp,
+            Double sellerPrice,
+            Double gt,
+            Double desiredSellingPrice,
+            Double commissionPercentage,
+            Double commissionAmount,
+            Double fixedFee,
+            Double excessFixedFee,
+            Double pickAndPackFee,
+            Double returnShippingCost,
+            Double excessGst,
+            Double nr,
+            Double finalSettlement,
+            Double codbWithGtPercentage,
+            Double finalDiscountPercentage) {
+        setMrp(mrp);
+        setSellerPrice(sellerPrice);
+        setGt(gt);
+        setDesiredSellingPrice(desiredSellingPrice);
+        setCommissionPercentage(commissionPercentage);
+        setCommissionAmount(commissionAmount);
+        setFixedFee(fixedFee);
+        setExcessFixedFee(excessFixedFee);
+        setPickAndPackFee(pickAndPackFee);
+        setReturnShippingCost(returnShippingCost);
+        setExcessGst(excessGst);
+        setNr(nr);
+        setFinalSettlement(finalSettlement);
+        setCodbWithGtPercentage(codbWithGtPercentage);
+        setFinalDiscountPercentage(finalDiscountPercentage);
+        return this;
+    }
+
+    private static Double roundNullable(Double v) {
+        return v == null ? null : round(v);
+    }
 }

@@ -18,6 +18,7 @@ public class ProductDto {
     private String currentType;  // "T", "A", "N"
     private Boolean enabled;
     private Long brandId;
+    private Long categoryId;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -45,4 +46,7 @@ public class ProductDto {
 
     public Long getBrandId() { return brandId; }
     public void setBrandId(Long brandId) { this.brandId = brandId; }
+
+    public Long getCategoryId() { return categoryId; }
+    public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
 }
