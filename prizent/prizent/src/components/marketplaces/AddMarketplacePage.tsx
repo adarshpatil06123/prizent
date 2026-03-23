@@ -333,6 +333,51 @@ const AddMarketplacePage: React.FC = () => {
       return { ...m, [slabKey]: (m[slabKey] as BrandSlab[]).map((s, i) => i === index ? { ...s, [field]: validated } : s) };
     }));
   };
+
+  const buildBrandMappingsPayload = () => {
+    return brandMappings
+      .filter(mapping => mapping.brandId && !Number.isNaN(parseInt(mapping.brandId, 10)))
+      .map(mapping => {
+        const toCosts = (costCategory: 'COMMISSION' | 'MARKETING' | 'SHIPPING', valueType: 'P' | 'A', slabs: BrandSlab[]) => {
+          return slabs
+            .map(slab => {
+              const from = parseFloat(slab.from);
+              const to = parseFloat(slab.to);
+              const value = parseFloat(slab.value);
+              if (!(to > from && value > 0)) return null;
+
+              const categoryPath = getSlabCategoryPath(slab);
+              const categoryId = categoryPath.length > 0
+                ? parseInt(categoryPath[categoryPath.length - 1], 10)
+                : slab.subCategoryId ? parseInt(slab.subCategoryId, 10)
+                : slab.categoryId ? parseInt(slab.categoryId, 10)
+                : slab.parentCategoryId ? parseInt(slab.parentCategoryId, 10)
+                : undefined;
+
+              return {
+                costCategory,
+                costValueType: valueType,
+                costValue: value,
+                costProductRange: `${slab.from}-${slab.to}`,
+                ...(categoryId !== undefined && { categoryId }),
+              };
+            })
+            .filter((cost): cost is NonNullable<typeof cost> => cost !== null);
+        };
+
+        const costs = [
+          ...toCosts('COMMISSION', mapping.commissionValueType, mapping.commissionSlabs),
+          ...toCosts('MARKETING', mapping.marketingValueType, mapping.marketingSlabs),
+          ...toCosts('SHIPPING', mapping.shippingValueType, mapping.shippingSlabs),
+        ];
+
+        return {
+          brandId: parseInt(mapping.brandId, 10),
+          costs,
+        };
+      })
+      .filter(mapping => mapping.costs.length > 0);
+  };
   // ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -854,6 +899,11 @@ const AddMarketplacePage: React.FC = () => {
       const response = await marketplaceService.createMarketplace(request);
       
       if (response.success) {
+        const mappingsPayload = buildBrandMappingsPayload();
+        if (response.marketplace?.id && mappingsPayload.length > 0) {
+          await marketplaceService.saveBrandMappings(response.marketplace.id, mappingsPayload);
+        }
+
         // Save custom field values
         if (Object.keys(customFieldValues).length > 0 && response.marketplace) {
           try {

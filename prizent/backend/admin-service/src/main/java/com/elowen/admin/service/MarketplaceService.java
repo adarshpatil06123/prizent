@@ -2,8 +2,10 @@ package com.elowen.admin.service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -117,7 +119,9 @@ public class MarketplaceService {
         marketplaceRepository.save(marketplace);
         
         if (request.getCosts() != null) {
-            marketplaceCostRepository.disableByClientIdAndMarketplaceId(clientId, id);
+            // Update API manages marketplace-level costs only.
+            // Brand-specific mappings are maintained via /brand-mappings endpoint.
+            marketplaceCostRepository.disableMarketplaceLevelCosts(clientId, id);
             
             if (!request.getCosts().isEmpty()) {
                 saveUpdateCostSlabs(id, clientId, userId, request.getCosts());
@@ -186,7 +190,7 @@ public class MarketplaceService {
 
     /**
      * Returns effective costs for a marketplace + brand:
-     * brand-specific costs if they exist, else marketplace-level defaults.
+     * brand-specific costs merged over marketplace-level defaults.
      * Used by the pricing-service engine to resolve the correct cost structure.
      */
     public List<MarketplaceResponse.CostResponse> getEffectiveCosts(Long marketplaceId, Long brandId) {
@@ -195,23 +199,111 @@ public class MarketplaceService {
         marketplaceRepository.findByIdAndClientId(marketplaceId, clientId)
             .orElseThrow(() -> new MarketplaceNotFoundException("Marketplace not found"));
 
-        // Use brand-specific costs if they exist for this (marketplace, brand) pair
-        if (brandId != null) {
-            List<MarketplaceCost> brandCosts = marketplaceCostRepository
-                .findByClientIdAndMarketplaceIdAndBrandIdAndEnabledTrue(clientId, marketplaceId, brandId);
-            if (!brandCosts.isEmpty()) {
-                return brandCosts.stream()
-                    .map(MarketplaceResponse.CostResponse::new)
-                    .collect(Collectors.toList());
+        List<MarketplaceCost> marketplaceCosts = marketplaceCostRepository
+            .findMarketplaceLevelCosts(clientId, marketplaceId);
+
+        List<MarketplaceCost> brandCosts = brandId != null
+            ? marketplaceCostRepository.findByClientIdAndMarketplaceIdAndBrandIdAndEnabledTrue(clientId, marketplaceId, brandId)
+            : List.of();
+
+        List<MarketplaceCost> effective = mergeEffectiveCosts(marketplaceCosts, brandCosts, marketplaceId, brandId);
+
+        validateGtShippingSlabs(effective, marketplaceId, brandId);
+
+        return effective.stream()
+            .map(MarketplaceResponse.CostResponse::new)
+            .collect(Collectors.toList());
+    }
+
+    private List<MarketplaceCost> mergeEffectiveCosts(List<MarketplaceCost> marketplaceCosts,
+                                                      List<MarketplaceCost> brandCosts,
+                                                      Long marketplaceId,
+                                                      Long brandId) {
+        LinkedHashMap<String, MarketplaceCost> merged = new LinkedHashMap<>();
+
+        for (MarketplaceCost cost : marketplaceCosts) {
+            merged.put(costMergeKey(cost), cost);
+        }
+
+        for (MarketplaceCost cost : brandCosts) {
+            merged.put(costMergeKey(cost), cost);
+        }
+
+        if (!brandCosts.isEmpty()) {
+            Set<String> brandKeys = brandCosts.stream().map(this::costMergeKey).collect(Collectors.toSet());
+            long fallbackCount = marketplaceCosts.stream()
+                .map(this::costMergeKey)
+                .filter(k -> !brandKeys.contains(k))
+                .count();
+            if (fallbackCount > 0) {
+                log.warn("Effective-costs fallback used: marketplaceId={}, brandId={}, fallbackSlabs={}", marketplaceId, brandId, fallbackCount);
+            }
+
+            List<MarketplaceCost> marketplaceGtShipping = marketplaceCosts.stream()
+                .filter(this::isGtShippingCost)
+                .collect(Collectors.toList());
+            List<MarketplaceCost> brandGtShipping = brandCosts.stream()
+                .filter(this::isGtShippingCost)
+                .collect(Collectors.toList());
+
+            if (!marketplaceGtShipping.isEmpty()) {
+                if (brandGtShipping.isEmpty()) {
+                    log.warn("Missing GT shipping slab for brandId={}, marketplaceId={}, using marketplace fallback", brandId, marketplaceId);
+                } else {
+                    Set<String> brandGtKeys = brandGtShipping.stream().map(this::costMergeKey).collect(Collectors.toSet());
+                    long gtFallbackCount = marketplaceGtShipping.stream()
+                        .map(this::costMergeKey)
+                        .filter(k -> !brandGtKeys.contains(k))
+                        .count();
+                    if (gtFallbackCount > 0) {
+                        log.warn("Partial GT shipping slab for brandId={}, marketplaceId={}, fallbackGtSlabs={}", brandId, marketplaceId, gtFallbackCount);
+                    }
+                }
             }
         }
 
-        // Fall back to marketplace-level costs
-        List<MarketplaceCost> costs = marketplaceCostRepository
-            .findMarketplaceLevelCosts(clientId, marketplaceId);
-        return costs.stream()
-            .map(MarketplaceResponse.CostResponse::new)
-            .collect(Collectors.toList());
+        return new ArrayList<>(merged.values());
+    }
+
+    private String costMergeKey(MarketplaceCost cost) {
+        String category = cost.getCostCategory() != null ? cost.getCostCategory().name() : "";
+        String range = cost.getCostProductRange() != null ? cost.getCostProductRange().trim().toLowerCase() : "";
+        String categoryId = cost.getCategoryId() != null ? String.valueOf(cost.getCategoryId()) : "*";
+        return category + "|" + range + "|" + categoryId;
+    }
+
+    private boolean isGtShippingCost(MarketplaceCost cost) {
+        return cost.getCostCategory() != null
+            && cost.getCostCategory().name().equals("SHIPPING")
+            && cost.getCostProductRange() != null
+            && cost.getCostProductRange().trim().toLowerCase().startsWith("gt:");
+    }
+
+    private void validateGtShippingSlabs(List<MarketplaceCost> costs, Long marketplaceId, Long brandId) {
+        for (MarketplaceCost cost : costs) {
+            if (!isGtShippingCost(cost)) continue;
+
+            String rawRange = cost.getCostProductRange().trim();
+            String range = rawRange.substring(3).trim();
+            int dashIdx = range.indexOf('-', 1);
+            if (dashIdx < 0) {
+                throw new IllegalStateException("Invalid GT shipping range '" + rawRange + "' for marketplaceId=" + marketplaceId + ", brandId=" + brandId);
+            }
+
+            try {
+                double from = Double.parseDouble(range.substring(0, dashIdx).trim());
+                double to = Double.parseDouble(range.substring(dashIdx + 1).trim());
+                if (to <= from) {
+                    throw new IllegalStateException("Invalid GT shipping range '" + rawRange + "' (to must be > from) for marketplaceId=" + marketplaceId + ", brandId=" + brandId);
+                }
+            } catch (NumberFormatException ex) {
+                throw new IllegalStateException("Invalid GT shipping range '" + rawRange + "' for marketplaceId=" + marketplaceId + ", brandId=" + brandId, ex);
+            }
+
+            if (cost.getCostValue() == null || cost.getCostValue().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalStateException("Invalid GT shipping value for range '" + rawRange + "' (must be > 0) for marketplaceId=" + marketplaceId + ", brandId=" + brandId);
+            }
+        }
     }
     
     @Transactional
@@ -312,7 +404,7 @@ public class MarketplaceService {
         MarketplaceResponse response = new MarketplaceResponse(marketplace);
         
         List<MarketplaceCost> costs = marketplaceCostRepository
-            .findMarketplaceLevelCosts(marketplace.getClientId(), marketplace.getId());
+            .findByClientIdAndMarketplaceIdAndEnabledTrue(marketplace.getClientId(), marketplace.getId());
         
         response.setCosts(costs.stream()
             .map(MarketplaceResponse.CostResponse::new)
